@@ -100,7 +100,7 @@ public static final  boolean horiScrollbar=true;
 //static final float mgdLmult= BuildConfig.DEBUG?18.0182f:18.0f;
 static final float mgdLmult=18.0f;
 //public static tk.glucodata.MessageSender messagesender=null;
-   static boolean Nativesloaded=false;
+public static boolean Nativesloaded=false;
 public static boolean hour24=true;
 static public final int TargetSDK=BuildConfig.targetSDK;
 static public final boolean isWearable= BuildConfig.isWear==1;

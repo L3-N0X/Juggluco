@@ -255,7 +255,11 @@ private void startdisplay() {
 
       lightBars(!getInvertColors( ));
       }
-    setContentView(curve);
+    if(!isWearable) {
+        tk.glucodata.ui.ComposeUiBridge.setupComposeUi(this);
+    } else {
+        setContentView(curve);
+    }
 
 if(!isWearable) {
     applyScreenOrientation(getResources().getConfiguration());
@@ -604,6 +608,10 @@ public boolean isHandlingConfigurationChange() {
     }
 public void applyScreenOrientation(Configuration config) {
 if(!isWearable) {
+    if(tk.glucodata.ui.ComposeUiBridge.isComposeUiActive) {
+        requestOrientationOnce(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        return;
+    }
     try {
     /*
     if(menuForcesLandscape) {
@@ -742,7 +750,7 @@ if(!isWearable) {
          return;
       startall();
       Natives.onCreate();
-     if(!isWearable&&Menus.on)
+     if(!isWearable && !tk.glucodata.ui.ComposeUiBridge.isComposeUiActive && Menus.on)
            Menus.show(this);
 
 //        var gestureListener= new Layout.ScrollListener(); mGestureDetector = new GestureDetector(this, gestureListener);
@@ -1343,6 +1351,9 @@ public void onConfigurationChanged(Configuration newConfig) {
 public void requestRender() {
     if(curve!=null)
         curve.requestRender();
+    if(tk.glucodata.ui.ComposeUiBridge.isComposeUiActive && tk.glucodata.ui.ComposeUiBridge.repository != null) {
+        tk.glucodata.ui.ComposeUiBridge.repository.refreshAll();
+    }
     }
 
 private void netinitstep() {
