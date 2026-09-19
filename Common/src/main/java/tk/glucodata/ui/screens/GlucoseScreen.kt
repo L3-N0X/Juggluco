@@ -92,6 +92,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,6 +124,25 @@ fun GlucoseScreen(
     // Sync viewport duration when time range pill changes from external controls
     LaunchedEffect(selectedRange) {
         viewportState.setDuration(selectedRange.durationMillis)
+    }
+
+    // Dynamic stats calculated for the currently visible graph period
+    val visibleStats = remember(readings, viewportState.startTimeMillis, viewportState.endTimeMillis, targetLow, targetHigh) {
+        val windowPoints = readings.filter { it.timestamp in viewportState.startTimeMillis..viewportState.endTimeMillis && !it.isScan }
+        if (windowPoints.isNotEmpty()) {
+            tk.glucodata.ui.model.GlucoseStats.calculate(windowPoints, targetLow, targetHigh)
+        } else {
+            screenStats
+        }
+    }
+
+    val statsTimeRangeLabel = remember(viewportState.isLive, selectedRange, viewportState.startTimeMillis, viewportState.endTimeMillis) {
+        if (viewportState.isLive) {
+            selectedRange.label
+        } else {
+            val dateFmt = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+            "${dateFmt.format(Date(viewportState.startTimeMillis))} - ${dateFmt.format(Date(viewportState.endTimeMillis))}"
+        }
     }
 
     // Handle back button when in fullscreen mode: exit fullscreen instead of closing app
@@ -296,9 +316,9 @@ fun GlucoseScreen(
                         minimalistUnits = displayConfig.minimalistUnits
                     )
                     GlucoseStatsCard(
-                        stats = screenStats,
+                        stats = visibleStats,
                         unit = unit,
-                        timeRangeLabel = selectedRange.label,
+                        timeRangeLabel = statsTimeRangeLabel,
                         minimalistUnits = displayConfig.minimalistUnits
                     )
                     Spacer(modifier = Modifier.height(10.dp))
@@ -307,7 +327,9 @@ fun GlucoseScreen(
                         onOpenAddEntry = onOpenAddEntry,
                         onViewAll = { showFullLogbookSheet = true },
                         unit = unit,
-                        minimalistUnits = displayConfig.minimalistUnits
+                        minimalistUnits = displayConfig.minimalistUnits,
+                        viewStartTime = viewportState.startTimeMillis,
+                        viewEndTime = viewportState.endTimeMillis
                     )
                 }
 
@@ -525,9 +547,9 @@ fun GlucoseScreen(
 
                 // 5. Glucose Stats & Time in Range Card
                 GlucoseStatsCard(
-                    stats = screenStats,
+                    stats = visibleStats,
                     unit = unit,
-                    timeRangeLabel = selectedRange.label,
+                    timeRangeLabel = statsTimeRangeLabel,
                     minimalistUnits = displayConfig.minimalistUnits
                 )
 
@@ -539,7 +561,9 @@ fun GlucoseScreen(
                     onOpenAddEntry = onOpenAddEntry,
                     onViewAll = { showFullLogbookSheet = true },
                     unit = unit,
-                    minimalistUnits = displayConfig.minimalistUnits
+                    minimalistUnits = displayConfig.minimalistUnits,
+                    viewStartTime = viewportState.startTimeMillis,
+                    viewEndTime = viewportState.endTimeMillis
                 )
             }
         }
@@ -1108,6 +1132,8 @@ fun LogbookSection(
     onViewAll: () -> Unit,
     unit: tk.glucodata.ui.model.GlucoseUnit,
     minimalistUnits: Boolean,
+    viewStartTime: Long = 0L,
+    viewEndTime: Long = 0L,
     modifier: Modifier = Modifier
 ) {
     val logs by repository.logs.collectAsState()
@@ -1115,34 +1141,38 @@ fun LogbookSection(
     var selectedTypeFilter by remember { mutableStateOf<LogType?>(null) }
 
     val now = System.currentTimeMillis()
-    val dayStart = remember(now) {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        cal.timeInMillis
+    val isViewingPast = viewStartTime > 0L && viewEndTime > 0L && abs(now - viewEndTime) >= 60_000L
+
+    val activePeriodLogs = remember(logs, isViewingPast, viewStartTime, viewEndTime, now) {
+        if (isViewingPast) {
+            val pastLogs = logs.filter { it.timestamp in viewStartTime..viewEndTime }
+            if (pastLogs.isNotEmpty()) pastLogs else logs.filter { it.timestamp in (viewStartTime - 12 * 3600 * 1000L)..(viewEndTime + 12 * 3600 * 1000L) }
+        } else {
+            val cal = Calendar.getInstance()
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val dayStart = cal.timeInMillis
+            logs.filter { it.timestamp >= dayStart }
+        }
     }
 
-    val todayLogs = remember(logs, dayStart) {
-        logs.filter { it.timestamp >= dayStart }
+    val todayBolus = remember(activePeriodLogs) {
+        activePeriodLogs.filter { it.type == LogType.RAPID_INSULIN }.sumOf { it.value.toDouble() }
+    }
+    val todayBasal = remember(activePeriodLogs) {
+        activePeriodLogs.filter { it.type == LogType.BASAL_INSULIN }.sumOf { it.value.toDouble() }
+    }
+    val todayCarbs = remember(activePeriodLogs) {
+        activePeriodLogs.filter { it.type == LogType.CARBS || it.type == LogType.MEAL }.sumOf { it.value.toDouble() }
+    }
+    val todayChecks = remember(activePeriodLogs) {
+        activePeriodLogs.count { it.type == LogType.BLOOD_GLUCOSE }
     }
 
-    val todayBolus = remember(todayLogs) {
-        todayLogs.filter { it.type == LogType.RAPID_INSULIN }.sumOf { it.value.toDouble() }
-    }
-    val todayBasal = remember(todayLogs) {
-        todayLogs.filter { it.type == LogType.BASAL_INSULIN }.sumOf { it.value.toDouble() }
-    }
-    val todayCarbs = remember(todayLogs) {
-        todayLogs.filter { it.type == LogType.CARBS || it.type == LogType.MEAL }.sumOf { it.value.toDouble() }
-    }
-    val todayChecks = remember(todayLogs) {
-        todayLogs.count { it.type == LogType.BLOOD_GLUCOSE }
-    }
-
-    val displayLogs = remember(logs, todayLogs, selectedTypeFilter) {
-        val sourceList = if (todayLogs.isNotEmpty()) todayLogs else logs.take(10)
+    val displayLogs = remember(logs, activePeriodLogs, selectedTypeFilter) {
+        val sourceList = if (activePeriodLogs.isNotEmpty()) activePeriodLogs else logs.take(10)
         val filtered = if (selectedTypeFilter != null) {
             sourceList.filter { it.type == selectedTypeFilter }
         } else {
