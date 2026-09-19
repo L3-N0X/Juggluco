@@ -1,9 +1,8 @@
 package tk.glucodata.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,8 +24,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.ListAlt
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -45,30 +43,27 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -80,11 +75,19 @@ import tk.glucodata.ui.components.GlucoseStatsCard
 import tk.glucodata.ui.components.SearchGlucoseDialog
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.graph.GlucoseGraph
+import tk.glucodata.ui.graph.GraphViewportState
 import tk.glucodata.ui.graph.TimeRangeSelector
+import tk.glucodata.ui.graph.rememberGraphViewportState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.FilterChip
+import androidx.compose.ui.graphics.Color
 import tk.glucodata.ui.model.GlucosePoint
-import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
+import tk.glucodata.ui.screens.DailyTotalPill
+import tk.glucodata.ui.screens.LogItemCard
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -106,7 +109,6 @@ fun GlucoseScreen(
     val targetLow by repository.targetLow.collectAsState()
     val targetHigh by repository.targetHigh.collectAsState()
     val selectedRange by repository.selectedTimeRange.collectAsState()
-    val stats by repository.stats.collectAsState()
     val screenStats by repository.screenStats.collectAsState()
     val sensorDetails by repository.sensorDetails.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
@@ -115,8 +117,18 @@ fun GlucoseScreen(
     val sensorName = sensorDetails.firstOrNull()?.name
     val previousReading = if (readings.size >= 2) readings[readings.size - 2] else null
 
-    var inspectedPoint by remember { mutableStateOf<GlucosePoint?>(null) }
-    val displayReading = inspectedPoint ?: currentReading
+    // 1. Unified Graph Viewport State
+    val viewportState = rememberGraphViewportState(initialDurationMillis = selectedRange.durationMillis)
+
+    // Sync viewport duration when time range pill changes from external controls
+    LaunchedEffect(selectedRange) {
+        viewportState.setDuration(selectedRange.durationMillis)
+    }
+
+    // Handle back button when in fullscreen mode: exit fullscreen instead of closing app
+    BackHandler(enabled = isFullscreen) {
+        onToggleFullscreen()
+    }
 
     var showLayersSheet by remember { mutableStateOf(false) }
     val layersSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -128,14 +140,12 @@ fun GlucoseScreen(
 
     var showSearchDialog by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
+    var searchMatches by remember { mutableStateOf<List<Long>>(emptyList()) }
+    var searchMatchIndex by remember { mutableIntStateOf(0) }
     var searchSummaryText by remember { mutableStateOf("") }
 
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
-
-    var isViewingPastData by remember { mutableStateOf(false) }
-    var pastWindowStart by remember { mutableLongStateOf(0L) }
-    var pastWindowEnd by remember { mutableLongStateOf(0L) }
 
     var showFullLogbookSheet by remember { mutableStateOf(false) }
     val fullLogbookSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -144,10 +154,11 @@ fun GlucoseScreen(
         val isLandscape = maxWidth > maxHeight && maxWidth > 550.dp
 
         if (isFullscreen) {
-            // Fullscreen Graph Mode (Classic landscape OpenGL parity with modern compose visuals)
+            // Fullscreen Graph Mode (With systemBarsPadding to prevent overlapping Android navigation & status bar)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .systemBarsPadding()
                     .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
                 // Top control bar in fullscreen
@@ -158,7 +169,10 @@ fun GlucoseScreen(
                 ) {
                     TimeRangeSelector(
                         selectedRange = selectedRange,
-                        onRangeSelected = { repository.setTimeRange(it) },
+                        onRangeSelected = {
+                            repository.setTimeRange(it)
+                            viewportState.setDuration(it.durationMillis)
+                        },
                         modifier = Modifier.weight(1f)
                     )
 
@@ -179,11 +193,38 @@ fun GlucoseScreen(
                     }
                 }
 
-                if (isViewingPastData) {
+                if (!viewportState.isLive) {
                     PastDataBanner(
-                        startTime = pastWindowStart,
-                        endTime = pastWindowEnd,
-                        onJumpToNow = { repository.jumpToNow() }
+                        startTime = viewportState.startTimeMillis,
+                        endTime = viewportState.endTimeMillis,
+                        onJumpToNow = {
+                            viewportState.jumpToNow()
+                            repository.jumpToNow()
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                if (isSearchActive && searchMatches.isNotEmpty()) {
+                    SearchActiveBar(
+                        summaryText = "Match ${searchMatchIndex + 1} of ${searchMatches.size} ($searchSummaryText)",
+                        onPrev = {
+                            if (searchMatches.isNotEmpty()) {
+                                searchMatchIndex = (searchMatchIndex - 1 + searchMatches.size) % searchMatches.size
+                                viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
+                            }
+                        },
+                        onNext = {
+                            if (searchMatches.isNotEmpty()) {
+                                searchMatchIndex = (searchMatchIndex + 1) % searchMatches.size
+                                viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
+                            }
+                        },
+                        onClose = {
+                            isSearchActive = false
+                            searchMatches = emptyList()
+                            repository.stopSearch()
+                        }
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                 }
@@ -191,19 +232,12 @@ fun GlucoseScreen(
                 GlucoseGraph(
                     readings = readings,
                     logs = logs,
-                    timeRange = selectedRange,
+                    viewportState = viewportState,
                     unit = unit,
                     targetLow = targetLow,
                     targetHigh = targetHigh,
                     displayConfig = displayConfig,
-                    onPointInspected = { inspectedPoint = it },
                     onLogEntryClicked = { selectedLogForDetail = it },
-                    onWindowChanged = { start, end, isPast ->
-                        isViewingPastData = isPast
-                        pastWindowStart = start
-                        pastWindowEnd = end
-                    },
-                    onNavigateDays = { delta -> repository.navigateDays(delta) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -214,10 +248,22 @@ fun GlucoseScreen(
                 GraphNavigationToolbar(
                     isFullscreen = true,
                     onToggleFullscreen = onToggleFullscreen,
-                    onJumpToNow = { repository.jumpToNow() },
-                    onNavigateDay = { delta -> repository.navigateDays(delta) },
-                    onNavigateWeek = { delta -> repository.navigateDays(delta * 7) },
-                    onShowLastScan = { repository.showLastScan() },
+                    onJumpToNow = {
+                        viewportState.jumpToNow()
+                        repository.jumpToNow()
+                        Toast.makeText(context, context.getString(R.string.now), Toast.LENGTH_SHORT).show()
+                    },
+                    onNavigateDay = { delta ->
+                        viewportState.navigateDays(delta)
+                        repository.navigateDays(delta)
+                    },
+                    onNavigateWeek = { delta ->
+                        viewportState.navigateWeeks(delta)
+                        repository.navigateDays(delta * 7)
+                    },
+                    onShowLastScan = {
+                        handleShowLastScan(readings, viewportState, repository, context)
+                    },
                     onOpenLayers = { showLayersSheet = true },
                     onOpenSearch = { showSearchDialog = true },
                     onOpenDatePicker = { showDatePicker = true },
@@ -239,8 +285,9 @@ fun GlucoseScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(end = 6.dp)
                 ) {
+                    // Always show current real-time sensor reading
                     CurrentGlucoseHeroCard(
-                        currentReading = displayReading,
+                        currentReading = currentReading,
                         previousReading = previousReading,
                         unit = unit,
                         sensorName = sensorName,
@@ -273,25 +320,42 @@ fun GlucoseScreen(
                 ) {
                     TimeRangeSelector(
                         selectedRange = selectedRange,
-                        onRangeSelected = { repository.setTimeRange(it) }
+                        onRangeSelected = {
+                            repository.setTimeRange(it)
+                            viewportState.setDuration(it.durationMillis)
+                        }
                     )
 
-                    if (isViewingPastData) {
+                    if (!viewportState.isLive) {
                         PastDataBanner(
-                            startTime = pastWindowStart,
-                            endTime = pastWindowEnd,
-                            onJumpToNow = { repository.jumpToNow() }
+                            startTime = viewportState.startTimeMillis,
+                            endTime = viewportState.endTimeMillis,
+                            onJumpToNow = {
+                                viewportState.jumpToNow()
+                                repository.jumpToNow()
+                            }
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
 
-                    if (isSearchActive) {
+                    if (isSearchActive && searchMatches.isNotEmpty()) {
                         SearchActiveBar(
-                            summaryText = searchSummaryText,
-                            onPrev = { repository.prevSearchMatch() },
-                            onNext = { repository.nextSearchMatch() },
+                            summaryText = "Match ${searchMatchIndex + 1} of ${searchMatches.size} ($searchSummaryText)",
+                            onPrev = {
+                                if (searchMatches.isNotEmpty()) {
+                                    searchMatchIndex = (searchMatchIndex - 1 + searchMatches.size) % searchMatches.size
+                                    viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
+                                }
+                            },
+                            onNext = {
+                                if (searchMatches.isNotEmpty()) {
+                                    searchMatchIndex = (searchMatchIndex + 1) % searchMatches.size
+                                    viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
+                                }
+                            },
                             onClose = {
                                 isSearchActive = false
+                                searchMatches = emptyList()
                                 repository.stopSearch()
                             }
                         )
@@ -301,19 +365,12 @@ fun GlucoseScreen(
                     GlucoseGraph(
                         readings = readings,
                         logs = logs,
-                        timeRange = selectedRange,
+                        viewportState = viewportState,
                         unit = unit,
                         targetLow = targetLow,
                         targetHigh = targetHigh,
                         displayConfig = displayConfig,
-                        onPointInspected = { inspectedPoint = it },
                         onLogEntryClicked = { selectedLogForDetail = it },
-                        onWindowChanged = { start, end, isPast ->
-                            isViewingPastData = isPast
-                            pastWindowStart = start
-                            pastWindowEnd = end
-                        },
-                        onNavigateDays = { delta -> repository.navigateDays(delta) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
@@ -324,10 +381,22 @@ fun GlucoseScreen(
                     GraphNavigationToolbar(
                         isFullscreen = false,
                         onToggleFullscreen = onToggleFullscreen,
-                        onJumpToNow = { repository.jumpToNow() },
-                        onNavigateDay = { delta -> repository.navigateDays(delta) },
-                        onNavigateWeek = { delta -> repository.navigateDays(delta * 7) },
-                        onShowLastScan = { repository.showLastScan() },
+                        onJumpToNow = {
+                            viewportState.jumpToNow()
+                            repository.jumpToNow()
+                            Toast.makeText(context, context.getString(R.string.now), Toast.LENGTH_SHORT).show()
+                        },
+                        onNavigateDay = { delta ->
+                            viewportState.navigateDays(delta)
+                            repository.navigateDays(delta)
+                        },
+                        onNavigateWeek = { delta ->
+                            viewportState.navigateWeeks(delta)
+                            repository.navigateDays(delta * 7)
+                        },
+                        onShowLastScan = {
+                            handleShowLastScan(readings, viewportState, repository, context)
+                        },
                         onOpenLayers = { showLayersSheet = true },
                         onOpenSearch = { showSearchDialog = true },
                         onOpenDatePicker = { showDatePicker = true },
@@ -343,9 +412,9 @@ fun GlucoseScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = 96.dp)
             ) {
-                // 1. Hero Card at top
+                // 1. Hero Card at top (ALWAYS real-time reading)
                 CurrentGlucoseHeroCard(
-                    currentReading = displayReading,
+                    currentReading = currentReading,
                     previousReading = previousReading,
                     unit = unit,
                     sensorName = sensorName,
@@ -357,55 +426,65 @@ fun GlucoseScreen(
                 // 2. Time Range Selector pills
                 TimeRangeSelector(
                     selectedRange = selectedRange,
-                    onRangeSelected = { repository.setTimeRange(it) }
+                    onRangeSelected = {
+                        repository.setTimeRange(it)
+                        viewportState.setDuration(it.durationMillis)
+                    }
                 )
 
-                // Past Data banner if user navigated into history
-                if (isViewingPastData) {
+                // Past Data banner if viewing history
+                if (!viewportState.isLive) {
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                         PastDataBanner(
-                            startTime = pastWindowStart,
-                            endTime = pastWindowEnd,
-                            onJumpToNow = { repository.jumpToNow() }
+                            startTime = viewportState.startTimeMillis,
+                            endTime = viewportState.endTimeMillis,
+                            onJumpToNow = {
+                                viewportState.jumpToNow()
+                                repository.jumpToNow()
+                            }
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // Search Active Banner (if searching)
-                if (isSearchActive) {
+                // Search Active Banner
+                if (isSearchActive && searchMatches.isNotEmpty()) {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         SearchActiveBar(
-                            summaryText = searchSummaryText,
-                            onPrev = { repository.prevSearchMatch() },
-                            onNext = { repository.nextSearchMatch() },
+                            summaryText = "Match ${searchMatchIndex + 1} of ${searchMatches.size} ($searchSummaryText)",
+                            onPrev = {
+                                if (searchMatches.isNotEmpty()) {
+                                    searchMatchIndex = (searchMatchIndex - 1 + searchMatches.size) % searchMatches.size
+                                    viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
+                                }
+                            },
+                            onNext = {
+                                if (searchMatches.isNotEmpty()) {
+                                    searchMatchIndex = (searchMatchIndex + 1) % searchMatches.size
+                                    viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
+                                }
+                            },
                             onClose = {
                                 isSearchActive = false
+                                searchMatches = emptyList()
                                 repository.stopSearch()
                             }
                         )
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
 
-                // 3. Interactive Jetpack Compose Canvas Glucose Graph
+                // 3. Modern Interactive Compose Glucose Graph
                 GlucoseGraph(
                     readings = readings,
                     logs = logs,
-                    timeRange = selectedRange,
+                    viewportState = viewportState,
                     unit = unit,
                     targetLow = targetLow,
                     targetHigh = targetHigh,
                     displayConfig = displayConfig,
-                    onPointInspected = { inspectedPoint = it },
                     onLogEntryClicked = { selectedLogForDetail = it },
-                    onWindowChanged = { start, end, isPast ->
-                        isViewingPastData = isPast
-                        pastWindowStart = start
-                        pastWindowEnd = end
-                    },
-                    onNavigateDays = { delta -> repository.navigateDays(delta) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp)
@@ -414,20 +493,26 @@ fun GlucoseScreen(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // 4. Quick Graph Navigation Controls (Parity with landscape OpenGL curve)
+                // 4. Quick Graph Navigation Controls
                 Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                     GraphNavigationToolbar(
                         isFullscreen = false,
                         onToggleFullscreen = onToggleFullscreen,
                         onJumpToNow = {
+                            viewportState.jumpToNow()
                             repository.jumpToNow()
                             Toast.makeText(context, context.getString(R.string.now), Toast.LENGTH_SHORT).show()
                         },
-                        onNavigateDay = { delta -> repository.navigateDays(delta) },
-                        onNavigateWeek = { delta -> repository.navigateDays(delta * 7) },
+                        onNavigateDay = { delta ->
+                            viewportState.navigateDays(delta)
+                            repository.navigateDays(delta)
+                        },
+                        onNavigateWeek = { delta ->
+                            viewportState.navigateWeeks(delta)
+                            repository.navigateDays(delta * 7)
+                        },
                         onShowLastScan = {
-                            repository.showLastScan()
-                            Toast.makeText(context, context.getString(R.string.last_scan), Toast.LENGTH_SHORT).show()
+                            handleShowLastScan(readings, viewportState, repository, context)
                         },
                         onOpenLayers = { showLayersSheet = true },
                         onOpenSearch = { showSearchDialog = true },
@@ -448,33 +533,18 @@ fun GlucoseScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 6. Diabetes Logbook / Tagebuch Section
+                // 6. Recent Logbook Entries Section
                 LogbookSection(
                     repository = repository,
                     onOpenAddEntry = onOpenAddEntry,
                     onViewAll = { showFullLogbookSheet = true },
                     unit = unit,
-                    minimalistUnits = displayConfig.minimalistUnits,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    minimalistUnits = displayConfig.minimalistUnits
                 )
             }
         }
 
-        // Quick Log FAB (Bottom right)
-        if (!isFullscreen) {
-            FloatingActionButton(
-                onClick = onOpenAddEntry,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = 24.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = stringResource(R.string.new_amount))
-            }
-        }
-
-        // 6. Graph Layers Bottom Sheet (Scans, Stream, History, Amounts, Meals)
+        // 6. Layers & Display Options Bottom Sheet
         if (showLayersSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showLayersSheet = false },
@@ -483,17 +553,18 @@ fun GlucoseScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 24.dp)
                         .padding(bottom = 36.dp)
                 ) {
                     Text(
                         text = stringResource(R.string.graph_layers),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = stringResource(R.string.graph_layers_desc),
+                        text = "Customize visible curves, calibration lines, and events",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -683,15 +754,22 @@ fun GlucoseScreen(
                 onDismiss = { showSearchDialog = false },
                 onExecuteSearch = { under, above, label, keyword ->
                     showSearchDialog = false
-                    val count = repository.searchGlucose(label, under, above, keyword)
-                    isSearchActive = true
-                    searchSummaryText = when {
-                        under > 0f -> "Lows (< ${unit.format(under)})"
-                        above > 0f -> "Highs (> ${unit.format(above)})"
-                        keyword.isNotEmpty() -> "\"$keyword\""
-                        else -> "Search Results"
+                    val matches = repository.searchGlucose(label, under, above, keyword)
+                    if (matches.isNotEmpty()) {
+                        searchMatches = matches
+                        searchMatchIndex = 0
+                        isSearchActive = true
+                        searchSummaryText = when {
+                            under > 0f -> "< ${unit.format(under)}"
+                            above > 0f -> "> ${unit.format(above)}"
+                            keyword.isNotEmpty() -> "\"$keyword\""
+                            else -> "Results"
+                        }
+                        viewportState.jumpTo(matches[0] + (viewportState.durationMillis / 2))
+                        Toast.makeText(context, "Found ${matches.size} matches", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "No matching readings or events found", Toast.LENGTH_SHORT).show()
                     }
-                    Toast.makeText(context, "Search active: $count matches found", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -706,13 +784,17 @@ fun GlucoseScreen(
                             showDatePicker = false
                             val selectedMillis = datePickerState.selectedDateMillis
                             if (selectedMillis != null) {
+                                viewportState.jumpToDate(selectedMillis)
+
                                 val cal = Calendar.getInstance()
                                 cal.timeInMillis = selectedMillis
                                 val year = cal.get(Calendar.YEAR)
                                 val month = cal.get(Calendar.MONTH) + 1
                                 val day = cal.get(Calendar.DAY_OF_MONTH)
                                 repository.moveToDate(year, month, day)
-                                Toast.makeText(context, "Navigated to $year-$month-$day", Toast.LENGTH_SHORT).show()
+
+                                val dateFmt = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+                                Toast.makeText(context, "Navigated to ${dateFmt.format(Date(viewportState.startTimeMillis))}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     ) {
@@ -746,6 +828,27 @@ fun GlucoseScreen(
     }
 }
 
+private fun handleShowLastScan(
+    readings: List<GlucosePoint>,
+    viewportState: GraphViewportState,
+    repository: GlucoseRepository,
+    context: android.content.Context
+) {
+    val lastScan = readings.filter { it.isScan }.maxByOrNull { it.timestamp }
+    if (lastScan != null) {
+        viewportState.jumpTo(lastScan.timestamp + (viewportState.durationMillis / 3))
+        val timeFmt = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+        Toast.makeText(
+            context,
+            "Jumped to last scan: ${timeFmt.format(Date(lastScan.timestamp))}",
+            Toast.LENGTH_SHORT
+        ).show()
+    } else {
+        Toast.makeText(context, "No NFC scans recorded yet", Toast.LENGTH_SHORT).show()
+    }
+    repository.showLastScan()
+}
+
 @Composable
 private fun PastDataBanner(
     startTime: Long,
@@ -765,7 +868,10 @@ private fun PastDataBanner(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f, fill = false)
+            ) {
                 Icon(
                     imageVector = Icons.Default.History,
                     contentDescription = null,
@@ -777,9 +883,11 @@ private fun PastDataBanner(
                     text = "${stringResource(R.string.viewing_past_data)}: ${dateFmt.format(Date(startTime))} - ${dateFmt.format(Date(endTime))}",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    maxLines = 1
                 )
             }
+            Spacer(modifier = Modifier.width(8.dp))
             OutlinedButton(
                 onClick = onJumpToNow,
                 shape = RoundedCornerShape(8.dp),
@@ -810,7 +918,10 @@ private fun SearchActiveBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f, fill = false)
+            ) {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = null,
@@ -822,7 +933,8 @@ private fun SearchActiveBar(
                     text = summaryText.ifEmpty { stringResource(R.string.search) },
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -871,7 +983,7 @@ private fun GraphNavigationToolbar(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
     ) {
         Row(
             modifier = Modifier
@@ -960,22 +1072,10 @@ private fun LayerToggleItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange
-        )
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -984,28 +1084,20 @@ private fun ClinicalHelpSection(
     title: String,
     description: String
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 18.sp
-            )
-        }
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 20.sp
+        )
     }
 }
 
@@ -1014,7 +1106,7 @@ fun LogbookSection(
     repository: GlucoseRepository,
     onOpenAddEntry: () -> Unit,
     onViewAll: () -> Unit,
-    unit: GlucoseUnit,
+    unit: tk.glucodata.ui.model.GlucoseUnit,
     minimalistUnits: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -1022,7 +1114,6 @@ fun LogbookSection(
     val context = LocalContext.current
     var selectedTypeFilter by remember { mutableStateOf<LogType?>(null) }
 
-    // Calculate today's time boundary
     val now = System.currentTimeMillis()
     val dayStart = remember(now) {
         val cal = Calendar.getInstance()
@@ -1037,7 +1128,6 @@ fun LogbookSection(
         logs.filter { it.timestamp >= dayStart }
     }
 
-    // Daily totals KPI
     val todayBolus = remember(todayLogs) {
         todayLogs.filter { it.type == LogType.RAPID_INSULIN }.sumOf { it.value.toDouble() }
     }
@@ -1051,7 +1141,6 @@ fun LogbookSection(
         todayLogs.count { it.type == LogType.BLOOD_GLUCOSE }
     }
 
-    // Display logs: prefer today's entries, fall back to recent logs if empty
     val displayLogs = remember(logs, todayLogs, selectedTypeFilter) {
         val sourceList = if (todayLogs.isNotEmpty()) todayLogs else logs.take(10)
         val filtered = if (selectedTypeFilter != null) {
@@ -1068,7 +1157,6 @@ fun LogbookSection(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header: Icon + Title ("Tagebuch" / "Logbook") + "Alle anzeigen" / View All + Add
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1114,7 +1202,6 @@ fun LogbookSection(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Totals row (Today)
             Card(
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
@@ -1134,7 +1221,6 @@ fun LogbookSection(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Filter chips (All, Bolus, Basal, Carbs, BG)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1170,7 +1256,6 @@ fun LogbookSection(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Recent log entries
             if (displayLogs.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -1202,4 +1287,3 @@ fun LogbookSection(
         }
     }
 }
-

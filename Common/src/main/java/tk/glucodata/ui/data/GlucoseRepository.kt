@@ -254,11 +254,15 @@ class GlucoseRepository(
                     }
                 }
 
-                // Read stream points from active sensors
-                val sensorPtrs = Natives.activeSensorPtrs()
-                if (sensorPtrs != null && sensorPtrs.isNotEmpty()) {
+                // Read stream points from all sensors (falling back to active)
+                val allPtrs = try { Natives.allSensorPtrs() } catch (_: Throwable) { null }
+                val sensorPtrs: LongArray = if (allPtrs != null && allPtrs.isNotEmpty()) allPtrs else (Natives.activeSensorPtrs() ?: LongArray(0))
+
+                if (sensorPtrs.isNotEmpty()) {
                     for (ptr in sensorPtrs) {
                         if (ptr == 0L) continue
+
+                        // 1. Raw Stream Readings
                         var pos = 0
                         var safetyLimit = 50000
                         while (safetyLimit-- > 0) {
@@ -272,6 +276,57 @@ class GlucoseRepository(
                                     GlucosePoint(
                                         timestamp = time * 1000L,
                                         valueMgDl = mgdL.toFloat(),
+                                        isScan = false,
+                                        isHistory = false,
+                                        isCalibrated = false,
+                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), _targetLow.value, _targetHigh.value)
+                                    )
+                                )
+                            }
+                            pos = nextPos
+                        }
+
+                        // 2. Calibrated Stream Readings
+                        pos = 0
+                        safetyLimit = 50000
+                        while (safetyLimit-- > 0) {
+                            val res = try { Natives.calibratedStreamfromSensorptr(ptr, pos) } catch (_: Throwable) { 0L }
+                            val time = res and 0xFFFFFFFFL
+                            val nextPos = (res ushr 48).toInt() and 0xFFFF
+                            if (time == 0L || nextPos <= pos) break
+                            val mgdL = (res ushr 32).toInt() and 0xFFFF
+                            if (mgdL in 20..600) {
+                                loadedList.add(
+                                    GlucosePoint(
+                                        timestamp = time * 1000L,
+                                        valueMgDl = mgdL.toFloat(),
+                                        isScan = false,
+                                        isHistory = false,
+                                        isCalibrated = true,
+                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), _targetLow.value, _targetHigh.value)
+                                    )
+                                )
+                            }
+                            pos = nextPos
+                        }
+
+                        // 3. Scan Readings
+                        pos = 0
+                        safetyLimit = 10000
+                        while (safetyLimit-- > 0) {
+                            val res = try { Natives.scanfromSensorptr(ptr, pos) } catch (_: Throwable) { 0L }
+                            val time = res and 0xFFFFFFFFL
+                            val nextPos = (res ushr 48).toInt() and 0xFFFF
+                            if (time == 0L || nextPos <= pos) break
+                            val mgdL = (res ushr 32).toInt() and 0xFFFF
+                            if (mgdL in 20..600) {
+                                loadedList.add(
+                                    GlucosePoint(
+                                        timestamp = time * 1000L,
+                                        valueMgDl = mgdL.toFloat(),
+                                        isScan = true,
+                                        isHistory = false,
+                                        isCalibrated = false,
                                         status = GlucoseStatus.fromValue(mgdL.toFloat(), _targetLow.value, _targetHigh.value)
                                     )
                                 )
@@ -282,6 +337,18 @@ class GlucoseRepository(
                 }
             }
         } catch (_: Throwable) {}
+
+        // If no real readings found, provide rich multi-day test data
+        if (loadedList.isEmpty()) {
+            loadedList = ArrayList(MockDataGenerator.generateReadings(days = 7, targetLow = _targetLow.value, targetHigh = _targetHigh.value))
+            if (_currentReading.value == null && loadedList.isNotEmpty()) {
+                val latest = loadedList.filter { !it.isScan && !it.isCalibrated }.lastOrNull() ?: loadedList.last()
+                _currentReading.value = latest
+            }
+        } else if (_currentReading.value == null) {
+            val latest = loadedList.filter { !it.isScan && !it.isCalibrated }.lastOrNull() ?: loadedList.last()
+            _currentReading.value = latest
+        }
 
         loadedList.sortBy { it.timestamp }
         _readings.value = loadedList
@@ -416,7 +483,7 @@ class GlucoseRepository(
     }
 
     private fun loadLogsFromNative() {
-        val logList = ArrayList<LogRecord>()
+        var logList = ArrayList<LogRecord>()
         try {
             if (Applic.Nativesloaded && numio.numptrs.isNotEmpty() && numio.numptrs[0] != 0L) {
                 val ptr = numio.numptrs[0]
@@ -444,6 +511,10 @@ class GlucoseRepository(
                 }
             }
         } catch (_: Throwable) {}
+
+        if (logList.isEmpty()) {
+            logList = ArrayList(MockDataGenerator.generateLogs(days = 7))
+        }
 
         logList.sortByDescending { it.timestamp }
         _logs.value = logList
@@ -1008,15 +1079,47 @@ class GlucoseRepository(
         under: Float = 0f,
         above: Float = 0f,
         keyword: String = ""
-    ): Int {
-        var count = 0
+    ): List<Long> {
+        val matches = mutableListOf<Long>()
+
+        // 1. Search in glucose readings
+        if (under > 0f || above > 0f) {
+            for (pt in _readings.value) {
+                if (under > 0f && pt.valueMgDl <= under) {
+                    matches.add(pt.timestamp)
+                } else if (above > 0f && pt.valueMgDl >= above) {
+                    matches.add(pt.timestamp)
+                }
+            }
+        }
+
+        // 2. Search in event logs
+        for (log in _logs.value) {
+            val categoryMatches = when (label) {
+                0 -> log.type == LogType.RAPID_INSULIN
+                1 -> log.type == LogType.CARBS || log.type == LogType.MEAL
+                2 -> log.type == LogType.BASAL_INSULIN
+                3 -> log.type == LogType.BLOOD_GLUCOSE
+                else -> true
+            }
+            val keywordMatches = if (keyword.isNotEmpty()) {
+                (log.note?.contains(keyword, ignoreCase = true) == true) ||
+                    log.type.label.contains(keyword, ignoreCase = true)
+            } else true
+
+            if (categoryMatches && keywordMatches) {
+                matches.add(log.timestamp)
+            }
+        }
+
         try {
             if (Applic.Nativesloaded) {
-                count = Natives.search(label, under, above, 0, 0, true, keyword, 0f)
+                Natives.search(label, under, above, 0, 0, true, keyword, 0f)
             }
         } catch (_: Throwable) {}
-        refreshAll()
-        return count
+
+        matches.sort()
+        return matches.distinct()
     }
 
     fun nextSearchMatch() {
