@@ -212,33 +212,24 @@ fun CurrentGlucoseHeroCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Bottom Row: Time ago, Delta, Target Range info
+            // Bottom Row: Time ago, Delta
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = timeAgoText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (deltaText != null) {
-                        Text(
-                            text = "  •  $deltaText",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = statusColor,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
                 Text(
-                    text = stringResource(R.string.target_label, unit.format(targetLow), unit.format(targetHigh)),
+                    text = timeAgoText,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (deltaText != null) {
+                    Text(
+                        text = "  •  $deltaText",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = statusColor,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
