@@ -477,6 +477,15 @@ static     void explicit(Context context) {
         }
     }
 private boolean netstarted=false;
+public static boolean isNetStarted() {
+    return Applic.app != null && Applic.app.netstarted;
+}
+public static void ensureNetStarted() {
+    if(Applic.app != null && !Applic.app.netstarted) {
+        Applic.app.initializeNet();
+        Applic.app.netstarted = true;
+    }
+}
 void initbluetooth(boolean usebluetooth,Context context,boolean frommain) {
     // Establish the permission snapshot before BleMirror.init()/SensorBluetooth
     // can start Bluetooth work. Normally finepermission() already populated it,

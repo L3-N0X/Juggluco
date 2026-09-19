@@ -214,8 +214,6 @@ class GlucoseRepository(
                     googleScan = try { Natives.getGoogleScan() } catch (_: Throwable) { false },
                     hasNfc = MainActivity.hasnfc
                 )
-
-                refreshMirrorConnections()
             }
         } catch (_: Throwable) {}
     }
@@ -453,7 +451,7 @@ class GlucoseRepository(
 
     fun addLogEntry(type: LogType, value: Float, note: String, timestamp: Long = System.currentTimeMillis()) {
         val entry = LogRecord(
-            id = timestamp,
+            id = System.nanoTime(),
             timestamp = timestamp,
             type = type,
             value = value,
@@ -652,18 +650,19 @@ class GlucoseRepository(
             val list = mutableListOf<MirrorConnection>()
             try {
                 if (Applic.Nativesloaded) {
-                    val count = Natives.backuphostNr()
+                    Applic.ensureNetStarted()
+                    val count = try { Natives.backuphostNr() } catch (_: Throwable) { 0 }
                     for (i in 0 until count) {
-                        val rawIps = Natives.getbackupIPs(i)
+                        val rawIps = try { Natives.getbackupIPs(i) } catch (_: Throwable) { null }
                         val ips = rawIps?.filterNotNull()?.filter { it.isNotBlank() } ?: emptyList()
-                        val label = Natives.getbackuplabel(i) ?: ""
-                        val port = Natives.getbackuphostport(i) ?: ""
-                        val isReceiver = Natives.getbackuphostreceive(i) != 0
-                        val sendAmounts = Natives.getbackuphostnums(i)
-                        val sendStream = Natives.getbackuphoststream(i)
-                        val sendScans = Natives.getbackuphostscans(i)
-                        val isActive = Natives.getbackuphostactive(i)
-                        val isPassive = Natives.getbackuphostpassive(i)
+                        val label = try { Natives.getbackuplabel(i) ?: "" } catch (_: Throwable) { "" }
+                        val port = try { Natives.getbackuphostport(i) ?: "" } catch (_: Throwable) { "" }
+                        val isReceiver = try { Natives.getbackuphostreceive(i) != 0 } catch (_: Throwable) { false }
+                        val sendAmounts = try { Natives.getbackuphostnums(i) } catch (_: Throwable) { false }
+                        val sendStream = try { Natives.getbackuphoststream(i) } catch (_: Throwable) { false }
+                        val sendScans = try { Natives.getbackuphostscans(i) } catch (_: Throwable) { false }
+                        val isActive = try { Natives.getbackuphostactive(i) } catch (_: Throwable) { false }
+                        val isPassive = try { Natives.getbackuphostpassive(i) } catch (_: Throwable) { false }
                         val isDeactivated = try { Natives.getHostDeactivated(i) } catch (_: Throwable) { false }
                         val status = try { Natives.mirrorStatus(i) ?: "" } catch (_: Throwable) { "" }
                         list.add(

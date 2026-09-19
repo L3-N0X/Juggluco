@@ -45,7 +45,7 @@ extern std::pair<std::unique_ptr<const char[],deleter>,int> ICEstatus(int allind
 //extern std::unique_ptr<const char[],deleter> ICEstatus(int allindex);
 static std::pair<std::unique_ptr<const char[],deleter>,int> getnetstatus(int allindex)  {
 
-	if(allindex<0||allindex>=backup->getupdatedata()->hostnr) {
+	if(!backup || allindex<0 || allindex>=backup->getupdatedata()->hostnr) {
 		return {std::unique_ptr<const char[],deleter>(errormessage,deleter(errormessage)),(int)(sizeof(errormessage)-1)};
 		}
         passhost_t &host= getBackupHosts()[allindex];
@@ -198,6 +198,9 @@ extern int getindex(const  passhost_t *host);
 
 extern jstring myNewStringUTF(JNIEnv *env,const std::string_view str);
 extern "C" JNIEXPORT jstring JNICALL   fromjava(mirrorStatus)(JNIEnv *envin, jclass cl,jint allindex) {
+	if(!backup) {
+		return nullptr;
+	}
 	auto text=getnetstatus(allindex); 
 //	return envin->NewStringUTF(text.get());
 
