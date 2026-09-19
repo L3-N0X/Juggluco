@@ -8,12 +8,12 @@ import androidx.compose.runtime.setValue
 import tk.glucodata.ui.model.TimeRange
 import java.util.Calendar
 import java.util.TimeZone
-import kotlin.math.abs
 
 /**
  * Manages the visible time window of the glucose graph.
  *
  * Provides smooth panning, pinch-to-zoom scaling, and external jumps (Now, DatePicker, Day/Week steps, Search, Last Scan).
+ * Clamped strictly at current time (cannot scroll into the future).
  */
 class GraphViewportState(
     initialDurationMillis: Long = TimeRange.SIX_HOURS.durationMillis,
@@ -22,23 +22,23 @@ class GraphViewportState(
     var durationMillis by mutableLongStateOf(initialDurationMillis.coerceIn(MIN_DURATION_MILLIS, MAX_DURATION_MILLIS))
         private set
 
-    var endTimeMillis by mutableLongStateOf(initialEndTimeMillis)
+    var endTimeMillis by mutableLongStateOf(initialEndTimeMillis.coerceAtMost(System.currentTimeMillis()))
         private set
 
     val startTimeMillis: Long
         get() = endTimeMillis - durationMillis
 
     /**
-     * True when the graph window is tracking live readings (within 1 minute of current wall clock).
+     * True when the graph window is tracking live readings (within 45 seconds of current wall clock).
      */
     val isLive: Boolean
-        get() = abs(System.currentTimeMillis() - endTimeMillis) < 60_000L
+        get() = (System.currentTimeMillis() - endTimeMillis) < 45_000L
 
     fun panBy(deltaMillis: Long) {
         val now = System.currentTimeMillis()
         val newEnd = endTimeMillis + deltaMillis
-        // Prevent scrolling into the future beyond 10 minutes ahead of now
-        endTimeMillis = newEnd.coerceAtMost(now + 10 * 60 * 1000L)
+        // Prevent scrolling into the future - stop firmly at now
+        endTimeMillis = newEnd.coerceAtMost(now)
     }
 
     fun zoomBy(scaleFactor: Float, focalTimeMillis: Long) {
@@ -51,7 +51,7 @@ class GraphViewportState(
         val focalFraction = ((focalTimeMillis - startTimeMillis).toDouble() / currentDuration.toDouble()).coerceIn(0.0, 1.0)
         val newStartTime = (focalTimeMillis - (focalFraction * newDuration)).toLong()
         val now = System.currentTimeMillis()
-        val newEndTime = (newStartTime + newDuration).coerceAtMost(now + 10 * 60 * 1000L)
+        val newEndTime = (newStartTime + newDuration).coerceAtMost(now)
 
         durationMillis = newDuration
         endTimeMillis = newEndTime
@@ -59,14 +59,14 @@ class GraphViewportState(
 
     fun setDuration(newDurationMillis: Long) {
         val clamped = newDurationMillis.coerceIn(MIN_DURATION_MILLIS, MAX_DURATION_MILLIS)
+        val now = System.currentTimeMillis()
         if (isLive) {
             durationMillis = clamped
-            endTimeMillis = System.currentTimeMillis()
+            endTimeMillis = now
         } else {
             val centerTime = startTimeMillis + (durationMillis / 2)
             durationMillis = clamped
-            val now = System.currentTimeMillis()
-            endTimeMillis = (centerTime + (clamped / 2)).coerceAtMost(now + 10 * 60 * 1000L)
+            endTimeMillis = (centerTime + (clamped / 2)).coerceAtMost(now)
         }
     }
 
@@ -75,7 +75,7 @@ class GraphViewportState(
         if (newDuration != null) {
             durationMillis = newDuration.coerceIn(MIN_DURATION_MILLIS, MAX_DURATION_MILLIS)
         }
-        endTimeMillis = targetEndTime.coerceAtMost(now + 10 * 60 * 1000L)
+        endTimeMillis = targetEndTime.coerceAtMost(now)
     }
 
     fun jumpToNow() {
