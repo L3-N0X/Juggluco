@@ -20,6 +20,13 @@ enum class GlucoseUnit(val label: String, val factor: Double) {
         }
     }
 
+    fun formatRate(rateMgDlPerMin: Float): String {
+        return when (this) {
+            MG_DL -> String.format(java.util.Locale.US, "%.1f", rateMgDlPerMin)
+            MMOL_L -> String.format(java.util.Locale.US, "%.2f", rateMgDlPerMin * factor)
+        }
+    }
+
     companion object {
         fun fromNative(unitCode: Int): GlucoseUnit {
             return if (unitCode == 1) MMOL_L else MG_DL

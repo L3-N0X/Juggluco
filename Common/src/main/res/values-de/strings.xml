@@ -514,6 +514,180 @@
 <string name="transport_needs_label">Direktes Bluetooth und Messages benötigen ein Etikett</string>
 
 <string name="transport_needs_password">Direktes Bluetooth benötigt ein passwort</string>
+
+    <!-- Compose Modern UI & Landscape Enhancements -->
+    <string name="tab_glucose">Glukose</string>
+    <string name="tab_stats">Statistik</string>
+    <string name="tab_logbook">Tagebuch</string>
+    <string name="tab_sensors">Sensoren</string>
+    <string name="tab_settings">Einstellungen</string>
+
+    <string name="timerange_1h">1 Std.</string>
+    <string name="timerange_3h">3 Std.</string>
+    <string name="timerange_6h">6 Std.</string>
+    <string name="timerange_12h">12 Std.</string>
+    <string name="timerange_24h">24 Std.</string>
+    <string name="timerange_all">Alle</string>
+    <string name="timerange_custom">Eigen</string>
+    <string name="custom_range">Benutzerdefinierter Bereich</string>
+    <string name="custom_time_range">Benutzerdefinierter Zeitbereich</string>
+    <string name="quick_presets">Schnellauswahl</string>
+    <string name="custom_duration">Dauer auswählen</string>
+    <string name="minimalist_units">Minimalistische Einheitenanzeige</string>
+    <string name="minimalist_units_desc">Überflüssige Einheiten auf Kacheln und Listen ausblenden für ein schöneres Design</string>
+    <string name="logbook_time_today">Heute</string>
+    <string name="logbook_time_7d">7 Tage</string>
+    <string name="logbook_time_14d">14 Tage</string>
+    <string name="logbook_time_30d">30 Tage</string>
+    <string name="logbook_time_all">Gesamt</string>
+    <string name="logbook_totals">Summen</string>
+
+    <string name="graph_layers">Grafikebenen</string>
+    <string name="graph_layers_desc">Auf der Kurve angezeigte Datenebenen anpassen</string>
+    <string name="layer_stream">Echtzeit-Stream</string>
+    <string name="layer_stream_desc">Kontinuierliche 1-Minuten-Bluetooth-Messwerte</string>
+    <string name="layer_calibrated_stream">Kalibrierter Stream</string>
+    <string name="layer_calibrated_stream_desc">Kalibrierte kontinuierliche Kurve</string>
+    <string name="layer_scans">NFC-Scans</string>
+    <string name="layer_scans_desc">Manuelle Scan-Messwerte aus dem Sensorspeicher</string>
+    <string name="layer_calibrated_scans">Kalibrierte Scans</string>
+    <string name="layer_calibrated_scans_desc">Kalibrierte NFC-Messpunkte</string>
+    <string name="layer_history">Sensor-Verlauf</string>
+    <string name="layer_history_desc">Historische 15-Minuten-Sensor-Sicherungswerte</string>
+    <string name="layer_calibrated_history">Kalibrierter Verlauf</string>
+    <string name="layer_calibrated_history_desc">Kalibrierte 15-Minuten-Verlaufswerte</string>
+    <string name="layer_amounts">Insulin &amp; Mengen</string>
+    <string name="layer_amounts_desc">Protokollierte Insulindosen &amp; Zahlen auf der Kurve anzeigen</string>
+    <string name="layer_meals">Mahlzeiten &amp; Kohlenhydrate</string>
+    <string name="layer_meals_desc">Mahlzeiten-Kohlenhydrate und Nahrungsmittel-Markierungen anzeigen</string>
+
+    <string name="fullscreen_graph">Vollbild-Grafik</string>
+    <string name="exit_fullscreen">Vollbild beenden</string>
+    <string name="viewing_past_data">Vergangene Daten werden angezeigt</string>
+    <string name="jump_to_now">Zu Jetzt springen</string>
+    <string name="rate_of_change">Änderungsrate</string>
+    <string name="rate_unit_mgdl">mg/dl/min</string>
+    <string name="rate_unit_mmol">mmol/l/min</string>
+    <string name="delta">Delta</string>
+
+    <string name="help_and_explanations">Hilfe &amp; Klinische Erklärungen</string>
+    <string name="help_tir_title">Zeit im Zielbereich (TIR)</string>
+    <string name="help_tir_desc" formatted="false">Der Prozentsatz der Zeit, in der Ihr Glukosewert im Zielbereich liegt (70–180 mg/dl bzw. 3,9–10,0 mmol/l). Klinische Leitlinien empfehlen &gt; 70% im Zielbereich, &lt; 4% zu niedrig und &lt; 1% sehr niedrig.</string>
+    <string name="help_gmi_title">Glukose-Management-Indikator (GMI)</string>
+    <string name="help_gmi_desc" formatted="false">Berechnet einen geschätzten Labor-HbA1c-Wert basierend auf Ihrem durchschnittlichen kontinuierlichen Glukosewert über die letzten Wochen. Das typische Ziel liegt für die meisten Erwachsenen bei &lt; 7,0%.</string>
+    <string name="help_cv_title" formatted="false">Glukosevariabilität (%CV)</string>
+    <string name="help_cv_desc" formatted="false">Der Variationskoeffizient spiegelt wider, wie stark Ihre Glukosewerte schwanken. Ein Wert unter 36% steht für eine stabile, gleichmäßige Glukoseeinstellung.</string>
+    <string name="help_agp_title">Ambulantes Glukoseprofil (AGP)</string>
+    <string name="help_agp_desc" formatted="false">Eine standardisierte 24-Stunden-Zusammenfassungskurve. Die durchgezogene Linie ist der 50%-Median; das dunkle Band umfasst 50% der Tage (25.–75. Perzentil); das helle äußere Band umfasst 80% (10.–90. Perzentil).</string>
+    <string name="help_data_sources_title">Stream vs. Verlauf vs. Scans</string>
+    <string name="help_data_sources_desc">Stream: kontinuierliche 1-Minuten-Bluetooth-Werte. Verlauf: 15-Minuten-Werte im Sensorspeicher, die bei Wiederverbindung nachgetragen werden. Scans: manuell per NFC am Sensor ausgelesene Werte.</string>
+    <string name="help_calibration_title">Hinweise zur Sensorkalibrierung</string>
+    <string name="help_calibration_desc">Passt die Sensormesswerte mithilfe von kapillären Blutzuckermessungen an. Kalibrieren Sie nur bei stabilem Glukoseverlauf (waagerechter Trendpfeil), niemals bei schnellen Anstiegen oder Abfällen.</string>
+    <string name="help_exchanges_title">Übertragungen &amp; Integrationen</string>
+    <string name="help_exchanges_desc">Glucodata- und xDrip-Broadcasts senden Messwerte lokal an Zifferblätter, Widgets und Apps. Der lokale Webserver stellt die Nightscout-API netzwerkweit oder lokal bereit.</string>
+
+    <string name="export_title">Sensordaten exportieren</string>
+    <string name="export_desc">Rohdaten für Glukose, Insulin und Kohlenhydrate exportieren</string>
+    <string name="export_days_label">Tage des Verlaufs</string>
+    <string name="export_amounts">Mengen (.tsv)</string>
+    <string name="export_scans">Scans (.tsv)</string>
+    <string name="export_stream">Stream (.tsv)</string>
+    <string name="export_history">Verlauf (.tsv)</string>
+    <string name="export_meals">Mahlzeiten (.html)</string>
+    <string name="export_libreview">LibreView (.csv)</string>
+    <string name="export_calibrated_checkbox">Kalibrierte Werte exportieren</string>
+
+    <string name="calibration_title">Sensorkalibrierung</string>
+    <string name="calibration_reference_input">Blutzucker-Referenzwert (Blutstropfen)</string>
+    <string name="calibration_current_factor">Aktiver Kalibrierungsfaktor</string>
+    <string name="calibration_rule_stable">Vor dem Kalibrieren sicherstellen, dass der Wert stabil ist (waagerechter Pfeil)</string>
+    <string name="calibration_save">Kalibrierung anwenden</string>
+
+    <string name="quick_bolus_chips">Schnell-Bolus</string>
+    <string name="quick_carbs_chips">Schnell-KH</string>
+    <string name="meal_breakfast">Frühstück</string>
+    <string name="meal_lunch">Mittagessen</string>
+    <string name="meal_dinner">Abendessen</string>
+    <string name="meal_snack">Snack</string>
+
+    <string name="sensor_time_remaining">Verbleibende Zeit</string>
+    <string name="sensor_lifetime_gauge">Sensor-Lebensdauer</string>
+    <string name="sensor_warmup_gauge">Sensor-Aufwärmphase</string>
+    <string name="sensor_reconnect">Sensor neu verbinden</string>
+    <string name="sensor_use_again">Sensor erneut verwenden</string>
+    <string name="sensor_forget">Entkoppeln &amp; neu suchen</string>
+    <string name="status_in_range">Im Zielbereich</string>
+    <string name="status_low">Niedrig</string>
+    <string name="status_very_low">Sehr niedrig</string>
+    <string name="status_high">Hoch</string>
+    <string name="status_very_high">Sehr hoch</string>
+
+    <!-- Hero & Glucose Readings -->
+    <string name="no_reading">Kein Messwert</string>
+    <string name="waiting_for_readings">Warten auf Messwerte…</string>
+    <string name="just_now">Gerade eben</string>
+    <string name="min_ago">vor %d Min.</string>
+    <string name="hours_min_ago">vor %1$d Std. %2$d Min.</string>
+    <string name="cgm_sensor">CGM-Sensor</string>
+    <string name="no_sensor_connected">Kein Sensor verbunden</string>
+    <string name="target_label">Zielbereich: %1$s–%2$s</string>
+
+    <!-- Stats & Clinical Targets -->
+    <string name="stats_agp_title">Statistik &amp; AGP</string>
+    <string name="stats_agp_desc">Klinische Parameter und Ambulantes Glukoseprofil</string>
+    <string name="stats_period_1d">1 Tag</string>
+    <string name="stats_period_7d">7 Tage</string>
+    <string name="stats_period_14d">14 Tage</string>
+    <string name="stats_period_30d">30 Tage</string>
+    <string name="stats_period_90d">90 Tage</string>
+    <string name="data_source">Datenquelle</string>
+    <string name="realtime_stream">Echtzeit-Stream</string>
+    <string name="sensor_history">Sensorverlauf</string>
+    <string name="kpi_average_glucose">Durchschnittsglukose</string>
+    <string name="kpi_gmi">GMI (geschätzter HbA1c)</string>
+    <string name="kpi_cv">Variabilität (CV)</string>
+    <string name="kpi_active_time">Aktive CGM-Zeit</string>
+    <string name="target_average_sub">Zielwert: &lt; %s</string>
+    <string name="target_gmi_sub" formatted="false">Zielwert: &lt; 7,0%</string>
+    <string name="target_cv_sub" formatted="false">Zielwert: &lt; 36,0%</string>
+    <string name="target_active_sub" formatted="false">Zielwert: &gt; 70,0%</string>
+    <string name="tir_title">Zeit im Zielbereich (TIR)</string>
+    <string name="tir_guidelines">Internationale Konsensrichtlinien</string>
+    <string name="tir_no_readings">Keine Messwerte für diesen Zeitraum verfügbar</string>
+    <string name="agp_card_title">Ambulantes Glukoseprofil (AGP)</string>
+    <string name="agp_card_subtitle">24-Stunden-Zusammensetzung über %s</string>
+    <string name="reports_export_title">Berichte &amp; Export</string>
+    <string name="reports_export_desc">Klinische Zusammenfassung erstellen oder Rohdaten exportieren</string>
+    <string name="btn_web_report">Web-Bericht</string>
+    <string name="btn_export_data">Daten exportieren</string>
+    <string name="agp_median" formatted="false">50% Median</string>
+    <string name="agp_iqr" formatted="false">25–75% Bereich</string>
+    <string name="agp_outer_range" formatted="false">10–90% Bereich</string>
+    <string name="clinical_target_reached">Ziel erreicht</string>
+    <string name="clinical_target_unmet">Handlungsbedarf</string>
+    <string name="clinical_stable_cv">Stabil</string>
+    <string name="clinical_high_cv">Hoch</string>
+
+    <!-- Calibration -->
+    <string name="calibration_desc">Sensormesswerte anhand von kapillären Referenzwerten kalibrieren:</string>
+    <string name="calibration_enable">Kalibrierung aktivieren</string>
+    <string name="calibration_enable_desc">Kalibrierungskurve auf Glukosestream anwenden</string>
+    <string name="calibration_past">Vergangene Messwerte kalibrieren</string>
+    <string name="calibration_past_desc">Frühere Sensorverlaufswerte neuberechnen</string>
+    <string name="calibration_all_values">Alle Blutzuckermessungen nutzen</string>
+    <string name="calibration_all_values_desc">Blutglukose-Einträge automatisch einbeziehen</string>
+    <string name="calibration_add_ref">Kalibrierungsreferenz hinzufügen</string>
+    <string name="calibration_new_ref">Neue Referenzmessung</string>
+    <string name="calibration_guidance">Nur bei stabilem Glukosespiegel (waagerechter Trendpfeil) kalibrieren. Schnelle Änderungen führen zu Fehlmessungen.</string>
+    <string name="calibration_factor">Kalibrierungsfaktor: %s</string>
+
+    <!-- Export Dialog -->
+    <string name="export_glucose_data">Glukosedaten exportieren</string>
+    <string name="export_select_stream">Zu exportierenden Datenstrom auswählen:</string>
+    <string name="export_days_count">Anzahl der Tage</string>
+    <string name="export_include_calibrated">Kalibrierte Werte einschließen</string>
+    <string name="export_start_action">Datei exportieren</string>
+
 </resources>
 
 

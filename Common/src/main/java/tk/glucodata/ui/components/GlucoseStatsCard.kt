@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,6 +27,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.theme.LocalClinicalColors
@@ -34,112 +39,148 @@ fun GlucoseStatsCard(
     stats: GlucoseStats,
     unit: GlucoseUnit,
     timeRangeLabel: String = "6h",
+    minimalistUnits: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val clinicalColors = LocalClinicalColors.current
+    val hasData = stats.readingsCount > 0 && stats.averageMgDl > 0f
+    val glucoseUnitLabel = if (!minimalistUnits) unit.label else ""
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(18.dp)
+            modifier = Modifier.padding(16.dp)
         ) {
-            // Header: Title & Time window
+            // Header: Title & Time in target with clinical badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Time in Range ($timeRangeLabel)",
+                    text = "${stringResource(R.string.tir_title)} ($timeRangeLabel)",
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = "${stats.timeInRangePercent}% in target",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = clinicalColors.inRange
-                )
+                if (hasData) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = (if (stats.timeInRangePercent >= 70) clinicalColors.inRange else clinicalColors.high).copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = if (stats.timeInRangePercent >= 70) "≥70% ✓" else "<70%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (stats.timeInRangePercent >= 70) clinicalColors.inRange else clinicalColors.high,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${stats.timeInRangePercent}%",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = clinicalColors.inRange
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Multi-segment Time in Range Bar
-            TimeInRangeBar(stats = stats)
+            if (!hasData) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.tir_no_readings),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                // Multi-segment Time in Range Bar
+                TimeInRangeBar(stats = stats)
 
-            Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-            // Legend / breakdown Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                TirLegendItem(
-                    label = "Very Low",
-                    percent = stats.timeVeryLowPercent,
-                    color = clinicalColors.veryLow
-                )
-                TirLegendItem(
-                    label = "Low",
-                    percent = stats.timeBelowPercent - stats.timeVeryLowPercent,
-                    color = clinicalColors.low
-                )
-                TirLegendItem(
-                    label = "In Target",
-                    percent = stats.timeInRangePercent,
-                    color = clinicalColors.inRange
-                )
-                TirLegendItem(
-                    label = "High",
-                    percent = stats.timeAbovePercent - stats.timeVeryHighPercent,
-                    color = clinicalColors.high
-                )
-                TirLegendItem(
-                    label = "Very High",
-                    percent = stats.timeVeryHighPercent,
-                    color = clinicalColors.veryHigh
-                )
-            }
+                // Concise Legend / Breakdown Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TirLegendItem(
+                        label = stringResource(R.string.status_very_low),
+                        percent = stats.timeVeryLowPercent,
+                        color = clinicalColors.veryLow
+                    )
+                    TirLegendItem(
+                        label = stringResource(R.string.status_low),
+                        percent = (stats.timeBelowPercent - stats.timeVeryLowPercent).coerceAtLeast(0),
+                        color = clinicalColors.low
+                    )
+                    TirLegendItem(
+                        label = stringResource(R.string.status_in_range),
+                        percent = stats.timeInRangePercent,
+                        color = clinicalColors.inRange
+                    )
+                    TirLegendItem(
+                        label = stringResource(R.string.status_high),
+                        percent = (stats.timeAbovePercent - stats.timeVeryHighPercent).coerceAtLeast(0),
+                        color = clinicalColors.high
+                    )
+                    TirLegendItem(
+                        label = stringResource(R.string.status_very_high),
+                        percent = stats.timeVeryHighPercent,
+                        color = clinicalColors.veryHigh
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-            // 4 Stat Tiles Grid: Average, GMI, Min, Max
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                StatTile(
-                    title = "Average",
-                    value = if (stats.averageMgDl > 0) unit.format(stats.averageMgDl) else "—",
-                    unit = unit.label,
-                    modifier = Modifier.weight(1f)
-                )
-                StatTile(
-                    title = "Est. A1C (GMI)",
-                    value = if (stats.estimatedA1c > 0) String.format(java.util.Locale.US, "%.1f", stats.estimatedA1c) else "—",
-                    unit = "%",
-                    modifier = Modifier.weight(1f)
-                )
-                StatTile(
-                    title = "Min",
-                    value = if (stats.minMgDl > 0) unit.format(stats.minMgDl) else "—",
-                    unit = unit.label,
-                    modifier = Modifier.weight(1f)
-                )
-                StatTile(
-                    title = "Max",
-                    value = if (stats.maxMgDl > 0) unit.format(stats.maxMgDl) else "—",
-                    unit = unit.label,
-                    modifier = Modifier.weight(1f)
-                )
+                // 4 Equal-Height Stat Tiles Grid: Average, GMI, Min, Max
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    StatTile(
+                        title = stringResource(R.string.kpi_average_glucose),
+                        value = unit.format(stats.averageMgDl),
+                        unit = glucoseUnitLabel,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatTile(
+                        title = stringResource(R.string.kpi_gmi),
+                        value = String.format(java.util.Locale.US, "%.1f", stats.estimatedA1c),
+                        unit = "%",
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatTile(
+                        title = "Min",
+                        value = unit.format(stats.minMgDl),
+                        unit = glucoseUnitLabel,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatTile(
+                        title = "Max",
+                        value = unit.format(stats.maxMgDl),
+                        unit = glucoseUnitLabel,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -244,35 +285,46 @@ private fun StatTile(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.height(68.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
         )
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = 8.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.Center
+            ) {
                 Text(
                     text = value,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
                 )
                 if (unit.isNotEmpty()) {
                     Spacer(modifier = Modifier.width(2.dp))
                     Text(
                         text = unit,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }

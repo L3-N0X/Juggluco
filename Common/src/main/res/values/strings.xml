@@ -540,4 +540,177 @@
     <string name="transport_needs_label">Direct Bluetooth and Messages need a connection label</string>
     <string name="transport_needs_password">Direct Bluetooth needs a mirror password</string>
 
+    <!-- Compose Modern UI & Landscape Enhancements -->
+    <string name="tab_glucose">Glucose</string>
+    <string name="tab_stats">Stats</string>
+    <string name="tab_logbook">Logbook</string>
+    <string name="tab_sensors">Sensors</string>
+    <string name="tab_settings">Settings</string>
+
+    <string name="timerange_1h">1h</string>
+    <string name="timerange_3h">3h</string>
+    <string name="timerange_6h">6h</string>
+    <string name="timerange_12h">12h</string>
+    <string name="timerange_24h">24h</string>
+    <string name="timerange_all">All</string>
+    <string name="timerange_custom">Custom</string>
+    <string name="custom_range">Custom Range</string>
+    <string name="custom_time_range">Custom Time Range</string>
+    <string name="quick_presets">Quick Presets</string>
+    <string name="custom_duration">Custom Duration</string>
+    <string name="minimalist_units">Minimalist Unit Display</string>
+    <string name="minimalist_units_desc">Omit redundant unit labels on badges, tiles and list entries for a cleaner aesthetic</string>
+    <string name="logbook_time_today">Today</string>
+    <string name="logbook_time_7d">7 Days</string>
+    <string name="logbook_time_14d">14 Days</string>
+    <string name="logbook_time_30d">30 Days</string>
+    <string name="logbook_time_all">All Time</string>
+    <string name="logbook_totals">Totals</string>
+
+    <string name="graph_layers">Graph Layers</string>
+    <string name="graph_layers_desc">Customize data layers rendered on the glucose curve</string>
+    <string name="layer_stream">Real-time Stream</string>
+    <string name="layer_stream_desc">Continuous 1-minute Bluetooth stream values</string>
+    <string name="layer_calibrated_stream">Calibrated Stream</string>
+    <string name="layer_calibrated_stream_desc">Calibrated real-time stream curve</string>
+    <string name="layer_scans">NFC Scans</string>
+    <string name="layer_scans_desc">Manual scan readings from sensor memory</string>
+    <string name="layer_calibrated_scans">Calibrated Scans</string>
+    <string name="layer_calibrated_scans_desc">Calibrated NFC scan points</string>
+    <string name="layer_history">Sensor History</string>
+    <string name="layer_history_desc">Historic 15-minute sensor backup values</string>
+    <string name="layer_calibrated_history">Calibrated History</string>
+    <string name="layer_calibrated_history_desc">Calibrated 15-minute history values</string>
+    <string name="layer_amounts">Insulin &amp; Amounts</string>
+    <string name="layer_amounts_desc">Show logged insulin doses &amp; numbers on curve</string>
+    <string name="layer_meals">Meals &amp; Food</string>
+    <string name="layer_meals_desc">Display meal carbs and food indicators</string>
+
+    <string name="fullscreen_graph">Fullscreen Graph</string>
+    <string name="exit_fullscreen">Exit Fullscreen</string>
+    <string name="viewing_past_data">Viewing Past Data</string>
+    <string name="jump_to_now">Jump to Now</string>
+    <string name="rate_of_change">Rate of change</string>
+    <string name="rate_unit_mgdl">mg/dL/min</string>
+    <string name="rate_unit_mmol">mmol/L/min</string>
+    <string name="delta">Delta</string>
+
+    <string name="help_and_explanations">Help &amp; Clinical Explanations</string>
+    <string name="help_tir_title">Time in Range (TIR)</string>
+    <string name="help_tir_desc" formatted="false">The percentage of time your glucose stays within your target range (70–180 mg/dL or 3.9–10.0 mmol/L). Clinical consensus recommends aiming for &gt; 70% in range, &lt; 4% low, and &lt; 1% very low.</string>
+    <string name="help_gmi_title">Glucose Management Indicator (GMI)</string>
+    <string name="help_gmi_desc" formatted="false">Calculates an estimated laboratory HbA1c based on your continuous glucose average over recent weeks. Target is typically &lt; 7.0% for most adults.</string>
+    <string name="help_cv_title" formatted="false">Glycemic Variability (%CV)</string>
+    <string name="help_cv_desc" formatted="false">Coefficient of Variation reflects how much your glucose swings. A %CV below 36% indicates stable, low-variability glucose control.</string>
+    <string name="help_agp_title">Ambulatory Glucose Profile (AGP)</string>
+    <string name="help_agp_desc" formatted="false">A standardized 24-hour composite visual curve. The solid line is the 50% median; the dark band represents 50% of days (25th–75th percentile); the light outer band encompasses 80% (10th–90th percentile).</string>
+    <string name="help_data_sources_title">Stream vs History vs Scans</string>
+    <string name="help_data_sources_desc">Stream: live 1-minute Bluetooth values. History: 15-minute values stored inside the sensor memory and backfilled on reconnection. Scans: readings taken by physically holding your phone to the sensor via NFC.</string>
+    <string name="help_calibration_title">Sensor Calibration Guidelines</string>
+    <string name="help_calibration_desc">Applies blood glucose fingerprick measurements to calibrate continuous sensor data. Calibrate only when glucose is stable (flat trend arrow), never during fast rises, drops, or immediately after eating.</string>
+    <string name="help_exchanges_title">Broadcasts &amp; Integrations</string>
+    <string name="help_exchanges_desc">Glucodata and xDrip broadcasts send readings locally to watchfaces, widgets, and apps on your device. Local web server serves Nightscout API locally without internet.</string>
+
+    <string name="export_title">Export Sensor Data</string>
+    <string name="export_desc">Export raw glucose, insulin, and carb records</string>
+    <string name="export_days_label">Days of History</string>
+    <string name="export_amounts">Amounts (.tsv)</string>
+    <string name="export_scans">Scans (.tsv)</string>
+    <string name="export_stream">Stream (.tsv)</string>
+    <string name="export_history">History (.tsv)</string>
+    <string name="export_meals">Meals (.html)</string>
+    <string name="export_libreview">LibreView (.csv)</string>
+    <string name="export_calibrated_checkbox">Export calibrated values</string>
+
+    <string name="calibration_title">Sensor Calibration</string>
+    <string name="calibration_reference_input">Blood Glucose Reference (Fingerprick)</string>
+    <string name="calibration_current_factor">Active Calibration Factor</string>
+    <string name="calibration_rule_stable">Ensure glucose is stable (horizontal arrow) before calibrating</string>
+    <string name="calibration_save">Apply Calibration</string>
+
+    <string name="quick_bolus_chips">Quick Bolus</string>
+    <string name="quick_carbs_chips">Quick Carbs</string>
+    <string name="meal_breakfast">Breakfast</string>
+    <string name="meal_lunch">Lunch</string>
+    <string name="meal_dinner">Dinner</string>
+    <string name="meal_snack">Snack</string>
+
+    <string name="sensor_time_remaining">Time Remaining</string>
+    <string name="sensor_lifetime_gauge">Sensor Lifespan</string>
+    <string name="sensor_warmup_gauge">Sensor Warmup</string>
+    <string name="sensor_reconnect">Reconnect Sensor</string>
+    <string name="sensor_use_again">Use Sensor Again</string>
+    <string name="sensor_forget">Forget &amp; Rescan</string>
+    <string name="status_in_range">In Range</string>
+    <string name="status_low">Low</string>
+    <string name="status_very_low">Very Low</string>
+    <string name="status_high">High</string>
+    <string name="status_very_high">Very High</string>
+
+    <!-- Hero & Glucose Readings -->
+    <string name="no_reading">No Reading</string>
+    <string name="waiting_for_readings">Waiting for readings…</string>
+    <string name="just_now">Just now</string>
+    <string name="min_ago">%d min ago</string>
+    <string name="hours_min_ago">%1$dh %2$dm ago</string>
+    <string name="cgm_sensor">CGM Sensor</string>
+    <string name="no_sensor_connected">No Sensor Connected</string>
+    <string name="target_label">Target: %1$s–%2$s</string>
+
+    <!-- Stats & Clinical Targets -->
+    <string name="stats_agp_title">Statistics &amp; AGP</string>
+    <string name="stats_agp_desc">Clinical metrics and Ambulatory Glucose Profile</string>
+    <string name="stats_period_1d">1 Day</string>
+    <string name="stats_period_7d">7 Days</string>
+    <string name="stats_period_14d">14 Days</string>
+    <string name="stats_period_30d">30 Days</string>
+    <string name="stats_period_90d">90 Days</string>
+    <string name="data_source">Data Source</string>
+    <string name="realtime_stream">Real-time Stream</string>
+    <string name="sensor_history">Sensor History</string>
+    <string name="kpi_average_glucose">Average Glucose</string>
+    <string name="kpi_gmi">GMI (est. A1C)</string>
+    <string name="kpi_cv">Variability (CV)</string>
+    <string name="kpi_active_time">Active CGM Time</string>
+    <string name="target_average_sub">Target: &lt; %s</string>
+    <string name="target_gmi_sub" formatted="false">Target: &lt; 7.0%</string>
+    <string name="target_cv_sub" formatted="false">Target: &lt; 36.0%</string>
+    <string name="target_active_sub" formatted="false">Target: &gt; 70.0%</string>
+    <string name="tir_title">Time In Range (TIR)</string>
+    <string name="tir_guidelines">International Consensus Guidelines</string>
+    <string name="tir_no_readings">No readings available for this period</string>
+    <string name="agp_card_title">Ambulatory Glucose Profile (AGP)</string>
+    <string name="agp_card_subtitle">24-hour composite curve across %s</string>
+    <string name="reports_export_title">Reports &amp; Export</string>
+    <string name="reports_export_desc">Generate clinical summary or export raw records</string>
+    <string name="btn_web_report">Web Report</string>
+    <string name="btn_export_data">Export Data</string>
+    <string name="agp_median" formatted="false">50% Median</string>
+    <string name="agp_iqr" formatted="false">25–75% Range</string>
+    <string name="agp_outer_range" formatted="false">10–90% Range</string>
+    <string name="clinical_target_reached">Target reached</string>
+    <string name="clinical_target_unmet">Action needed</string>
+    <string name="clinical_stable_cv">Stable</string>
+    <string name="clinical_high_cv">High</string>
+
+    <!-- Calibration -->
+    <string name="calibration_desc">Calibrate sensor readings against fingerprick reference values:</string>
+    <string name="calibration_enable">Enable Calibration</string>
+    <string name="calibration_enable_desc">Apply calibration curve to glucose stream</string>
+    <string name="calibration_past">Calibrate Past Readings</string>
+    <string name="calibration_past_desc">Recalibrate earlier sensor history values</string>
+    <string name="calibration_all_values">Use All Blood Glucose Checks</string>
+    <string name="calibration_all_values_desc">Automatically incorporate fingerprick logs</string>
+    <string name="calibration_add_ref">Add Calibration Reference</string>
+    <string name="calibration_new_ref">New Reference Check</string>
+    <string name="calibration_guidance">Only calibrate when glucose is stable (flat trend arrow). Calibrating during rapid changes leads to inaccuracies.</string>
+    <string name="calibration_factor">Calibration Factor: %s</string>
+
+    <!-- Export Dialog -->
+    <string name="export_glucose_data">Export Glucose Data</string>
+    <string name="export_select_stream">Select data stream to export:</string>
+    <string name="export_days_count">Number of Days</string>
+    <string name="export_include_calibrated">Include Calibrated Values</string>
+    <string name="export_start_action">Export File</string>
+
 </resources>

@@ -1701,7 +1701,11 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                     int type = requestCode & 0xF;
                     Uri uri;
                     if (data == null || (uri = data.getData()) == null) {
-                        curve.dialogs.exportlabel.setText(R.string.nodata);
+                        if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                            curve.dialogs.exportlabel.setText(R.string.nodata);
+                        } else {
+                            Applic.argToaster(this, getString(R.string.nodata), Toast.LENGTH_SHORT);
+                        }
                         return;
                     }
                     int fd = -1;
@@ -1709,24 +1713,44 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                         if (parcelFileDescriptor != null)
                             fd = parcelFileDescriptor.detachFd();
                         else {
-                            curve.dialogs.exportlabel.setText("Can't save: parcelFileDescriptor == null");
+                            if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                                curve.dialogs.exportlabel.setText("Can't save: parcelFileDescriptor == null");
+                            } else {
+                                Applic.argToaster(this, "Can't save: parcelFileDescriptor == null", Toast.LENGTH_SHORT);
+                            }
                             return;
                         }
 
                     } catch (IOException e) {
 
                         Log.stack(LOG_ID, e);
-                        curve.dialogs.exportlabel.setText(R.string.failedbyexception);
+                        if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                            curve.dialogs.exportlabel.setText(R.string.failedbyexception);
+                        } else {
+                            Applic.argToaster(this, getString(R.string.failedbyexception), Toast.LENGTH_SHORT);
+                        }
                         return;
                     }
                     if (Natives.exportdata(type, fd,Dialogs.showdays)) {
-                        curve.dialogs.exportlabel.setText(R.string.saved);
+                        if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                            curve.dialogs.exportlabel.setText(R.string.saved);
+                        } else {
+                            Applic.argToaster(this, getString(R.string.saved), Toast.LENGTH_SHORT);
+                        }
                     } else {
-                        curve.dialogs.exportlabel.setText(R.string.savefailed);
+                        if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                            curve.dialogs.exportlabel.setText(R.string.savefailed);
+                        } else {
+                            Applic.argToaster(this, getString(R.string.savefailed), Toast.LENGTH_SHORT);
+                        }
                     }
                 } else {
 
-                    curve.dialogs.exportlabel.setText(R.string.notsaved);
+                    if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                        curve.dialogs.exportlabel.setText(R.string.notsaved);
+                    } else {
+                        Applic.argToaster(this, getString(R.string.notsaved), Toast.LENGTH_SHORT);
+                    }
                 }
 
             } catch (Throwable th) {

@@ -44,12 +44,14 @@ data class DisplayConfig(
     val invertColors: Boolean = false,
     val talkGlucose: Boolean = false,
     val showScans: Boolean = true,
+    val showCalibratedScans: Boolean = false,
     val showStream: Boolean = true,
-    val showHistory: Boolean = true,
     val showCalibratedStream: Boolean = false,
+    val showHistory: Boolean = true,
     val showCalibratedHistory: Boolean = false,
     val showAmounts: Boolean = true,
-    val showMeals: Boolean = true
+    val showMeals: Boolean = true,
+    val minimalistUnits: Boolean = true
 )
 
 data class HardwareConfig(

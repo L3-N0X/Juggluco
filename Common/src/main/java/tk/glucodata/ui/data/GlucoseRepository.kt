@@ -72,6 +72,9 @@ class GlucoseRepository(
     private val _stats = MutableStateFlow(GlucoseStats())
     val stats: StateFlow<GlucoseStats> = _stats.asStateFlow()
 
+    private val _screenStats = MutableStateFlow(GlucoseStats())
+    val screenStats: StateFlow<GlucoseStats> = _screenStats.asStateFlow()
+
     private val _statsPeriod = MutableStateFlow(StatsPeriod.FOURTEEN_DAYS)
     val statsPeriod: StateFlow<StatsPeriod> = _statsPeriod.asStateFlow()
 
@@ -186,9 +189,11 @@ class GlucoseRepository(
                     systemUiFullscreen = Natives.getsystemUI(),
                     invertColors = Natives.getInvertColors(),
                     showScans = Natives.getshowscans(),
+                    showCalibratedScans = Natives.getshowcalibratedscans(),
                     showStream = Natives.getshowstream(),
-                    showHistory = Natives.getshowhistories(),
                     showCalibratedStream = Natives.getshowcalibratedstream(),
+                    showHistory = Natives.getshowhistories(),
+                    showCalibratedHistory = Natives.getshowcalibratedhistories(),
                     showAmounts = Natives.getshownumbers(),
                     showMeals = Natives.getshowmeals()
                 )
@@ -268,13 +273,6 @@ class GlucoseRepository(
             }
         } catch (_: Throwable) {}
 
-        if (loadedList.isEmpty()) {
-            loadedList = ArrayList(MockDataGenerator.generateReadings())
-            if (_currentReading.value == null && loadedList.isNotEmpty()) {
-                _currentReading.value = loadedList.last()
-            }
-        }
-
         loadedList.sortBy { it.timestamp }
         _readings.value = loadedList
     }
@@ -307,38 +305,38 @@ class GlucoseRepository(
 
                         detailsList.add(
                             SensorDetail(
-                                id = info.serial,
-                                name = info.serial,
+                                id = info.serial ?: "Unknown",
+                                name = info.serial ?: typeName,
                                 sensorPtr = info.sensorptr,
                                 status = status,
                                 sensorGen = info.sensorgen,
                                 sensorTypeName = typeName,
-                                macAddress = info.macAddress ?: "D4:36:39:B2:A1:8F",
+                                macAddress = info.macAddress,
                                 rssi = info.rssi,
-                                signalQuality = SignalQuality.fromRssi(info.rssi),
+                                signalQuality = if (info.isConnected && info.rssi != null && info.rssi != 0) SignalQuality.fromRssi(info.rssi) else SignalQuality.LOST,
                                 startTime = info.startTime,
-                                endTime = info.startTime + 14 * 24 * 3600 * 1000L,
-                                lastReadingTime = System.currentTimeMillis() - 45_000L,
+                                endTime = if (info.startTime > 0) info.startTime + 14 * 24 * 3600 * 1000L else 0L,
+                                lastReadingTime = if (info.isConnected) System.currentTimeMillis() else 0L,
                                 warmupMinutes = info.warmupMinutes,
                                 minWarmupMinutes = info.minWarmupMinutes,
                                 isConnected = info.isConnected,
                                 isStreaming = info.isStreaming,
                                 isHidden = info.isHidden,
                                 hasCalibration = info.hasCalibration,
-                                batteryPercent = 95,
-                                connectionStatusStr = info.statusStr,
-                                handshakeStatusStr = info.handshakeStr,
-                                rawDiagnosticText = info.infoHtml
+                                batteryPercent = null,
+                                connectionStatusStr = info.statusStr ?: if (info.isConnected) "Connected" else "Disconnected",
+                                handshakeStatusStr = info.handshakeStr ?: "",
+                                rawDiagnosticText = info.infoHtml ?: ""
                             )
                         )
                         legacyList.add(
                             SensorInfo(
-                                id = info.serial,
-                                name = info.serial,
+                                id = info.serial ?: "Unknown",
+                                name = info.serial ?: typeName,
                                 state = if (info.isConnected) SensorState.ACTIVE else SensorState.DISCONNECTED,
                                 startTime = info.startTime,
-                                endTime = info.startTime + 14 * 24 * 3600 * 1000L,
-                                lastReadingTime = System.currentTimeMillis(),
+                                endTime = if (info.startTime > 0) info.startTime + 14 * 24 * 3600 * 1000L else 0L,
+                                lastReadingTime = if (info.isConnected) System.currentTimeMillis() else 0L,
                                 sensorType = typeName,
                                 isStreaming = info.isStreaming,
                                 isConnected = info.isConnected
@@ -368,11 +366,11 @@ class GlucoseRepository(
                                     status = SensorStatus.CONNECTED_STREAMING,
                                     sensorGen = 3,
                                     sensorTypeName = "FreeStyle Libre 3",
-                                    macAddress = "D4:36:39:B2:A1:8F",
-                                    rssi = -68,
+                                    macAddress = null,
+                                    rssi = null,
                                     signalQuality = SignalQuality.GOOD,
-                                    startTime = System.currentTimeMillis() - 3 * 24 * 3600 * 1000L,
-                                    endTime = System.currentTimeMillis() + 11 * 24 * 3600 * 1000L,
+                                    startTime = 0L,
+                                    endTime = 0L,
                                     lastReadingTime = System.currentTimeMillis(),
                                     warmupMinutes = warmup,
                                     minWarmupMinutes = minWarmup,
@@ -380,7 +378,7 @@ class GlucoseRepository(
                                     isStreaming = true,
                                     isHidden = isHidden,
                                     hasCalibration = hasCali,
-                                    batteryPercent = 94,
+                                    batteryPercent = null,
                                     connectionStatusStr = "Connected",
                                     handshakeStatusStr = "Authenticated",
                                     rawDiagnosticText = infoText
@@ -402,15 +400,9 @@ class GlucoseRepository(
             }
         } catch (_: Throwable) {}
 
-        if (detailsList.isEmpty()) {
-            val mockActive = MockDataGenerator.generateSensorDetail()
-            detailsList.add(mockActive)
-            legacyList.add(MockDataGenerator.generateSensor())
-        }
-
         _sensorDetails.value = detailsList
         _sensors.value = legacyList
-        _previousSensors.value = MockDataGenerator.generatePreviousSensors()
+        _previousSensors.value = emptyList()
     }
 
     private fun loadLogsFromNative() {
@@ -432,7 +424,7 @@ class GlucoseRepository(
                         }
                         logList.add(
                             LogRecord(
-                                id = itm.time,
+                                id = itm.time * 1000L + pos,
                                 timestamp = itm.time * 1000L,
                                 type = type,
                                 value = itm.value
@@ -443,9 +435,6 @@ class GlucoseRepository(
             }
         } catch (_: Throwable) {}
 
-        if (logList.isEmpty()) {
-            logList.addAll(MockDataGenerator.generateLogs())
-        }
         logList.sortByDescending { it.timestamp }
         _logs.value = logList
     }
@@ -670,9 +659,11 @@ class GlucoseRepository(
         val current = _displayConfig.value
         val updated = when (layer) {
             "scans" -> current.copy(showScans = enabled)
+            "calibratedscans" -> current.copy(showCalibratedScans = enabled)
             "stream" -> current.copy(showStream = enabled)
+            "calibrated", "calibratedstream" -> current.copy(showCalibratedStream = enabled)
             "history" -> current.copy(showHistory = enabled)
-            "calibrated" -> current.copy(showCalibratedStream = enabled)
+            "calibratedhistory" -> current.copy(showCalibratedHistory = enabled)
             "amounts" -> current.copy(showAmounts = enabled)
             "meals" -> current.copy(showMeals = enabled)
             else -> current
@@ -683,15 +674,21 @@ class GlucoseRepository(
                 if (Applic.Nativesloaded) {
                     when (layer) {
                         "scans" -> Natives.setshowscans(enabled)
+                        "calibratedscans" -> Natives.setshowcalibratedscans(enabled)
                         "stream" -> Natives.setshowstream(enabled)
+                        "calibrated", "calibratedstream" -> Natives.setshowcalibratedstream(enabled)
                         "history" -> Natives.setshowhistories(enabled)
-                        "calibrated" -> Natives.setshowcalibratedstream(enabled)
+                        "calibratedhistory" -> Natives.setshowcalibratedhistories(enabled)
                         "amounts" -> Natives.setshownumbers(enabled)
                         "meals" -> Natives.setshowmeals(enabled)
                     }
                 }
             } catch (_: Throwable) {}
         }
+    }
+
+    fun setMinimalistUnits(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(minimalistUnits = enabled)
     }
 
     // --- GRAPH NAVIGATION ACTIONS ---
@@ -794,6 +791,7 @@ class GlucoseRepository(
         val all = _readings.value
         if (all.isEmpty()) {
             _stats.value = GlucoseStats()
+            _screenStats.value = GlucoseStats()
             _agpProfile.value = AgpProfile.calculate(emptyList(), _statsPeriod.value)
             return
         }
@@ -804,13 +802,21 @@ class GlucoseRepository(
 
         _stats.value = GlucoseStats.calculate(toUse, _targetLow.value, _targetHigh.value)
         _agpProfile.value = AgpProfile.calculate(toUse, _statsPeriod.value)
+
+        // Calculate screen stats specifically for the selected time range window (e.g. 1h, 6h, or custom duration)
+        val screenCutoff = System.currentTimeMillis() - _selectedTimeRange.value.durationMillis
+        val screenFiltered = all.filter { it.timestamp >= screenCutoff }
+        val screenToUse = if (screenFiltered.isNotEmpty()) screenFiltered else all
+        _screenStats.value = GlucoseStats.calculate(screenToUse, _targetLow.value, _targetHigh.value)
     }
 
     private fun startPolling() {
         scope.launch(Dispatchers.IO) {
+            var counter = 0
             while (isActive) {
-                delay(10_000L)
+                delay(3_000L)
                 try {
+                    counter++
                     if (Applic.Nativesloaded) {
                         val strGl = Natives.lastglucose()
                         if (strGl != null && strGl.time > 0) {
@@ -836,6 +842,11 @@ class GlucoseRepository(
                                 }
                             }
                         }
+                    }
+                    if (counter % 3 == 0) {
+                        loadReadingsFromNative()
+                        loadSensorsFromNative()
+                        loadLogsFromNative()
                     }
                 } catch (_: Throwable) {}
             }

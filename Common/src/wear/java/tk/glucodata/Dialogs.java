@@ -29,4 +29,5 @@ public class Dialogs {
 		public TextView exportlabel;
 	Dialogs(float density) { }
 	public void showexport(MainActivity activity,int width,int height,Object obj) { }
+	public static void runExport(MainActivity activity, int typeIndex, boolean isCalibrated, float days) { }
 	}

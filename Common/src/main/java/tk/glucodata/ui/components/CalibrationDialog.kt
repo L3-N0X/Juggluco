@@ -38,6 +38,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.ui.res.stringResource
+import tk.glucodata.R
 import tk.glucodata.Natives
 import tk.glucodata.ui.model.GlucoseUnit
 
@@ -72,7 +75,7 @@ fun CalibrationDialog(
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Sensor Calibration", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.calibration_title), fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -82,8 +85,33 @@ fun CalibrationDialog(
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Clinical Stability Guidance Banner
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.calibration_guidance),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+
                 Text(
-                    text = "Calibrate sensor readings against fingerprick reference values:",
+                    text = stringResource(R.string.calibration_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -95,8 +123,8 @@ fun CalibrationDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text("Enable Calibration", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        Text("Apply calibration curve to glucose stream", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text(stringResource(R.string.calibration_enable), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.calibration_enable_desc), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     }
                     Switch(
                         checked = isCalibrateActive,
@@ -119,8 +147,8 @@ fun CalibrationDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text("Calibrate Past Readings", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        Text("Recalibrate earlier sensor history values", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text(stringResource(R.string.calibration_past), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.calibration_past_desc), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     }
                     Switch(
                         checked = calibratePast,
@@ -142,8 +170,8 @@ fun CalibrationDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text("Use All Blood Glucose Checks", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        Text("Automatically incorporate fingerprick logs", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text(stringResource(R.string.calibration_all_values), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.calibration_all_values_desc), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     }
                     Switch(
                         checked = allValues,
@@ -167,7 +195,7 @@ fun CalibrationDialog(
                     ) {
                         Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add Calibration Reference")
+                        Text(stringResource(R.string.calibration_add_ref))
                     }
                 } else {
                     Card(
@@ -176,7 +204,7 @@ fun CalibrationDialog(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
-                            Text("New Reference Check", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.calibration_new_ref), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = bloodGlucoseText,
@@ -192,7 +220,7 @@ fun CalibrationDialog(
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(onClick = { showAddPoint = false }) {
-                                    Text("Cancel")
+                                    Text(stringResource(R.string.cancel))
                                 }
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Button(
@@ -206,7 +234,7 @@ fun CalibrationDialog(
                                         }
                                     }
                                 ) {
-                                    Text("Save")
+                                    Text(stringResource(R.string.save))
                                 }
                             }
                         }
@@ -216,7 +244,7 @@ fun CalibrationDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Done")
+                Text(stringResource(R.string.closename))
             }
         }
     )

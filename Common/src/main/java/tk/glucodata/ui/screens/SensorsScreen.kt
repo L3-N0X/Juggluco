@@ -72,8 +72,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import tk.glucodata.R
 import tk.glucodata.ui.components.CalibrationDialog
 import tk.glucodata.ui.components.StartSensorDialog
 import tk.glucodata.ui.components.StopSensorDialog
@@ -108,7 +110,7 @@ fun SensorsScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .padding(bottom = 96.dp)
     ) {
         // Page Title Header
@@ -227,15 +229,15 @@ fun SensorsScreen(
 private fun NfcScanBanner(onScanClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(50.dp)
+                        .size(44.dp)
                         .background(MaterialTheme.colorScheme.primary, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -243,14 +245,14 @@ private fun NfcScanBanner(onScanClick: () -> Unit) {
                         imageVector = Icons.Default.Nfc,
                         contentDescription = "NFC",
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(14.dp))
                 Column {
                     Text(
                         text = "NFC Quick Scan / Start Sensor",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -262,7 +264,7 @@ private fun NfcScanBanner(onScanClick: () -> Unit) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Button(
                 onClick = onScanClick,
@@ -297,30 +299,30 @@ private fun OverhauledSensorCard(
 
     val statusColor = when (sensor.status) {
         SensorStatus.CONNECTED_STREAMING -> clinicalColors.inRange
-        SensorStatus.CONNECTED_IDLE -> Color(0xFF2563EB)
-        SensorStatus.CONNECTING -> Color(0xFFEAB308)
-        SensorStatus.WARMING_UP -> Color(0xFFF97316)
-        SensorStatus.DISCONNECTED -> clinicalColors.veryLow
+        SensorStatus.CONNECTED_IDLE -> MaterialTheme.colorScheme.primary
+        SensorStatus.CONNECTING -> Color(0xFFD97706)
+        SensorStatus.WARMING_UP -> Color(0xFFEA580C)
+        SensorStatus.DISCONNECTED -> MaterialTheme.colorScheme.outline
         SensorStatus.EXPIRED, SensorStatus.ENDED -> Color.Gray
         SensorStatus.HIDDEN -> Color.DarkGray
     }
 
-    val statusBg = statusColor.copy(alpha = 0.15f)
+    val statusBg = statusColor.copy(alpha = 0.12f)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            // Top Row: Sensor Type, Serial & Status Badge
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Top Row: Sensor Type, Serial & Status Badge (Clean, No dot!)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
                         text = sensor.sensorTypeName,
                         style = MaterialTheme.typography.titleLarge,
@@ -328,107 +330,130 @@ private fun OverhauledSensorCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Serial: ${sensor.id}",
+                        text = "ID: ${sensor.id}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                // Status Badge
+                // Clean Muted Status Badge (No dot!)
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(8.dp),
                     color = statusBg
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(statusColor, CircleShape)
+                    Text(
+                        text = sensor.status.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Signal Quality & Connection Status
+            if (sensor.isConnected) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.SignalCellularAlt,
+                            contentDescription = "Signal Strength",
+                            tint = if (sensor.signalQuality != SignalQuality.LOST) clinicalColors.inRange else Color.Gray,
+                            modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = sensor.status.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = statusColor
+                            text = "Signal: ${sensor.signalQuality.label}" + if (sensor.rssi != null && sensor.rssi != 0) " (${sensor.rssi} dBm)" else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    if (sensor.batteryPercent != null) {
+                        Text(
+                            text = "Battery: ${sensor.batteryPercent}%",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Warmup Status Banner (if currently warming up)
+            if (sensor.isCurrentlyWarmingUp) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${stringResource(R.string.sensor_warmup_gauge)}: ${sensor.warmupRemainingMinutes} min",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
 
-            // Signal Quality & Battery Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.SignalCellularAlt,
-                        contentDescription = "Signal Strength",
-                        tint = if (sensor.signalQuality != SignalQuality.LOST) clinicalColors.inRange else Color.Gray,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+            // Lifespan Progress (only if valid start time)
+            if (sensor.startTime > 0L) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text(
-                        text = "Signal: ${sensor.signalQuality.label}" + if (sensor.rssi != null) " (${sensor.rssi} dBm)" else "",
+                        text = stringResource(R.string.sensor_lifetime_gauge),
                         style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${String.format(Locale.US, "%.1f", sensor.daysRemaining)} ${stringResource(R.string.days)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
 
-                if (sensor.batteryPercent != null) {
-                    Text(
-                        text = "Battery: ${sensor.batteryPercent}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
+                Spacer(modifier = Modifier.height(6.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Lifespan Progress
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Sensor Wear Progress",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                LinearProgressIndicator(
+                    progress = { 1f - sensor.progressPercent },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = clinicalColors.inRange,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
-                Text(
-                    text = "${String.format(Locale.US, "%.1f", sensor.daysRemaining)} days remaining",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+
+                Spacer(modifier = Modifier.height(14.dp))
             }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            LinearProgressIndicator(
-                progress = { 1f - sensor.progressPercent },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = clinicalColors.inRange,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
 
             // 3-Step Live Connection Pipeline
             Text(
@@ -445,54 +470,7 @@ private fun OverhauledSensorCard(
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Warmup Settings Slider
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                    .padding(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Warmup Period",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Text(
-                        text = "${warmupSliderValue.toInt()} min",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Slider(
-                    value = warmupSliderValue,
-                    onValueChange = { warmupSliderValue = it },
-                    onValueChangeFinished = { onWarmupChanged(warmupSliderValue.toInt()) },
-                    valueRange = sensor.minWarmupMinutes.toFloat()..180f,
-                    steps = 11
-                )
-
-                Text(
-                    text = "Adjust initial stabilization delay before readings are displayed on the graph.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Hide from Graph Switch Row
             Row(
@@ -530,7 +508,7 @@ private fun OverhauledSensorCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Actions Row 1: Reconnect & Forget/Rescan
             Row(
@@ -544,7 +522,7 @@ private fun OverhauledSensorCard(
                 ) {
                     Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Reconnect", fontSize = 13.sp)
+                    Text(stringResource(R.string.sensor_reconnect), fontSize = 13.sp)
                 }
 
                 OutlinedButton(
@@ -554,7 +532,7 @@ private fun OverhauledSensorCard(
                 ) {
                     Icon(imageVector = Icons.AutoMirrored.Filled.BluetoothSearching, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Forget & Rescan", fontSize = 13.sp)
+                    Text(stringResource(R.string.sensor_forget), fontSize = 13.sp)
                 }
             }
 
@@ -572,7 +550,7 @@ private fun OverhauledSensorCard(
                 ) {
                     Icon(imageVector = Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Calibrate", fontSize = 13.sp)
+                    Text(stringResource(R.string.calibration_title), fontSize = 13.sp)
                 }
 
                 OutlinedButton(
@@ -601,7 +579,7 @@ private fun OverhauledSensorCard(
                     Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Technical Details & Diagnostics",
+                        text = "Technical Details & Advanced Settings",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -625,11 +603,53 @@ private fun OverhauledSensorCard(
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                         .padding(12.dp)
                 ) {
-                    DiagField(label = "MAC Address", value = sensor.macAddress ?: "Unknown")
+                    DiagField(label = "MAC Address", value = sensor.macAddress ?: "Not paired")
                     DiagField(label = "Sensor Generation", value = "${sensor.sensorGen}")
                     DiagField(label = "Start Timestamp", value = if (sensor.startTime > 0) SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(sensor.startTime)) else "Pending")
                     DiagField(label = "Expected End", value = if (sensor.endTime > 0) SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(sensor.endTime)) else "14 Days")
                     DiagField(label = "Calibration Status", value = if (sensor.hasCalibration) "User Calibrated" else "Factory Calibration")
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Warmup Period Adjuster (Advanced, kept here for parity with Sensors.java)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                            .padding(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Warmup Stabilization Time",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${warmupSliderValue.toInt()} min",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Slider(
+                            value = warmupSliderValue,
+                            onValueChange = { warmupSliderValue = it },
+                            onValueChangeFinished = { onWarmupChanged(warmupSliderValue.toInt()) },
+                            valueRange = sensor.minWarmupMinutes.toFloat()..180f,
+                            steps = 11
+                        )
+                        Text(
+                            text = "Default for Libre is 60 min. Adjust only if using specialized sensor configurations.",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
 
                     if (sensor.rawDiagnosticText.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -822,7 +842,7 @@ private fun SupportedDevicesCard() {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "Supported CGM Hardware",
                 style = MaterialTheme.typography.titleMedium,
@@ -830,7 +850,7 @@ private fun SupportedDevicesCard() {
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             DeviceSupportRow(name = "FreeStyle Libre 2 & 3", note = "Direct BLE streaming & NFC scan")
             DeviceSupportRow(name = "Dexcom G7 / ONE+", note = "Direct Bluetooth transmitter")
@@ -846,27 +866,35 @@ private fun DeviceSupportRow(name: String, note: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = "• $note",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline
-        )
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(13.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

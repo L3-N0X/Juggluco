@@ -1,5 +1,7 @@
 package tk.glucodata.ui.model
 
+import java.util.concurrent.atomic.AtomicLong
+
 enum class LogType(val label: String, val unitLabel: String) {
     RAPID_INSULIN("Rapid Insulin", "U"),
     BASAL_INSULIN("Basal Insulin", "U"),
@@ -9,8 +11,10 @@ enum class LogType(val label: String, val unitLabel: String) {
     NOTE("Note", "");
 }
 
+private val idGenerator = AtomicLong(System.currentTimeMillis())
+
 data class LogRecord(
-    val id: Long = System.currentTimeMillis(),
+    val id: Long = idGenerator.incrementAndGet(),
     val timestamp: Long,
     val type: LogType,
     val value: Float,

@@ -5,6 +5,7 @@ data class GlucosePoint(
     val valueMgDl: Float,
     val rate: Float = 0f,
     val isScan: Boolean = false,
+    val isHistory: Boolean = false,
     val isCalibrated: Boolean = false,
     val status: GlucoseStatus = GlucoseStatus.fromValue(valueMgDl)
 ) {

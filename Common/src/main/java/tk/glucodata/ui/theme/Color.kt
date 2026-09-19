@@ -76,41 +76,41 @@ data class ClinicalColors(
 )
 
 val LightClinicalColors = ClinicalColors(
-    inRange = Color(0xFF059669), // Emerald
-    inRangeContainer = Color(0xFFD1FAE5),
-    onInRangeContainer = Color(0xFF065F46),
-    low = Color(0xFFD97706), // Amber
+    inRange = Color(0xFF2E6B4F), // Muted sage / forest green
+    inRangeContainer = Color(0xFFE2EFE7),
+    onInRangeContainer = Color(0xFF133825),
+    low = Color(0xFFB45309), // Muted warm amber
     lowContainer = Color(0xFFFEF3C7),
-    onLowContainer = Color(0xFF92400E),
-    veryLow = Color(0xFFDC2626), // Red
+    onLowContainer = Color(0xFF78350F),
+    veryLow = Color(0xFFB91C1C), // Deep crimson
     veryLowContainer = Color(0xFFFEE2E2),
-    onVeryLowContainer = Color(0xFF991B1B),
-    high = Color(0xFFEA580C), // Orange
+    onVeryLowContainer = Color(0xFF7F1D1D),
+    high = Color(0xFFC2410C), // Muted burnt orange
     highContainer = Color(0xFFFFEDD5),
-    onHighContainer = Color(0xFF9A3412),
-    veryHigh = Color(0xFFBE123C), // Rose
+    onHighContainer = Color(0xFF7C2D12),
+    veryHigh = Color(0xFF9F1239), // Muted wine / rose
     veryHighContainer = Color(0xFFFFE4E6),
-    onVeryHighContainer = Color(0xFF881337),
-    targetRangeShade = Color(0x18059669),
-    graphGrid = Color(0x2070787D)
+    onVeryHighContainer = Color(0xFF701A31),
+    targetRangeShade = Color(0x142E6B4F),
+    graphGrid = Color(0x1870787D)
 )
 
 val DarkClinicalColors = ClinicalColors(
-    inRange = Color(0xFF34D399),
-    inRangeContainer = Color(0xFF064E3B),
-    onInRangeContainer = Color(0xFFA7F3D0),
-    low = Color(0xFFFBBF24),
-    lowContainer = Color(0xFF78350F),
+    inRange = Color(0xFF7CB69D), // Soft muted sage, never neon
+    inRangeContainer = Color(0xFF1B382B),
+    onInRangeContainer = Color(0xFFD1E8DC),
+    low = Color(0xFFE0A34E), // Muted gold/amber
+    lowContainer = Color(0xFF4A3315),
     onLowContainer = Color(0xFFFDE68A),
-    veryLow = Color(0xFFF87171),
-    veryLowContainer = Color(0xFF7F1D1D),
+    veryLow = Color(0xFFE57373), // Soft muted coral
+    veryLowContainer = Color(0xFF4C1D1D),
     onVeryLowContainer = Color(0xFFFECACA),
-    high = Color(0xFFFB923C),
-    highContainer = Color(0xFF7C2D12),
+    high = Color(0xFFE08E55), // Muted soft orange
+    highContainer = Color(0xFF4A2612),
     onHighContainer = Color(0xFFFED7AA),
-    veryHigh = Color(0xFFFB7185),
-    veryHighContainer = Color(0xFF881337),
+    veryHigh = Color(0xFFE57388), // Soft muted rose
+    veryHighContainer = Color(0xFF4C1625),
     onVeryHighContainer = Color(0xFFFECDD3),
-    targetRangeShade = Color(0x2834D399),
-    graphGrid = Color(0x288A9297)
+    targetRangeShade = Color(0x1A7CB69D),
+    graphGrid = Color(0x208A9297)
 )

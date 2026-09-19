@@ -1,16 +1,36 @@
 package tk.glucodata.ui.model
 
+import androidx.annotation.StringRes
+import tk.glucodata.R
 import java.util.Calendar
 
-enum class StatsPeriod(val label: String, val days: Int) {
-    ONE_DAY("1 Day", 1),
-    SEVEN_DAYS("7 Days", 7),
-    FOURTEEN_DAYS("14 Days", 14),
-    THIRTY_DAYS("30 Days", 30),
-    NINETY_DAYS("90 Days", 90);
-
+data class StatsPeriod(
+    val label: String,
+    val days: Int,
+    @StringRes val labelRes: Int? = null,
+    val isCustom: Boolean = false
+) {
     val durationMillis: Long
         get() = days * 24 * 3600 * 1000L
+
+    companion object {
+        val ONE_DAY = StatsPeriod("1 Day", 1, R.string.stats_period_1d)
+        val SEVEN_DAYS = StatsPeriod("7 Days", 7, R.string.stats_period_7d)
+        val FOURTEEN_DAYS = StatsPeriod("14 Days", 14, R.string.stats_period_14d)
+        val THIRTY_DAYS = StatsPeriod("30 Days", 30, R.string.stats_period_30d)
+        val NINETY_DAYS = StatsPeriod("90 Days", 90, R.string.stats_period_90d)
+
+        val PRESETS = listOf(ONE_DAY, SEVEN_DAYS, FOURTEEN_DAYS, THIRTY_DAYS, NINETY_DAYS)
+
+        fun fromDays(days: Int): StatsPeriod {
+            val d = days.coerceIn(1, 365)
+            return StatsPeriod(
+                label = "$d Days",
+                days = d,
+                isCustom = true
+            )
+        }
+    }
 }
 
 data class HourlyPercentiles(

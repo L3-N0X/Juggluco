@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import tk.glucodata.R
 import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
@@ -41,20 +43,29 @@ fun CurrentGlucoseHeroCard(
     currentReading: GlucosePoint?,
     previousReading: GlucosePoint?,
     unit: GlucoseUnit,
-    sensorName: String = "FreeStyle Libre 3",
+    sensorName: String? = null,
     targetLow: Float = 70f,
     targetHigh: Float = 180f,
+    minimalistUnits: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val clinicalColors = LocalClinicalColors.current
 
-    val status = currentReading?.status ?: GlucoseStatus.IN_RANGE
-    val (statusColor, containerColor) = when (status) {
-        GlucoseStatus.VERY_LOW -> Pair(clinicalColors.veryLow, clinicalColors.veryLowContainer)
-        GlucoseStatus.LOW -> Pair(clinicalColors.low, clinicalColors.lowContainer)
-        GlucoseStatus.IN_RANGE -> Pair(clinicalColors.inRange, clinicalColors.inRangeContainer)
-        GlucoseStatus.HIGH -> Pair(clinicalColors.high, clinicalColors.highContainer)
-        GlucoseStatus.VERY_HIGH -> Pair(clinicalColors.veryHigh, clinicalColors.veryHighContainer)
+    val isConnected = currentReading != null
+    val statusLabel = if (currentReading != null) stringResource(currentReading.status.labelRes) else stringResource(R.string.no_reading)
+    val (statusColor, containerColor) = if (currentReading != null) {
+        when (currentReading.status) {
+            GlucoseStatus.VERY_LOW -> Pair(clinicalColors.veryLow, clinicalColors.veryLowContainer)
+            GlucoseStatus.LOW -> Pair(clinicalColors.low, clinicalColors.lowContainer)
+            GlucoseStatus.IN_RANGE -> Pair(clinicalColors.inRange, clinicalColors.inRangeContainer)
+            GlucoseStatus.HIGH -> Pair(clinicalColors.high, clinicalColors.highContainer)
+            GlucoseStatus.VERY_HIGH -> Pair(clinicalColors.veryHigh, clinicalColors.veryHighContainer)
+        }
+    } else {
+        Pair(
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            MaterialTheme.colorScheme.surfaceVariant
+        )
     }
 
     val trendArrow = if (currentReading != null) TrendArrow.fromRate(currentReading.rate) else TrendArrow.UNKNOWN
@@ -63,36 +74,37 @@ fun CurrentGlucoseHeroCard(
     val timeAgoText = if (currentReading != null) {
         val diffMinutes = ((System.currentTimeMillis() - currentReading.timestamp) / (1000 * 60)).toInt()
         when {
-            diffMinutes <= 1 -> "Just now"
-            diffMinutes < 60 -> "$diffMinutes min ago"
-            else -> "${diffMinutes / 60}h ${diffMinutes % 60}m ago"
+            diffMinutes <= 1 -> stringResource(R.string.just_now)
+            diffMinutes < 60 -> stringResource(R.string.min_ago, diffMinutes)
+            else -> stringResource(R.string.hours_min_ago, diffMinutes / 60, diffMinutes % 60)
         }
     } else {
-        "No reading"
+        stringResource(R.string.waiting_for_readings)
     }
 
-    // Delta from previous reading
+    // Delta from previous reading (clean number, omitting redundant unit)
     val deltaText = if (currentReading != null && previousReading != null && currentReading != previousReading) {
         val deltaMgDl = currentReading.valueMgDl - previousReading.valueMgDl
         val sign = if (deltaMgDl >= 0) "+" else ""
-        when (unit) {
-            GlucoseUnit.MG_DL -> "$sign${deltaMgDl.toInt()} mg/dL"
-            GlucoseUnit.MMOL_L -> "$sign${String.format(java.util.Locale.US, "%.1f", deltaMgDl * unit.factor)} mmol/L"
+        val numStr = when (unit) {
+            GlucoseUnit.MG_DL -> "$sign${deltaMgDl.toInt()}"
+            GlucoseUnit.MMOL_L -> "$sign${String.format(java.util.Locale.US, "%.1f", deltaMgDl * unit.factor)}"
         }
+        if (!minimalistUnits) "$numStr ${unit.label}" else numStr
     } else null
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(24.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier.padding(18.dp)
         ) {
             // Top Row: Sensor Name & Status Chip
             Row(
@@ -106,39 +118,42 @@ fun CurrentGlucoseHeroCard(
                     Box(
                         modifier = Modifier
                             .size(24.dp)
-                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                            .background(
+                                if (isConnected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                CircleShape
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Sensors,
                             contentDescription = "Sensor",
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(14.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = sensorName,
+                        text = sensorName ?: (if (isConnected) stringResource(R.string.cgm_sensor) else stringResource(R.string.no_sensor_connected)),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = containerColor
                 ) {
                     Text(
-                        text = status.label,
+                        text = statusLabel,
                         color = statusColor,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Middle Row: Big Glucose Value + Unit + Trend Arrow
             Row(
@@ -152,40 +167,42 @@ fun CurrentGlucoseHeroCard(
                     val formattedValue = currentReading?.formatted(unit) ?: "—"
                     Text(
                         text = formattedValue,
-                        fontSize = 54.sp,
+                        fontSize = 50.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         letterSpacing = (-1).sp
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = unit.label,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 10.dp)
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = if (minimalistUnits) 11.sp else 14.sp,
+                        fontWeight = if (minimalistUnits) FontWeight.Normal else FontWeight.Medium,
+                        color = if (minimalistUnits) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = if (minimalistUnits) 8.dp else 10.dp)
                     )
                 }
 
                 // Trend Arrow Box
                 Surface(
                     shape = CircleShape,
-                    color = statusColor.copy(alpha = 0.12f),
-                    modifier = Modifier.size(56.dp)
+                    color = if (isConnected) statusColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(52.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        if (trendArrow != TrendArrow.UNKNOWN) {
+                        if (isConnected && trendArrow != TrendArrow.UNKNOWN) {
                             Icon(
                                 imageVector = Icons.Default.ArrowForward,
                                 contentDescription = trendArrow.label,
                                 tint = statusColor,
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(30.dp)
                                     .rotate(trendArrow.angleDegrees)
                             )
                         } else {
                             Text(
                                 text = "—",
-                                color = statusColor,
+                                color = MaterialTheme.colorScheme.outline,
                                 style = MaterialTheme.typography.titleLarge
                             )
                         }
@@ -218,7 +235,7 @@ fun CurrentGlucoseHeroCard(
                 }
 
                 Text(
-                    text = "Target: ${unit.format(targetLow)}–${unit.format(targetHigh)}",
+                    text = stringResource(R.string.target_label, unit.format(targetLow), unit.format(targetHigh)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )

@@ -16,7 +16,7 @@ data class GlucoseStats(
     val cvPercent: Float = 0f,          // Coefficient of Variation = (SD / Mean) * 100 (Goal < 36%)
     val estimatedA1c: Float = 0f,       // Glucose Management Indicator (GMI)
     val readingsCount: Int = 0,
-    val activeTimePercent: Float = 98.5f
+    val activeTimePercent: Float = 0f
 ) {
     companion object {
         fun calculate(readings: List<GlucosePoint>, targetLow: Float = 70f, targetHigh: Float = 180f): GlucoseStats {
