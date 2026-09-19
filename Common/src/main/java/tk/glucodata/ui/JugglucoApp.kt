@@ -35,6 +35,7 @@ import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.NavigationTab
 import tk.glucodata.ui.navigation.JugglucoBottomNavBar
 import tk.glucodata.ui.navigation.JugglucoNavigationRail
+import tk.glucodata.ui.screens.ExportScreen
 import tk.glucodata.ui.screens.GlucoseScreen
 import tk.glucodata.ui.screens.LogbookScreen
 import tk.glucodata.ui.screens.SensorsScreen
@@ -51,6 +52,7 @@ fun JugglucoApp(
     onExportData: () -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(NavigationTab.GLUCOSE) }
+    var isExportScreenOpen by rememberSaveable { mutableStateOf(false) }
     var showAddEntrySheet by rememberSaveable { mutableStateOf(false) }
     var isFullscreenGraph by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -65,114 +67,125 @@ fun JugglucoApp(
     var isDarkThemeOverride by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val darkTheme = isDarkThemeOverride ?: if (displayConfig.invertColors) true else systemDark
 
+    val handleOpenExport = {
+        isExportScreenOpen = true
+    }
+
     JugglucoTheme(darkTheme = darkTheme) {
-        val showTopBar = !isFullscreenGraph && (!isLandscape || selectedTab != NavigationTab.GLUCOSE)
-        val showBottomBar = !isFullscreenGraph && !isLandscape
-        val showNavRail = !isFullscreenGraph && isLandscape
+        if (isExportScreenOpen) {
+            ExportScreen(
+                repository = repository,
+                onNavigateBack = { isExportScreenOpen = false }
+            )
+        } else {
+            val showTopBar = !isFullscreenGraph && (!isLandscape || selectedTab != NavigationTab.GLUCOSE)
+            val showBottomBar = !isFullscreenGraph && !isLandscape
+            val showNavRail = !isFullscreenGraph && isLandscape
 
-        Scaffold(
-            topBar = {
-                if (showTopBar) {
-                    CenterAlignedTopAppBar(
-                        title = {
-                            Text(
-                                text = if (selectedTab == NavigationTab.GLUCOSE) "Juggluco" else stringResource(selectedTab.titleRes),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
+            Scaffold(
+                topBar = {
+                    if (showTopBar) {
+                        CenterAlignedTopAppBar(
+                            title = {
+                                Text(
+                                    text = if (selectedTab == NavigationTab.GLUCOSE) "Juggluco" else stringResource(selectedTab.titleRes),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                titleContentColor = MaterialTheme.colorScheme.onSurface
                             )
-                        },
-                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            titleContentColor = MaterialTheme.colorScheme.onSurface
                         )
-                    )
+                    }
+                },
+                bottomBar = {
+                    if (showBottomBar) {
+                        JugglucoBottomNavBar(
+                            selectedTab = selectedTab,
+                            onTabSelected = { selectedTab = it }
+                        )
+                    }
+                },
+                snackbarHost = {
+                    SnackbarHost(hostState = snackbarHostState)
                 }
-            },
-            bottomBar = {
-                if (showBottomBar) {
-                    JugglucoBottomNavBar(
-                        selectedTab = selectedTab,
-                        onTabSelected = { selectedTab = it }
-                    )
-                }
-            },
-            snackbarHost = {
-                SnackbarHost(hostState = snackbarHostState)
-            }
-        ) { innerPadding ->
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(if (isFullscreenGraph) PaddingValues(0.dp) else innerPadding)
-            ) {
-                if (showNavRail) {
-                    JugglucoNavigationRail(
-                        selectedTab = selectedTab,
-                        onTabSelected = { selectedTab = it }
-                    )
-                }
-
-                Box(
+            ) { innerPadding ->
+                Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .weight(1f)
+                        .padding(if (isFullscreenGraph) PaddingValues(0.dp) else innerPadding)
                 ) {
-                    when (selectedTab) {
-                        NavigationTab.GLUCOSE -> {
-                            GlucoseScreen(
-                                repository = repository,
-                                onOpenAddEntry = { showAddEntrySheet = true },
-                                isFullscreen = isFullscreenGraph,
-                                onToggleFullscreen = { isFullscreenGraph = !isFullscreenGraph }
-                            )
-                        }
-                        NavigationTab.STATS -> {
-                            StatsScreen(
-                                repository = repository,
-                                onExportData = onExportData
-                            )
-                        }
-                        NavigationTab.LOGBOOK -> {
-                            LogbookScreen(
-                                repository = repository,
-                                onOpenAddEntry = { showAddEntrySheet = true }
-                            )
-                        }
-                        NavigationTab.SENSORS -> {
-                            SensorsScreen(
-                                repository = repository,
-                                onTriggerNfcScan = onTriggerNfcScan
-                            )
-                        }
-                        NavigationTab.SETTINGS -> {
-                            SettingsScreen(
-                                repository = repository,
-                                isDarkTheme = darkTheme,
-                                onDarkThemeChanged = {
-                                    isDarkThemeOverride = it
-                                    repository.setInvertColors(it ?: systemDark)
-                                },
-                                onOpenLegacyView = onOpenLegacyView,
-                                onExportData = onExportData
-                            )
+                    if (showNavRail) {
+                        JugglucoNavigationRail(
+                            selectedTab = selectedTab,
+                            onTabSelected = { selectedTab = it }
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f)
+                    ) {
+                        when (selectedTab) {
+                            NavigationTab.GLUCOSE -> {
+                                GlucoseScreen(
+                                    repository = repository,
+                                    onOpenAddEntry = { showAddEntrySheet = true },
+                                    isFullscreen = isFullscreenGraph,
+                                    onToggleFullscreen = { isFullscreenGraph = !isFullscreenGraph }
+                                )
+                            }
+                            NavigationTab.STATS -> {
+                                StatsScreen(
+                                    repository = repository,
+                                    onExportData = handleOpenExport
+                                )
+                            }
+                            NavigationTab.LOGBOOK -> {
+                                LogbookScreen(
+                                    repository = repository,
+                                    onOpenAddEntry = { showAddEntrySheet = true }
+                                )
+                            }
+                            NavigationTab.SENSORS -> {
+                                SensorsScreen(
+                                    repository = repository,
+                                    onTriggerNfcScan = onTriggerNfcScan
+                                )
+                            }
+                            NavigationTab.SETTINGS -> {
+                                SettingsScreen(
+                                    repository = repository,
+                                    isDarkTheme = darkTheme,
+                                    onDarkThemeChanged = {
+                                        isDarkThemeOverride = it
+                                        repository.setInvertColors(it ?: systemDark)
+                                    },
+                                    onOpenLegacyView = onOpenLegacyView,
+                                    onExportData = handleOpenExport
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            if (showAddEntrySheet) {
-                val currentUnit = repository.unit.value
-                AddEntryBottomSheet(
-                    sheetState = sheetState,
-                    unit = currentUnit,
-                    onDismiss = { showAddEntrySheet = false },
-                    onSave = { type, value, note ->
-                        repository.addLogEntry(type, value, note)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Logged ${type.label}: $value")
+                if (showAddEntrySheet) {
+                    val currentUnit = repository.unit.value
+                    AddEntryBottomSheet(
+                        sheetState = sheetState,
+                        unit = currentUnit,
+                        onDismiss = { showAddEntrySheet = false },
+                        onSave = { type, value, note ->
+                            repository.addLogEntry(type, value, note)
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Logged ${type.label}: $value")
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }

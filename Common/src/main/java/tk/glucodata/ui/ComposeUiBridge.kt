@@ -43,16 +43,7 @@ object ComposeUiBridge {
                     switchToLegacyView(activity)
                 },
                 onExportData = {
-                    try {
-                        val c = activity.curve
-                        if (c != null && c.dialogs != null) {
-                            c.dialogs.showexport(activity, activity.window.decorView.width, activity.window.decorView.height, null)
-                        } else {
-                            Applic.argToaster(activity, "Export feature ready", Toast.LENGTH_SHORT)
-                        }
-                    } catch (e: Throwable) {
-                        Applic.argToaster(activity, "Export: ${e.message}", Toast.LENGTH_SHORT)
-                    }
+                    // Handled within Compose UI by dedicated ExportScreen
                 }
             )
         }

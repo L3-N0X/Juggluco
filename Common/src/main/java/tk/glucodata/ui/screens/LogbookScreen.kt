@@ -179,33 +179,27 @@ fun LogbookScreen(
                     )
                 }
 
-                // If a custom day interval is active
-                if (customDays != null) {
-                    FilterChip(
-                        selected = true,
-                        onClick = { showCustomRangeDialog = true },
-                        label = { Text("${customDays} Days", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(14.dp))
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    )
-                }
-
-                // Custom Interval chip
+                // Custom interval chip
                 FilterChip(
                     selected = customDays != null,
                     onClick = { showCustomRangeDialog = true },
-                    label = { Text(stringResource(R.string.timerange_custom), fontSize = 12.sp) },
+                    label = {
+                        Text(
+                            text = if (customDays != null) {
+                                "$customDays ${stringResource(R.string.days)}"
+                            } else {
+                                stringResource(R.string.timerange_custom)
+                            },
+                            fontWeight = if (customDays != null) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 12.sp
+                        )
+                    },
                     leadingIcon = {
-                        Icon(imageVector = Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Icon(imageVector = Icons.Default.Tune, contentDescription = stringResource(R.string.custom_range), modifier = Modifier.size(14.dp))
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 )
             }

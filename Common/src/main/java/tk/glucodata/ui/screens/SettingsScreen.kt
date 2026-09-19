@@ -661,8 +661,8 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                OutlinedButton(onClick = { showExportDialog = true }) {
-                    Text("Export")
+                OutlinedButton(onClick = onExportData) {
+                    Text(stringResource(R.string.export))
                 }
             }
 

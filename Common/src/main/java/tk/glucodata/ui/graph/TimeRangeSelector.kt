@@ -76,41 +76,16 @@ fun TimeRangeSelector(
             )
         }
 
-        // If a custom range is currently active and not in presets, display it as selected chip
-        if (selectedRange.isCustom && TimeRange.PRESETS.none { it.durationMillis == selectedRange.durationMillis }) {
-            FilterChip(
-                selected = true,
-                onClick = { showCustomDialog = true },
-                label = {
-                    Text(
-                        text = selectedRange.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        }
-
-        // Custom chip button
+        // Custom range chip
+        val isCustomRange = selectedRange.isCustom && TimeRange.PRESETS.none { it.durationMillis == selectedRange.durationMillis }
         FilterChip(
-            selected = selectedRange.isCustom && TimeRange.PRESETS.none { it.durationMillis == selectedRange.durationMillis },
+            selected = isCustomRange,
             onClick = { showCustomDialog = true },
             label = {
                 Text(
-                    text = stringResource(R.string.timerange_custom),
+                    text = if (isCustomRange) selectedRange.label else stringResource(R.string.timerange_custom),
                     style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (isCustomRange) FontWeight.Bold else FontWeight.Normal,
                     fontSize = 12.sp
                 )
             },
@@ -122,8 +97,8 @@ fun TimeRangeSelector(
                 )
             },
             colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
         )
     }

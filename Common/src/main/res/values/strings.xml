@@ -713,4 +713,25 @@
     <string name="export_include_calibrated">Include Calibrated Values</string>
     <string name="export_start_action">Export File</string>
 
+    <!-- AGP & Web Report -->
+    <string name="agp_no_data_period">No glucose data available for this period</string>
+    <string name="agp_no_data_sequence">No data available for this sequence</string>
+    <string name="agp_reading_count">%1$d readings</string>
+    <string name="web_report_server_required_title">Enable Local Web Server?</string>
+    <string name="web_report_server_required_desc">The Web Report creates an interactive clinical HTML summary in your browser with comprehensive glucose trends, AGP analysis, and daily distributions.\n\nTo view this report, Juggluco needs its integrated local web server enabled. It runs strictly on this device (127.0.0.1) and does not transmit data across the internet.\n\nWould you like to turn on the local web server now and open the report?</string>
+    <string name="web_report_activate_and_open">Turn On &amp; Open</string>
+
+    <!-- Dedicated Export Screen -->
+    <string name="export_screen_title">Data Export</string>
+    <string name="export_screen_desc">Export continuous glucose records, history, scans, or insulin doses to standard file formats.</string>
+    <string name="export_stream_desc">Real-time 1-minute streaming glucose readings</string>
+    <string name="export_history_desc">15-minute sensor internal memory records</string>
+    <string name="export_amounts_desc">Logged insulin doses, carbohydrates, and events</string>
+    <string name="export_scans_desc">Manual NFC scan readings</string>
+    <string name="export_meals_desc">Visual HTML summary report of meal logs</string>
+    <string name="export_libreview_desc">Standard format for Abbott LibreView import</string>
+    <string name="export_calibrated_help">Calibrated values apply blood-glucose fingerprick reference adjustments.</string>
+    <string name="export_time_range_title">Time Range</string>
+    <string name="export_all_time">All Available Data</string>
+    <string name="export_action_button">Export File Now</string>
 </resources>

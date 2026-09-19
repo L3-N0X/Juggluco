@@ -41,38 +41,41 @@ data class HourlyPercentiles(
     val p75: Float,
     val p90: Float,
     val count: Int
-)
+) {
+    val hasData: Boolean get() = count > 0
+}
 
 data class AgpProfile(
     val hourlyPercentiles: List<HourlyPercentiles>,
     val period: StatsPeriod = StatsPeriod.FOURTEEN_DAYS,
-    val overallMedian: Float = 120f,
+    val overallMedian: Float = 0f,
     val daysAnalyzed: Int = 14,
     val totalReadings: Int = 0
 ) {
+    val hasAnyData: Boolean get() = totalReadings > 0 && hourlyPercentiles.any { it.hasData }
+
     companion object {
         fun calculate(readings: List<GlucosePoint>, period: StatsPeriod): AgpProfile {
-            if (readings.isEmpty()) {
-                // Return synthetic empty profile with clean 24h baseline
+            val validReadings = readings.filter { it.valueMgDl > 0f }
+            if (validReadings.isEmpty()) {
                 val defaultHourly = (0..23).map { hour ->
                     HourlyPercentiles(
                         hour = hour,
-                        p10 = 85f,
-                        p25 = 100f,
-                        p50 = 120f,
-                        p75 = 145f,
-                        p90 = 165f,
+                        p10 = 0f,
+                        p25 = 0f,
+                        p50 = 0f,
+                        p75 = 0f,
+                        p90 = 0f,
                         count = 0
                     )
                 }
-                return AgpProfile(defaultHourly, period, 120f, period.days, 0)
+                return AgpProfile(defaultHourly, period, 0f, period.days, 0)
             }
 
             val cal = Calendar.getInstance()
             val buckets = Array(24) { ArrayList<Float>() }
 
-            for (pt in readings) {
-                if (pt.valueMgDl <= 0f) continue
+            for (pt in validReadings) {
                 cal.timeInMillis = pt.timestamp
                 val hour = cal.get(Calendar.HOUR_OF_DAY)
                 buckets[hour].add(pt.valueMgDl)
@@ -89,31 +92,38 @@ data class AgpProfile(
                     val p75 = getPercentile(list, 75f)
                     val p90 = getPercentile(list, 90f)
                     result.add(HourlyPercentiles(hour, p10, p25, p50, p75, p90, list.size))
+                } else if (list.isNotEmpty()) {
+                    list.sort()
+                    val p10 = list.first()
+                    val p25 = getPercentile(list, 25f)
+                    val p50 = getPercentile(list, 50f)
+                    val p75 = getPercentile(list, 75f)
+                    val p90 = list.last()
+                    result.add(HourlyPercentiles(hour, p10, p25, p50, p75, p90, list.size))
                 } else {
-                    // Fallback to neighboring interpolation or default
                     result.add(
                         HourlyPercentiles(
                             hour = hour,
-                            p10 = 85f,
-                            p25 = 100f,
-                            p50 = 120f,
-                            p75 = 145f,
-                            p90 = 165f,
-                            count = list.size
+                            p10 = 0f,
+                            p25 = 0f,
+                            p50 = 0f,
+                            p75 = 0f,
+                            p90 = 0f,
+                            count = 0
                         )
                     )
                 }
             }
 
-            val allSorted = readings.map { it.valueMgDl }.filter { it > 0f }.sorted()
-            val overallMedian = if (allSorted.isNotEmpty()) getPercentile(allSorted, 50f) else 120f
+            val allSorted = validReadings.map { it.valueMgDl }.sorted()
+            val overallMedian = if (allSorted.isNotEmpty()) getPercentile(allSorted, 50f) else 0f
 
             return AgpProfile(
                 hourlyPercentiles = result,
                 period = period,
                 overallMedian = overallMedian,
                 daysAnalyzed = period.days,
-                totalReadings = readings.size
+                totalReadings = validReadings.size
             )
         }
 

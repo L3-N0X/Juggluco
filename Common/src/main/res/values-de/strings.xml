@@ -528,7 +528,7 @@
     <string name="timerange_12h">12 Std.</string>
     <string name="timerange_24h">24 Std.</string>
     <string name="timerange_all">Alle</string>
-    <string name="timerange_custom">Eigen</string>
+    <string name="timerange_custom">Benutzerdefiniert</string>
     <string name="custom_range">Benutzerdefinierter Bereich</string>
     <string name="custom_time_range">Benutzerdefinierter Zeitbereich</string>
     <string name="quick_presets">Schnellauswahl</string>
@@ -659,7 +659,7 @@
     <string name="reports_export_title">Berichte &amp; Export</string>
     <string name="reports_export_desc">Klinische Zusammenfassung erstellen oder Rohdaten exportieren</string>
     <string name="btn_web_report">Web-Bericht</string>
-    <string name="btn_export_data">Daten exportieren</string>
+    <string name="btn_export_data">Datenexport</string>
     <string name="agp_median" formatted="false">50% Median</string>
     <string name="agp_iqr" formatted="false">25–75% Bereich</string>
     <string name="agp_outer_range" formatted="false">10–90% Bereich</string>
@@ -669,14 +669,14 @@
     <string name="clinical_high_cv">Hoch</string>
 
     <!-- Calibration -->
-    <string name="calibration_desc">Sensormesswerte anhand von kapillären Referenzwerten kalibrieren:</string>
+    <string name="calibration_desc">Sensormessungen anhand von Blutzucker-Referenzwerten kalibrieren:</string>
     <string name="calibration_enable">Kalibrierung aktivieren</string>
-    <string name="calibration_enable_desc">Kalibrierungskurve auf Glukosestream anwenden</string>
+    <string name="calibration_enable_desc">Kalibrierungskurve auf Glukosestrom anwenden</string>
     <string name="calibration_past">Vergangene Messwerte kalibrieren</string>
-    <string name="calibration_past_desc">Frühere Sensorverlaufswerte neuberechnen</string>
+    <string name="calibration_past_desc">Frühere Sensorverlaufswerte nachträglich anpassen</string>
     <string name="calibration_all_values">Alle Blutzuckermessungen nutzen</string>
-    <string name="calibration_all_values_desc">Blutglukose-Einträge automatisch einbeziehen</string>
-    <string name="calibration_add_ref">Kalibrierungsreferenz hinzufügen</string>
+    <string name="calibration_all_values_desc">Protokollierte Blutzuckerwerte automatisch einbeziehen</string>
+    <string name="calibration_add_ref">Referenzmessung hinzufügen</string>
     <string name="calibration_new_ref">Neue Referenzmessung</string>
     <string name="calibration_guidance">Nur bei stabilem Glukosespiegel (waagerechter Trendpfeil) kalibrieren. Schnelle Änderungen führen zu Fehlmessungen.</string>
     <string name="calibration_factor">Kalibrierungsfaktor: %s</string>
@@ -688,6 +688,25 @@
     <string name="export_include_calibrated">Kalibrierte Werte einschließen</string>
     <string name="export_start_action">Datei exportieren</string>
 
+    <!-- AGP & Web Report -->
+    <string name="agp_no_data_period">Keine Glukosedaten für diesen Zeitraum verfügbar</string>
+    <string name="agp_no_data_sequence">Keine Messwerte für diesen Bereich</string>
+    <string name="agp_reading_count">%1$d Messungen</string>
+    <string name="web_report_server_required_title">Lokalen Webserver aktivieren?</string>
+    <string name="web_report_server_required_desc">Der Web-Bericht generiert eine interaktive klinische HTML-Übersicht im Browser mit detaillierten Glukosekurven, AGP-Analysen und Tagesverteilungen.\n\nHierfür benötigt Juggluco den integrierten lokalen Webserver. Dieser läuft ausschließlich lokal auf diesem Gerät (127.0.0.1) und überträgt keine Daten ins Netzwerk.\n\nMöchten Sie den lokalen Webserver jetzt einschalten und den Bericht öffnen?</string>
+    <string name="web_report_activate_and_open">Aktivieren &amp; Öffnen</string>
+
+    <!-- Dedicated Export Screen -->
+    <string name="export_screen_title">Datenexport</string>
+    <string name="export_screen_desc">Exportieren Sie kontinuierliche Glukose-Rohdaten, Verlaufswerte, Scans oder Insulindosen in Standardformate.</string>
+    <string name="export_stream_desc">Echtzeit-Glukosedaten im 1-Minuten-Takt</string>
+    <string name="export_history_desc">15-Minuten-Verlaufsspeicher des Sensors</string>
+    <string name="export_amounts_desc">Protokollierte Insulindosen, Kohlenhydrate und Ereignisse</string>
+    <string name="export_scans_desc">Manuelle NFC-Scanmessungen</string>
+    <string name="export_meals_desc">Visueller HTML-Bericht der Mahlzeiten</string>
+    <string name="export_libreview_desc">Standard-Format für den Import in Abbott LibreView</string>
+    <string name="export_calibrated_help">Kalibrierte Werte wenden Korrekturen aus Blutzucker-Referenzmessungen an.</string>
+    <string name="export_time_range_title">Zeitbereich</string>
+    <string name="export_all_time">Alle verfügbaren Daten</string>
+    <string name="export_action_button">Datei jetzt exportieren</string>
 </resources>
-
-

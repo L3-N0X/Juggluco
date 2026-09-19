@@ -9,6 +9,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Tune
@@ -58,6 +60,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.Applic
@@ -74,8 +78,9 @@ import tk.glucodata.ui.theme.LocalClinicalColors
 @Composable
 fun StatsScreen(
     repository: GlucoseRepository,
+    modifier: Modifier = Modifier,
     onExportData: () -> Unit = {},
-    modifier: Modifier = Modifier
+    onOpenWebServerSettings: () -> Unit = {}
 ) {
     val stats by repository.stats.collectAsState()
     val agpProfile by repository.agpProfile.collectAsState()
@@ -86,7 +91,7 @@ fun StatsScreen(
     val targetHigh by repository.targetHigh.collectAsState()
     val context = LocalContext.current
 
-    var inspectedHour by remember { mutableStateOf<HourlyPercentiles?>(null) }
+    var showWebServerActivationDialog by remember { mutableStateOf(false) }
     var infoDialogTitle by remember { mutableStateOf<String?>(null) }
     var infoDialogText by remember { mutableStateOf<String?>(null) }
 
@@ -139,24 +144,22 @@ fun StatsScreen(
                 )
             }
 
-            // If a custom period is active, display it as selected chip
-            if (selectedPeriod.isCustom && StatsPeriod.PRESETS.none { it.days == selectedPeriod.days }) {
-                FilterChip(
-                    selected = true,
-                    onClick = { showCustomPeriodDialog = true },
-                    label = { Text(selectedPeriod.label, fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
-            }
-
-            // Custom Chip button
+            // Custom period selector chip
+            val isCustomPeriod = selectedPeriod.isCustom && StatsPeriod.PRESETS.none { it.days == selectedPeriod.days }
             FilterChip(
-                selected = selectedPeriod.isCustom && StatsPeriod.PRESETS.none { it.days == selectedPeriod.days },
+                selected = isCustomPeriod,
                 onClick = { showCustomPeriodDialog = true },
-                label = { Text(stringResource(R.string.timerange_custom), fontSize = 12.sp) },
+                label = {
+                    Text(
+                        text = if (isCustomPeriod) {
+                            "${selectedPeriod.days} ${stringResource(R.string.days)}"
+                        } else {
+                            stringResource(R.string.timerange_custom)
+                        },
+                        fontSize = 12.sp,
+                        fontWeight = if (isCustomPeriod) FontWeight.Bold else FontWeight.Normal
+                    )
+                },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Tune,
@@ -165,8 +168,8 @@ fun StatsScreen(
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
         }
@@ -294,41 +297,13 @@ fun StatsScreen(
                     }
                 }
 
-                // Inspected hour display banner
-                if (inspectedHour != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = String.format(java.util.Locale.US, "Time: %02d:00", inspectedHour!!.hour),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "Median: ${unit.format(inspectedHour!!.p50)} • 50% IQR: ${unit.format(inspectedHour!!.p25)}–${unit.format(inspectedHour!!.p75)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(14.dp))
 
                 AgpGraph(
                     profile = agpProfile,
                     unit = unit,
                     targetLow = targetLow,
-                    targetHigh = targetHigh,
-                    onHourInspected = { inspectedHour = it }
+                    targetHigh = targetHigh
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -363,48 +338,126 @@ fun StatsScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                fun openWebReport() {
+                    try {
+                        val endtime = Natives.percentileEndtime(selectedPeriod.days)
+                        val key = Natives.getApiSecret() ?: ""
+                        val addkey = if (key.isNotEmpty()) "$key/" else ""
+                        val type = (if (Natives.getDoCalibrate()) (if (Natives.getCalibratePast()) "&pastvalues" else "") + "&calibrated" else "&") + if (useHistory) "history" else "stream"
+                        val url = "http://127.0.0.1:${Natives.gethttpport()}/$addkey" + "x/report?amounts&days=${selectedPeriod.days}&endtime=$endtime$type&hl=${Applic.curlang}"
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        context.startActivity(intent)
+                    } catch (e: Throwable) {
+                        Toast.makeText(context, "Report error: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
                         onClick = {
-                            try {
-                                if (Applic.Nativesloaded && Natives.getusexdripwebserver()) {
-                                    val endtime = Natives.percentileEndtime(selectedPeriod.days)
-                                    val key = Natives.getApiSecret() ?: ""
-                                    val addkey = if (key.isNotEmpty()) "$key/" else ""
-                                    val type = (if (Natives.getDoCalibrate()) (if (Natives.getCalibratePast()) "&pastvalues" else "") + "&calibrated" else "&") + if (useHistory) "history" else "stream"
-                                    val url = "http://127.0.0.1:${Natives.gethttpport()}/$addkey" + "x/report?amounts&days=${selectedPeriod.days}&endtime=$endtime$type&hl=${Applic.curlang}"
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                    context.startActivity(intent)
-                                } else {
-                                    Toast.makeText(context, "Local webserver is offline. Enable it in Settings > Exchanges.", Toast.LENGTH_LONG).show()
-                                }
-                            } catch (e: Throwable) {
-                                Toast.makeText(context, "Report error: ${e.message}", Toast.LENGTH_SHORT).show()
+                            if (Applic.Nativesloaded && Natives.getusexdripwebserver()) {
+                                openWebReport()
+                            } else {
+                                showWebServerActivationDialog = true
                             }
                         },
                         modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.btn_web_report), fontSize = 13.sp)
+                        Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.btn_web_report),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
 
                     OutlinedButton(
                         onClick = onExportData,
                         modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Assessment, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.btn_export_data), fontSize = 13.sp)
+                        Icon(imageVector = Icons.Default.Assessment, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.btn_export_data),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
         }
+    }
+
+    if (showWebServerActivationDialog) {
+        fun launchReportAfterServerEnable() {
+            try {
+                val endtime = Natives.percentileEndtime(selectedPeriod.days)
+                val key = Natives.getApiSecret() ?: ""
+                val addkey = if (key.isNotEmpty()) "$key/" else ""
+                val type = (if (Natives.getDoCalibrate()) (if (Natives.getCalibratePast()) "&pastvalues" else "") + "&calibrated" else "&") + if (useHistory) "history" else "stream"
+                val url = "http://127.0.0.1:${Natives.gethttpport()}/$addkey" + "x/report?amounts&days=${selectedPeriod.days}&endtime=$endtime$type&hl=${Applic.curlang}"
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                context.startActivity(intent)
+            } catch (e: Throwable) {
+                Toast.makeText(context, "Report error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showWebServerActivationDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Language,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = stringResource(R.string.web_report_server_required_title),
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.web_report_server_required_desc),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showWebServerActivationDialog = false
+                        repository.setXdripWebServer(true)
+                        try {
+                            Natives.setusexdripwebserver(true)
+                        } catch (_: Throwable) {}
+                        launchReportAfterServerEnable()
+                    }
+                ) {
+                    Text(stringResource(R.string.web_report_activate_and_open))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWebServerActivationDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     if (infoDialogTitle != null && infoDialogText != null) {
