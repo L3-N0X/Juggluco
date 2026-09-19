@@ -253,8 +253,14 @@ private void startdisplay() {
     else {
         }
 
-      lightBars(!getInvertColors( ));
-      }
+       if(!isWearable) {
+           boolean isDark = getInvertColors() ||
+               ((getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
+           lightBars(!isDark);
+       } else {
+           lightBars(!getInvertColors( ));
+       }
+       }
     if(!isWearable) {
         tk.glucodata.ui.ComposeUiBridge.setupComposeUi(this);
     } else {
@@ -340,28 +346,36 @@ private void supportRTL() {
     // Returns true if the currently applied theme is a light theme
 private void reallightBars(boolean light) {
    Log.i(LOG_ID,"lightBars "+ light);
-   if(Build.VERSION.SDK_INT >= 30) {
+   if(Build.VERSION.SDK_INT >= 23) {
      var win=getWindow();
-     var view= win.getDecorView();
-     WindowInsetsControllerCompat windowInsetsController =WindowCompat.getInsetsController(win, view);
-     windowInsetsController.setAppearanceLightStatusBars(light);
-     windowInsetsController.setAppearanceLightNavigationBars(light);
+     if(win != null) {
+       var view= win.getDecorView();
+       WindowInsetsControllerCompat windowInsetsController =WindowCompat.getInsetsController(win, view);
+       windowInsetsController.setAppearanceLightStatusBars(light);
+       if(Build.VERSION.SDK_INT >= 26) {
+         windowInsetsController.setAppearanceLightNavigationBars(light);
+       }
      }
    }
+}
 
 
 private boolean waslight=true;
 public void lightBars(boolean light) {
    waslight=light;
-    reallightBars(light);
-   }
+   reallightBars(light);
+}
 
 public void themeLightBars() {
-    lightBars(isLightTheme);
+    if(!isWearable && tk.glucodata.ui.ComposeUiBridge.isComposeUiActive) {
+        reallightBars(waslight);
+        return;
     }
+    lightBars(isLightTheme);
+}
 private void waslightBars() {
     reallightBars(waslight);
-    }
+}
 
 //s/android.view.WindowInsetsController.\([A-Z_]*\),/if((status\&android.view.WindowInsetsController.\1)!=0)  {message+=" "+"\1";};/g
 //s/\([A-Z_]*\),/if((status\&android.view.WindowInsetsController.\1)!=0)  {message+=" "+"\1";};/g

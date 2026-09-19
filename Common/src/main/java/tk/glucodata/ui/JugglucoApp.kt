@@ -160,6 +160,7 @@ fun JugglucoApp(
                                 SettingsScreen(
                                     repository = repository,
                                     isDarkTheme = darkTheme,
+                                    darkThemeOverride = isDarkThemeOverride,
                                     onDarkThemeChanged = {
                                         isDarkThemeOverride = it
                                         repository.setInvertColors(it ?: systemDark)

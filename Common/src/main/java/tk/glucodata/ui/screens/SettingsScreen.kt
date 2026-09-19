@@ -72,6 +72,7 @@ import tk.glucodata.ui.model.GlucoseUnit
 fun SettingsScreen(
     repository: GlucoseRepository,
     isDarkTheme: Boolean = false,
+    darkThemeOverride: Boolean? = null,
     onDarkThemeChanged: (Boolean?) -> Unit = {},
     onOpenLegacyView: () -> Unit = {},
     onExportData: () -> Unit = {},
@@ -498,7 +499,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
-                        selected = isDarkTheme,
+                        selected = darkThemeOverride == true,
                         onClick = { onDarkThemeChanged(true) },
                         label = { Text("Dark Theme", fontSize = 12.sp) },
                         leadingIcon = {
@@ -506,7 +507,7 @@ fun SettingsScreen(
                         }
                     )
                     FilterChip(
-                        selected = !isDarkTheme,
+                        selected = darkThemeOverride == false,
                         onClick = { onDarkThemeChanged(false) },
                         label = { Text("Light Theme", fontSize = 12.sp) },
                         leadingIcon = {
@@ -514,7 +515,7 @@ fun SettingsScreen(
                         }
                     )
                     FilterChip(
-                        selected = false,
+                        selected = darkThemeOverride == null,
                         onClick = { onDarkThemeChanged(null) },
                         label = { Text("System Default", fontSize = 12.sp) }
                     )

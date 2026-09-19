@@ -1,5 +1,8 @@
 package tk.glucodata.ui.theme
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -9,8 +12,18 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import tk.glucodata.MainActivity
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 val LocalClinicalColors = staticCompositionLocalOf { LightClinicalColors }
 
@@ -76,6 +89,26 @@ fun JugglucoTheme(
     }
 
     val clinicalColors = if (darkTheme) DarkClinicalColors else LightClinicalColors
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val activity = view.context.findActivity()
+            if (activity != null) {
+                val window = activity.window
+                val insetsController = WindowCompat.getInsetsController(window, view)
+                // When darkTheme is true, appearance light bars is false so status bar and
+                // navigation bar icons/text appear light (white) on dark surfaces.
+                // When darkTheme is false, appearance light bars is true so icons appear dark (black).
+                insetsController.isAppearanceLightStatusBars = !darkTheme
+                insetsController.isAppearanceLightNavigationBars = !darkTheme
+
+                if (activity is MainActivity) {
+                    activity.lightBars(!darkTheme)
+                }
+            }
+        }
+    }
 
     CompositionLocalProvider(
         LocalClinicalColors provides clinicalColors
