@@ -558,35 +558,40 @@ fun GlucoseGraph(
                     }
                 }
 
-                // 12. Floating "Jump to Now" Pill (Bottom Right)
-                if (!viewportState.isLive) {
+                // 12. Floating "Now" Jump Pill (Top Start - guaranteed clear of all axes and curve data)
+                if (!viewportState.isLive && inspectedPoint == null) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        shadowElevation = 4.dp,
+                        shadowElevation = 3.dp,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        ),
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 10.dp, bottom = 36.dp)
+                            .align(Alignment.TopStart)
+                            .padding(start = 10.dp, top = 8.dp)
                             .clickable {
                                 viewportState.jumpToNow()
                             }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Update,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.now),
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = stringResource(R.string.jump_to_now),
+                                text = stringResource(R.string.now),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
