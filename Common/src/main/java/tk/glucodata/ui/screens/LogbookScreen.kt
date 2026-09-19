@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bloodtype
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.Medication
@@ -78,7 +79,8 @@ enum class LogbookTimeFilter(val label: String, val days: Int) {
 fun LogbookScreen(
     repository: GlucoseRepository,
     onOpenAddEntry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClose: (() -> Unit)? = null
 ) {
     val logs by repository.logs.collectAsState()
     val unit by repository.unit.collectAsState()
@@ -140,18 +142,34 @@ fun LogbookScreen(
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text(
-                    text = "Diabetes Logbook",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Track insulin doses, carbs, fingerpricks and notes",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.tab_logbook),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Track insulin doses, carbs, fingerpricks and notes",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (onClose != null) {
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.closename)
+                        )
+                    }
+                }
             }
 
             // 1. Time Interval Selector Pills (Customizable time intervals)
@@ -332,7 +350,7 @@ fun LogbookScreen(
 }
 
 @Composable
-private fun DailyTotalPill(label: String, value: String, color: Color) {
+fun DailyTotalPill(label: String, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(2.dp))
@@ -341,7 +359,7 @@ private fun DailyTotalPill(label: String, value: String, color: Color) {
 }
 
 @Composable
-private fun LogItemCard(
+fun LogItemCard(
     record: LogRecord,
     unit: GlucoseUnit,
     minimalistUnits: Boolean = true,

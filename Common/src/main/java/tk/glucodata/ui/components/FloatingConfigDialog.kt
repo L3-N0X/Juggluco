@@ -28,9 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import tk.glucodata.Floating
+import tk.glucodata.R
 
 @Composable
 fun FloatingConfigDialog(
@@ -50,7 +53,7 @@ fun FloatingConfigDialog(
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Floating Glucose Widget", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.settings_floating_widget), fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -61,7 +64,7 @@ fun FloatingConfigDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Configure appearance of the floating desktop overlay number:",
+                    text = stringResource(R.string.dialog_floating_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -73,8 +76,8 @@ fun FloatingConfigDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text("Touchable Overlay", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        Text("Allow moving the widget by dragging (disable to click through)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text(stringResource(R.string.dialog_touchable_overlay), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.dialog_touchable_overlay_desc), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     }
                     Switch(
                         checked = isTouchable,
@@ -95,7 +98,7 @@ fun FloatingConfigDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Background Opacity", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.dialog_bg_opacity), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         Text("${(opacity * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                     Slider(
@@ -111,7 +114,7 @@ fun FloatingConfigDialog(
                 }
 
                 Text(
-                    text = "Note: Android requires 'Display over other apps' permission to show the floating overlay above other apps.",
+                    text = stringResource(R.string.dialog_floating_permission_note),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -119,7 +122,7 @@ fun FloatingConfigDialog(
         },
         confirmButton = {
             Button(onClick = onDismiss) {
-                Text("Done")
+                Text(stringResource(R.string.dialog_done))
             }
         }
     )

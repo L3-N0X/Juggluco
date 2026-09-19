@@ -541,6 +541,8 @@
     <string name="logbook_time_30d">30 Tage</string>
     <string name="logbook_time_all">Gesamt</string>
     <string name="logbook_totals">Summen</string>
+    <string name="logbook_view_all">Alle anzeigen</string>
+    <string name="logbook_no_entries_today">Heute noch keine Einträge</string>
 
     <string name="graph_layers">Grafikebenen</string>
     <string name="graph_layers_desc">Auf der Kurve angezeigte Datenebenen anpassen</string>
@@ -709,4 +711,144 @@
     <string name="export_time_range_title">Zeitbereich</string>
     <string name="export_all_time">Alle verfügbaren Daten</string>
     <string name="export_action_button">Datei jetzt exportieren</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Einstellungen &amp; Konfiguration</string>
+    <string name="settings_subtitle">Grenzwerte, Alarme, Übertragungen, Erscheinungsbild und Hardware</string>
+    <string name="settings_cat_glucose">GLUKOSE-ZIELE &amp; EINHEITEN</string>
+    <string name="settings_card_target_range">Zielbereich &amp; Einheiten</string>
+    <string name="settings_unit_label">Glukose-Einheit</string>
+    <string name="settings_unit_mgdl_desc">mg/dL (Milligramm pro Deziliter)</string>
+    <string name="settings_unit_mmoll_desc">mmol/L (Millimol pro Liter)</string>
+    <string name="settings_target_low">Unterer Zielwert</string>
+    <string name="settings_target_high">Oberer Zielwert</string>
+
+    <string name="settings_cat_alarms">ALARME &amp; BENACHRICHTIGUNGEN</string>
+    <string name="settings_card_alarms">Glukose-Alarme &amp; Töne</string>
+    <string name="settings_alarm_low">Niedriger Glukosewert-Alarm</string>
+    <string name="settings_alarm_low_desc">Alarmieren, wenn Glukose unter %s fällt</string>
+    <string name="settings_alarm_threshold_snooze">Schwellenwert: %1$s • Schlummern: %2$d Min.</string>
+    <string name="settings_alarm_snooze_duration">Schlummerdauer</string>
+    <string name="settings_alarm_high">Hoher Glukosewert-Alarm</string>
+    <string name="settings_alarm_high_desc">Alarmieren, wenn Glukose über %s steigt</string>
+    <string name="settings_alarm_loss">Signalverlust-Alarm</string>
+    <string name="settings_alarm_loss_desc">Alarmieren, wenn CGM länger als %d Minuten getrennt ist</string>
+    <string name="settings_alarm_loss_wait">Wartezeit vor Alarmierung</string>
+    <string name="settings_alarm_value_available">Neuer Messwert Benachrichtigung</string>
+    <string name="settings_alarm_value_available_desc">Signalton beim Eintreffen neuer Sensormesswerte</string>
+    <string name="settings_alarm_stream">Alarm-Audiokanal</string>
+    <string name="settings_alarm_active_channel">Aktiver Kanal: %s</string>
+    <string name="settings_stream_alarm">Alarmkanal</string>
+    <string name="settings_stream_notification">Benachrichtigung</string>
+    <string name="settings_stream_media">Medien</string>
+
+    <string name="settings_cat_dev_testing">ENTWICKLUNG &amp; TESTEN</string>
+    <string name="settings_card_dev_testing">Parallele Installation &amp; Weiterleitung</string>
+    <string name="settings_dev_testing_desc">Zweite Installation (z. B. tk.glucodata.dev) parallel zur Haupt-App testen, ohne Bluetooth zu trennen. Die Haupt-App bleibt mit dem Sensor verbunden und leitet Messwerte per Mirror TCP/IP, Broadcast oder lokalem Webserver weiter.</string>
+    <string name="settings_dev_btn_setup_relay">Mirror-Weiterleitung einrichten</string>
+    <string name="settings_dev_btn_guide">Test-Anleitung</string>
+    <string name="settings_dev_role_receiver">Empfänger aktiv (Empfängt Live-Daten)</string>
+    <string name="settings_dev_role_sender">Sender aktiv (Leitet Daten weiter)</string>
+    <string name="settings_dev_role_standalone">Eigenständig / Direkter Sensor</string>
+    <string name="settings_dev_guide_title">Anleitung: Parallele Test-Installation</string>
+    <string name="settings_dev_guide_body"><b>Parallele Installation (Andere App-ID)</b><br/><br/><b>Warum empfohlen?</b><br/>Durch eine eigene applicationId auf dem Dev-Fork (z. B. tk.glucodata.dev) werden Datenbank- oder Schema-Konflikte mit der alltäglichen Haupt-Installation verhindert.<br/><br/><b>Messwerte ohne Bluetooth-Umschalten empfangen:</b><br/><br/><b>1. Produktions-App (mit Sensor gekoppelt):</b><br/>• Bleibt dauerhaft per Bluetooth mit dem CGM-Sensor verbunden.<br/>• In den Mirror-Einstellungen sicherstellen, dass der Sync-Port aktiv ist (Standard: 17580 oder 8795).<br/>• Oder \'Als Sender einrichten\' mit Ziel-Port 17581 antippen.<br/>• Alternativ kann <i>Patched Libre Broadcast (com.librelink.app)</i> oder der <i>Lokale xDrip-Server</i> aktiviert werden.<br/><br/><b>2. Entwicklungs-Build (tk.glucodata.dev):</b><br/>• Einen abweichenden Abhör-Port (z. B. 17581) wählen, um Port-Konflikte auf demselben Gerät zu vermeiden.<br/>• In den Mirror-Einstellungen <b>Als Empfänger verbinden (Dev-Modus)</b> mit Ziel-IP 127.0.0.1 und Ziel-Port 17580 wählen.<br/>• Der Dev-Build empfängt sofort Live-Glukosestrom, Scans und Verläufe der Produktions-App!</string>
+
+    <string name="settings_cat_integrations">INTEGRATIONEN &amp; ÜBERTRAGUNGEN</string>
+    <string name="settings_card_exchanges">Datenaustausch &amp; Lokale Synchronisation</string>
+    <string name="settings_glucodata_broadcast">Glucodata Broadcast</string>
+    <string name="settings_glucodata_broadcast_desc">Glukosedaten lokal an Juggluco-Zifferblätter &amp; Apps senden</string>
+    <string name="settings_xdrip_broadcast">xDrip Broadcast</string>
+    <string name="settings_xdrip_broadcast_desc">Messwerte an xDrip+ und kompatible Apps übertragen</string>
+    <string name="settings_librelink_broadcast">Patched Libre Broadcast (com.librelink.app)</string>
+    <string name="settings_librelink_broadcast_desc">Live-Messwerte per com.librelink.app Intent an lokale Dev-Builds und Apps senden</string>
+    <string name="settings_health_connect">Google Health Connect</string>
+    <string name="settings_health_connect_desc">Blutzuckerwerte mit Android Health Connect synchronisieren</string>
+    <string name="settings_libreview">Abbott LibreView Upload</string>
+    <string name="settings_libreview_desc">Sensordaten automatisch in die LibreView-Cloud synchronisieren</string>
+    <string name="settings_xdrip_server">Lokaler xDrip / Nightscout Server</string>
+    <string name="settings_xdrip_server_desc">Lokale REST-API unter http://127.0.0.1:17580/ für Dev-Builds, Emulatoren &amp; Zifferblätter</string>
+    <string name="settings_mirror_sync">Mirror &amp; Netzwerk-Synchronisation (TCP/IP)</string>
+    <string name="settings_mirror_sync_desc">Messwerte zwischen Geräten oder lokalen Apps abgleichen (127.0.0.1 für Dev-Tests)</string>
+    <string name="settings_btn_config">Konfigurieren</string>
+
+    <string name="settings_cat_display">ANZEIGE &amp; ERSCHEINUNGSBILD</string>
+    <string name="settings_card_display">Erscheinungsbild &amp; Overlays</string>
+    <string name="settings_theme_pref">Farbschema</string>
+    <string name="settings_theme_pref_desc">Dunkles oder helles Design wählen oder dem System folgen</string>
+    <string name="settings_theme_dark">Dunkel</string>
+    <string name="settings_theme_light">Hell</string>
+    <string name="settings_theme_system">Systemstandard</string>
+    <string name="settings_floating_widget">Schwebendes Glukose-Widget</string>
+    <string name="settings_floating_widget_desc">Verschiebbares Glukose-Overlay über anderen Apps anzeigen</string>
+    <string name="settings_btn_configure_appearance">Aussehen anpassen</string>
+    <string name="settings_voice_speech">Sprachausgabe &amp; Ansagen</string>
+    <string name="settings_voice_speech_desc">Glukosewerte beim Eintreffen vorlesen, Alarme und Sprechtempo</string>
+    <string name="settings_btn_configure">Anpassen</string>
+    <string name="settings_status_bar">Statusleisten-Benachrichtigung</string>
+    <string name="settings_status_bar_desc">Aktuellen Glukosewert und Trend dauerhaft in der Statusleiste anzeigen</string>
+    <string name="settings_fullscreen">Vollbildmodus</string>
+    <string name="settings_fullscreen_desc">Status- und Navigationsleiste für maximale Kurvendarstellung ausblenden</string>
+
+    <string name="settings_cat_hardware">NFC &amp; HARDWARE</string>
+    <string name="settings_card_hardware">Scan- &amp; Tonoptionen</string>
+    <string name="settings_nfc_sound">NFC-Scan Ton</string>
+    <string name="settings_nfc_sound_desc">Bestätigungston abspielen, wenn ein NFC-Sensor gescannt wird</string>
+    <string name="settings_nfc_launch">App bei NFC-Scan öffnen</string>
+    <string name="settings_nfc_launch_desc">Juggluco automatisch starten, sobald das Smartphone den Sensor berührt</string>
+
+    <string name="settings_cat_data">DATENVERWALTUNG &amp; WERKZEUGE</string>
+    <string name="settings_card_data">Export &amp; Klassische Ansicht</string>
+    <string name="settings_export_sensor_data">Sensordaten exportieren</string>
+    <string name="settings_export_sensor_data_desc">CSV- oder HTML-Dateien für Insulindosen, Scans, Datenstrom &amp; Verlauf exportieren</string>
+    <string name="settings_legacy_canvas">Klassische OpenGL-Ansicht</string>
+    <string name="settings_legacy_canvas_desc">Zur klassischen horizontalen OpenGL-Kurve wechseln. Jederzeit mit Zurück-Taste zurückkehren.</string>
+    <string name="settings_btn_switch">Wechseln</string>
+
+    <string name="settings_cat_about">ÜBER</string>
+    <string name="settings_card_about">Über Juggluco</string>
+    <string name="settings_version_title">Juggluco v11.0.2</string>
+    <string name="settings_about_details">Moderne Jetpack Compose Material 3 Edition\nOpen-Source-Software lizenziert unter GPLv3\nEntwickelt von Jaap Korthals Altes</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_done">Fertig</string>
+    <string name="dialog_floating_desc">Darstellung der schwebenden Glukoseanzeige anpassen:</string>
+    <string name="dialog_touchable_overlay">Berührbares Overlay</string>
+    <string name="dialog_touchable_overlay_desc">Verschieben des Widgets durch Ziehen erlauben (deaktivieren für Durchklicken)</string>
+    <string name="dialog_bg_opacity">Hintergrund-Deckkraft</string>
+    <string name="dialog_floating_permission_note">Hinweis: Android benötigt die Berechtigung \'Über anderen Apps anzeigen\' für das schwebende Overlay.</string>
+    <string name="dialog_speak_new_readings">Neue Messwerte vorlesen</string>
+    <string name="dialog_speak_new_readings_desc">Glukosewert beim Eintreffen jedes neuen Messwerts ansagen</string>
+    <string name="dialog_speak_alarms">Glukose-Alarme vorlesen</string>
+    <string name="dialog_speak_alarms_desc">Niedrig-/Hoch-Alarmmeldungen akustisch vorlesen</string>
+    <string name="dialog_speech_rate">Sprechgeschwindigkeit</string>
+    <string name="dialog_voice_pitch">Tonhöhe</string>
+    <string name="dialog_mirror_title">Mirror &amp; Gerätesynchronisation</string>
+    <string name="dialog_mirror_desc">Sensormesswerte über TCP/IP synchronisieren oder lokal weiterleiten (127.0.0.1 für Dev-Tests):</string>
+    <string name="dialog_wlan_ip">WLAN-IP-Adresse:</string>
+    <string name="dialog_ip_unavailable">Nicht verfügbar</string>
+    <string name="dialog_tcp_port">Abhör-Port dieser App:</string>
+    <string name="dialog_lock_amounts">Eingetragene Mengen sperren</string>
+    <string name="dialog_lock_amounts_desc">Verhindert, dass verbundene Geräte Insulindosen oder Mengen ändern</string>
+    <string name="dialog_trigger_sync">Sync anstoßen</string>
+    <string name="dialog_reinit">Neu initialisieren</string>
+    <string name="dialog_sync_toggled">Mirror-Sync umgeschaltet</string>
+    <string name="dialog_reinit_success">Netzwerkverbindungen neu initialisiert</string>
+    <string name="dialog_mirror_quick_setup_title">Parallele Weiterleitung (127.0.0.1)</string>
+    <string name="dialog_mirror_quick_setup_desc">Diese App direkt mit einer zweiten lokalen Juggluco-Installation verbinden:</string>
+    <string name="dialog_mirror_target_host">Ziel-IP / Host</string>
+    <string name="dialog_mirror_target_port">Ziel-Sync-Port</string>
+    <string name="dialog_mirror_conn_label">Verbindungsname</string>
+    <string name="dialog_mirror_btn_receiver">Als Empfänger verbinden (Dev-Modus)</string>
+    <string name="dialog_mirror_btn_sender">Als Sender einrichten (Prod-Modus)</string>
+    <string name="dialog_mirror_active_list">Konfigurierte Verbindungen (%d)</string>
+    <string name="dialog_mirror_no_conns">Keine Mirror-Verbindungen aktiv.\nOben Schnelleinrichtung nutzen, um zur Haupt-App zu verbinden.</string>
+    <string name="dialog_mirror_role_receiver_tag">Empfänger (Eingehend)</string>
+    <string name="dialog_mirror_role_sender_tag">Sender (Ausgehend)</string>
+    <string name="dialog_mirror_delete_confirm">Mirror-Verbindung \"%s\" löschen?</string>
+    <string name="dialog_mirror_save_port">Port speichern</string>
+    <string name="dialog_mirror_port_saved">Abhör-Port auf %s aktualisiert</string>
+    <string name="dialog_mirror_port_invalid">Ungültiger Port (muss 1024-65535 sein)</string>
+    <string name="dialog_mirror_conn_added">Mirror-Verbindung erfolgreich hinzugefügt</string>
+    <string name="dialog_mirror_legacy_btn">Erweiterte Mirror-Verwaltung (Klassische UI / QR)</string>
+    <string name="dialog_mirror_port_hint">Hinweis: Wenn zwei Apps auf einem Gerät laufen, muss jede einen anderen Port nutzen (z.B. 17580 für Prod, 17581 für Dev).</string>
 </resources>

@@ -2,6 +2,7 @@ package tk.glucodata.ui.screens
 
 import android.app.Activity
 import android.widget.Toast
+import tk.glucodata.Natives
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -20,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
@@ -27,6 +30,7 @@ import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -40,6 +44,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -85,6 +90,7 @@ fun SettingsScreen(
     val exchanges by repository.exchanges.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
     val hardwareConfig by repository.hardwareConfig.collectAsState()
+    val mirrorConnections by repository.mirrorConnections.collectAsState()
     val context = LocalContext.current
 
     var currentLowSlider by remember(targetLow) { mutableFloatStateOf(targetLow) }
@@ -94,6 +100,7 @@ fun SettingsScreen(
     var showTalkerDialog by remember { mutableStateOf(false) }
     var showFloatingConfigDialog by remember { mutableStateOf(false) }
     var showMirrorConfigDialog by remember { mutableStateOf(false) }
+    var showDevGuideDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -104,13 +111,13 @@ fun SettingsScreen(
     ) {
         // Page Header
         Text(
-            text = "Settings & Config",
+            text = stringResource(R.string.settings_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "Thresholds, alarms, broadcasts, appearance and hardware",
+            text = stringResource(R.string.settings_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -118,10 +125,9 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(18.dp))
 
         // SECTION 1: GLUCOSE TARGETS & UNITS
-        SettingsCategoryHeader(title = "GLUCOSE TARGETS & UNITS")
-
         SettingsSectionCard(
-            title = "Target Range & Units",
+            categorySubtitle = stringResource(R.string.settings_cat_glucose),
+            title = stringResource(R.string.settings_card_target_range),
             icon = Icons.Default.Straighten
         ) {
             // Unit Switcher
@@ -134,12 +140,12 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = "Glucose Unit",
+                        text = stringResource(R.string.settings_unit_label),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = if (unit == GlucoseUnit.MG_DL) "mg/dL (Milligrams per deciliter)" else "mmol/L (Millimoles per liter)",
+                        text = if (unit == GlucoseUnit.MG_DL) stringResource(R.string.settings_unit_mgdl_desc) else stringResource(R.string.settings_unit_mmoll_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -147,7 +153,7 @@ fun SettingsScreen(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "mg/dL",
+                        text = stringResource(R.string.mgdL),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (unit == GlucoseUnit.MG_DL) FontWeight.Bold else FontWeight.Normal,
                         color = if (unit == GlucoseUnit.MG_DL) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -161,7 +167,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "mmol/L",
+                        text = stringResource(R.string.mmolL),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (unit == GlucoseUnit.MMOL_L) FontWeight.Bold else FontWeight.Normal,
                         color = if (unit == GlucoseUnit.MMOL_L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -178,7 +184,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Target Low Threshold",
+                        text = stringResource(R.string.settings_target_low),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -204,7 +210,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Target High Threshold",
+                        text = stringResource(R.string.settings_target_high),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -227,23 +233,22 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // SECTION 2: ALARMS & SOUNDS
-        SettingsCategoryHeader(title = "ALARMS & NOTIFICATIONS")
-
         SettingsSectionCard(
-            title = "Glucose Alarms & Chimes",
+            categorySubtitle = stringResource(R.string.settings_cat_alarms),
+            title = stringResource(R.string.settings_card_alarms),
             icon = Icons.Default.NotificationsActive
         ) {
             SettingToggleRow(
-                title = "Low Glucose Alarm",
-                subtitle = "Alert when glucose drops below ${unit.format(alarms.lowThreshold)}",
+                title = stringResource(R.string.settings_alarm_low),
+                subtitle = stringResource(R.string.settings_alarm_low_desc, unit.format(alarms.lowThreshold)),
                 checked = alarms.lowAlarmEnabled,
                 onCheckedChange = { repository.updateAlarms(alarms.copy(lowAlarmEnabled = it)) }
             )
 
             if (alarms.lowAlarmEnabled) {
-                Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 8.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
                     Text(
-                        text = "Threshold: ${unit.format(alarms.lowThreshold)} • Snooze: ${alarms.lowSnoozeMinutes}m",
+                        text = stringResource(R.string.settings_alarm_threshold_snooze, unit.format(alarms.lowThreshold), alarms.lowSnoozeMinutes),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -253,7 +258,7 @@ fun SettingsScreen(
                         valueRange = 55f..95f
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "Snooze Duration", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = stringResource(R.string.settings_alarm_snooze_duration), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -274,16 +279,16 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             SettingToggleRow(
-                title = "High Glucose Alarm",
-                subtitle = "Alert when glucose rises above ${unit.format(alarms.highThreshold)}",
+                title = stringResource(R.string.settings_alarm_high),
+                subtitle = stringResource(R.string.settings_alarm_high_desc, unit.format(alarms.highThreshold)),
                 checked = alarms.highAlarmEnabled,
                 onCheckedChange = { repository.updateAlarms(alarms.copy(highAlarmEnabled = it)) }
             )
 
             if (alarms.highAlarmEnabled) {
-                Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 8.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
                     Text(
-                        text = "Threshold: ${unit.format(alarms.highThreshold)} • Snooze: ${alarms.highSnoozeMinutes}m",
+                        text = stringResource(R.string.settings_alarm_threshold_snooze, unit.format(alarms.highThreshold), alarms.highSnoozeMinutes),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -293,7 +298,7 @@ fun SettingsScreen(
                         valueRange = 140f..250f
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "Snooze Duration", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = stringResource(R.string.settings_alarm_snooze_duration), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -314,15 +319,15 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             SettingToggleRow(
-                title = "Loss of Signal Alarm",
-                subtitle = "Alert if CGM disconnects for more than ${alarms.lossWaitMinutes} minutes",
+                title = stringResource(R.string.settings_alarm_loss),
+                subtitle = stringResource(R.string.settings_alarm_loss_desc, alarms.lossWaitMinutes),
                 checked = alarms.lossAlarmEnabled,
                 onCheckedChange = { repository.updateAlarms(alarms.copy(lossAlarmEnabled = it)) }
             )
 
             if (alarms.lossAlarmEnabled) {
-                Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 8.dp)) {
-                    Text(text = "Wait Duration Before Alarm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
+                    Text(text = stringResource(R.string.settings_alarm_loss_wait), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -343,8 +348,8 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             SettingToggleRow(
-                title = "Value Available Notification",
-                subtitle = "Chime when fresh sensor reading arrives",
+                title = stringResource(R.string.settings_alarm_value_available),
+                subtitle = stringResource(R.string.settings_alarm_value_available_desc),
                 checked = alarms.valueAvailableNotification,
                 onCheckedChange = { repository.updateAlarms(alarms.copy(valueAvailableNotification = it)) }
             )
@@ -352,14 +357,19 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             // Alarm Stream Selector (Compact, Non-overflowing chips)
-            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            val currentStreamLabel = when (alarms.soundStream) {
+                AlarmSoundStream.ALARM -> stringResource(R.string.settings_stream_alarm)
+                AlarmSoundStream.NOTIFICATION -> stringResource(R.string.settings_stream_notification)
+                AlarmSoundStream.MEDIA -> stringResource(R.string.settings_stream_media)
+            }
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(
-                    text = "Alarm Audio Stream",
+                    text = stringResource(R.string.settings_alarm_stream),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Active channel: ${alarms.soundStream.label}",
+                    text = stringResource(R.string.settings_alarm_active_channel, currentStreamLabel),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -373,9 +383,9 @@ fun SettingsScreen(
                     AlarmSoundStream.entries.forEach { stream ->
                         val isSelected = stream == alarms.soundStream
                         val shortLabel = when (stream) {
-                            AlarmSoundStream.ALARM -> "Alarm Stream"
-                            AlarmSoundStream.NOTIFICATION -> "Notification"
-                            AlarmSoundStream.MEDIA -> "Media"
+                            AlarmSoundStream.ALARM -> stringResource(R.string.settings_stream_alarm)
+                            AlarmSoundStream.NOTIFICATION -> stringResource(R.string.settings_stream_notification)
+                            AlarmSoundStream.MEDIA -> stringResource(R.string.settings_stream_media)
                         }
                         FilterChip(
                             selected = isSelected,
@@ -393,16 +403,100 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // SECTION 3: BROADCASTS & SYNC
-        SettingsCategoryHeader(title = "INTEGRATIONS & BROADCASTS")
-
+        // SECTION: DEVELOPMENT & TESTING STRATEGIES (SIDE-BY-SIDE INSTALL)
         SettingsSectionCard(
-            title = "Exchanges & Local Sync",
+            categorySubtitle = stringResource(R.string.settings_cat_dev_testing),
+            title = stringResource(R.string.settings_card_dev_testing),
+            icon = Icons.Default.Devices
+        ) {
+            Text(
+                text = stringResource(R.string.settings_dev_testing_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Status row: Active Role & Configured Connections
+            val isReceiverActive = mirrorConnections.any { it.isReceiver }
+            val isSenderActive = mirrorConnections.any { !it.isReceiver }
+            val roleText = when {
+                isReceiverActive -> stringResource(R.string.settings_dev_role_receiver)
+                isSenderActive -> stringResource(R.string.settings_dev_role_sender)
+                else -> stringResource(R.string.settings_dev_role_standalone)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isReceiverActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = roleText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isReceiverActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                val listenPort = remember { try { Natives.getreceiveport() ?: "17580" } catch (_: Throwable) { "17580" } }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Text(
+                        text = "Port: $listenPort",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { showMirrorConfigDialog = true },
+                    modifier = Modifier.weight(1.2f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(stringResource(R.string.settings_dev_btn_setup_relay), fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = { showDevGuideDialog = true },
+                    modifier = Modifier.weight(0.9f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.settings_dev_btn_guide), fontSize = 12.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // SECTION 3: BROADCASTS & SYNC
+        SettingsSectionCard(
+            categorySubtitle = stringResource(R.string.settings_cat_integrations),
+            title = stringResource(R.string.settings_card_exchanges),
             icon = Icons.Default.CloudSync
         ) {
             SettingToggleRow(
-                title = "Glucodata Broadcast",
-                subtitle = "Broadcast glucose locally to Juggluco watchfaces & apps",
+                title = stringResource(R.string.settings_glucodata_broadcast),
+                subtitle = stringResource(R.string.settings_glucodata_broadcast_desc),
                 checked = exchanges.glucodataBroadcast,
                 onCheckedChange = { repository.setGlucodataBroadcast(it) }
             )
@@ -410,8 +504,8 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             SettingToggleRow(
-                title = "xDrip Broadcast",
-                subtitle = "Broadcast readings to xDrip+ and compatible apps",
+                title = stringResource(R.string.settings_xdrip_broadcast),
+                subtitle = stringResource(R.string.settings_xdrip_broadcast_desc),
                 checked = exchanges.xdripBroadcast,
                 onCheckedChange = { repository.setXdripBroadcast(it) }
             )
@@ -419,8 +513,17 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             SettingToggleRow(
-                title = "Google Health Connect",
-                subtitle = "Sync blood glucose records with Android Health Connect",
+                title = stringResource(R.string.settings_librelink_broadcast),
+                subtitle = stringResource(R.string.settings_librelink_broadcast_desc),
+                checked = exchanges.librelinkBroadcast,
+                onCheckedChange = { repository.setLibrelinkBroadcast(it) }
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+
+            SettingToggleRow(
+                title = stringResource(R.string.settings_health_connect),
+                subtitle = stringResource(R.string.settings_health_connect_desc),
                 checked = exchanges.healthConnect,
                 onCheckedChange = { repository.setHealthConnect(it, context as? Activity) }
             )
@@ -428,19 +531,10 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             SettingToggleRow(
-                title = "Abbott LibreView Upload",
-                subtitle = "Automatically sync sensor readings to LibreView cloud",
+                title = stringResource(R.string.settings_libreview),
+                subtitle = stringResource(R.string.settings_libreview_desc),
                 checked = exchanges.libreViewEnabled,
                 onCheckedChange = { repository.setLibreViewEnabled(it) }
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-
-            SettingToggleRow(
-                title = "Local xDrip / Nightscout Server",
-                subtitle = "Serve local REST API on port 17580 for watchfaces",
-                checked = exchanges.xdripWebServer,
-                onCheckedChange = { repository.setXdripWebServer(it) }
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
@@ -454,18 +548,59 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = "Mirror & Network Sync",
+                        text = stringResource(R.string.settings_xdrip_server),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Sync readings and alarms with other devices over Wi-Fi",
+                        text = stringResource(R.string.settings_xdrip_server_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = exchanges.xdripWebServer,
+                        onCheckedChange = { repository.setXdripWebServer(it) }
+                    )
+                    if (exchanges.xdripWebServer) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        OutlinedButton(
+                            onClick = {
+                                if (context is Activity) {
+                                    repository.openWebServerConfig(context)
+                                }
+                            }
+                        ) {
+                            Text(stringResource(R.string.settings_btn_config), fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_mirror_sync),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_mirror_sync_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 OutlinedButton(onClick = { showMirrorConfigDialog = true }) {
-                    Text("Config")
+                    Text(stringResource(R.string.settings_btn_config))
                 }
             }
         }
@@ -473,21 +608,20 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // SECTION 4: DISPLAY & THEME
-        SettingsCategoryHeader(title = "DISPLAY & THEME")
-
         SettingsSectionCard(
-            title = "Appearance & Overlays",
+            categorySubtitle = stringResource(R.string.settings_cat_display),
+            title = stringResource(R.string.settings_card_display),
             icon = Icons.Default.Palette
         ) {
             // Theme Mode Selector
-            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(
-                    text = "Theme Preference",
+                    text = stringResource(R.string.settings_theme_pref),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Select dark, light, or follow system theme",
+                    text = stringResource(R.string.settings_theme_pref_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -501,7 +635,7 @@ fun SettingsScreen(
                     FilterChip(
                         selected = darkThemeOverride == true,
                         onClick = { onDarkThemeChanged(true) },
-                        label = { Text("Dark Theme", fontSize = 12.sp) },
+                        label = { Text(stringResource(R.string.settings_theme_dark), fontSize = 12.sp) },
                         leadingIcon = {
                             Icon(imageVector = Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
@@ -509,7 +643,7 @@ fun SettingsScreen(
                     FilterChip(
                         selected = darkThemeOverride == false,
                         onClick = { onDarkThemeChanged(false) },
-                        label = { Text("Light Theme", fontSize = 12.sp) },
+                        label = { Text(stringResource(R.string.settings_theme_light), fontSize = 12.sp) },
                         leadingIcon = {
                             Icon(imageVector = Icons.Default.LightMode, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
@@ -517,7 +651,7 @@ fun SettingsScreen(
                     FilterChip(
                         selected = darkThemeOverride == null,
                         onClick = { onDarkThemeChanged(null) },
-                        label = { Text("System Default", fontSize = 12.sp) }
+                        label = { Text(stringResource(R.string.settings_theme_system), fontSize = 12.sp) }
                     )
                 }
             }
@@ -525,8 +659,8 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
 
             SettingToggleRow(
-                title = "Floating Glucose Widget",
-                subtitle = "Show movable floating glucose overlay above other apps",
+                title = stringResource(R.string.settings_floating_widget),
+                subtitle = stringResource(R.string.settings_floating_widget_desc),
                 checked = displayConfig.floatingGlucose,
                 onCheckedChange = {
                     if (context is Activity) {
@@ -539,11 +673,11 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, bottom = 4.dp),
+                        .padding(bottom = 4.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = { showFloatingConfigDialog = true }) {
-                        Text("Configure Appearance")
+                        Text(stringResource(R.string.settings_btn_configure_appearance))
                     }
                 }
             }
@@ -559,26 +693,26 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = "Voice & Speech Announcements",
+                        text = stringResource(R.string.settings_voice_speech),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Spoken readings on arrival, alarms and speech rate",
+                        text = stringResource(R.string.settings_voice_speech_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 OutlinedButton(onClick = { showTalkerDialog = true }) {
-                    Text("Configure")
+                    Text(stringResource(R.string.settings_btn_configure))
                 }
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             SettingToggleRow(
-                title = "Status Bar Glucose Notification",
-                subtitle = "Keep live glucose and trend continuously in Android status bar",
+                title = stringResource(R.string.settings_status_bar),
+                subtitle = stringResource(R.string.settings_status_bar_desc),
                 checked = displayConfig.statusBarNotification,
                 onCheckedChange = { repository.setStatusBarNotification(it) }
             )
@@ -586,8 +720,8 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             SettingToggleRow(
-                title = "Fullscreen System UI",
-                subtitle = "Hide Android status and navigation bars for immersive curve",
+                title = stringResource(R.string.settings_fullscreen),
+                subtitle = stringResource(R.string.settings_fullscreen_desc),
                 checked = displayConfig.systemUiFullscreen,
                 onCheckedChange = {
                     repository.setSystemUiFullscreen(it, context as? Activity)
@@ -607,15 +741,14 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // SECTION 5: NFC & HARDWARE
-        SettingsCategoryHeader(title = "NFC & HARDWARE")
-
         SettingsSectionCard(
-            title = "Scanning & Sound Options",
+            categorySubtitle = stringResource(R.string.settings_cat_hardware),
+            title = stringResource(R.string.settings_card_hardware),
             icon = Icons.Default.Nfc
         ) {
             SettingToggleRow(
-                title = "NFC Scan Sound",
-                subtitle = "Play confirmation chime when NFC sensor is read",
+                title = stringResource(R.string.settings_nfc_sound),
+                subtitle = stringResource(R.string.settings_nfc_sound_desc),
                 checked = hardwareConfig.nfcSound,
                 onCheckedChange = {
                     // Update NFC sound
@@ -625,8 +758,8 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             SettingToggleRow(
-                title = "Launch App on NFC Scan",
-                subtitle = "Automatically open Juggluco when phone touches sensor",
+                title = stringResource(R.string.settings_nfc_launch),
+                subtitle = stringResource(R.string.settings_nfc_launch_desc),
                 checked = hardwareConfig.globalScanStartsApp,
                 onCheckedChange = {
                     // Update global scan
@@ -637,10 +770,9 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // SECTION 6: DATA & LEGACY
-        SettingsCategoryHeader(title = "DATA MANAGEMENT & TOOLS")
-
         SettingsSectionCard(
-            title = "Export & Legacy View",
+            categorySubtitle = stringResource(R.string.settings_cat_data),
+            title = stringResource(R.string.settings_card_data),
             icon = Icons.Default.FileUpload
         ) {
             Row(
@@ -652,12 +784,12 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = "Export Sensor Data",
+                        text = stringResource(R.string.settings_export_sensor_data),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Export CSV or HTML records for amounts, scans, stream & history",
+                        text = stringResource(R.string.settings_export_sensor_data_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -678,18 +810,18 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = "Legacy OpenGL Canvas View",
+                        text = stringResource(R.string.settings_legacy_canvas),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Switch to classic landscape OpenGL curve. Press Back anytime to return.",
+                        text = stringResource(R.string.settings_legacy_canvas_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 TextButton(onClick = onOpenLegacyView) {
-                    Text("Switch")
+                    Text(stringResource(R.string.settings_btn_switch))
                 }
             }
         }
@@ -697,21 +829,20 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // SECTION 7: ABOUT
-        SettingsCategoryHeader(title = "ABOUT")
-
         SettingsSectionCard(
-            title = "About Juggluco",
+            categorySubtitle = stringResource(R.string.settings_cat_about),
+            title = stringResource(R.string.settings_card_about),
             icon = Icons.Default.Info
         ) {
             Text(
-                text = "Juggluco v11.0.2",
+                text = stringResource(R.string.settings_version_title),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Modern Jetpack Compose Material 3 Edition\nOpen Source Software licensed under GPLv3\nCreated by Jaap Korthals Altes",
+                text = stringResource(R.string.settings_about_details),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -751,21 +882,53 @@ fun SettingsScreen(
     // Mirror / Sync Dialog
     if (showMirrorConfigDialog) {
         MirrorConfigDialog(
+            repository = repository,
             onDismiss = { showMirrorConfigDialog = false }
         )
     }
-}
 
-@Composable
-private fun SettingsCategoryHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        letterSpacing = 1.sp,
-        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-    )
+    // Side-by-Side Dev Testing Guide Dialog
+    if (showDevGuideDialog) {
+        AlertDialog(
+            onDismissRequest = { showDevGuideDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.settings_dev_guide_title), fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                val guideHtml = stringResource(R.string.settings_dev_guide_body)
+                val spanned = remember(guideHtml) {
+                    androidx.core.text.HtmlCompat.fromHtml(guideHtml, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT)
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp)
+                ) {
+                    Text(
+                        text = spanned.toString(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showDevGuideDialog = false }) {
+                    Text(stringResource(R.string.dialog_done))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -879,6 +1042,7 @@ fun ExportDataDialog(
 private fun SettingsSectionCard(
     title: String,
     icon: ImageVector,
+    categorySubtitle: String? = null,
     content: @Composable () -> Unit
 ) {
     Card(
@@ -888,6 +1052,16 @@ private fun SettingsSectionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            if (categorySubtitle != null) {
+                Text(
+                    text = categorySubtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = icon,

@@ -37,7 +37,6 @@ import tk.glucodata.ui.navigation.JugglucoBottomNavBar
 import tk.glucodata.ui.navigation.JugglucoNavigationRail
 import tk.glucodata.ui.screens.ExportScreen
 import tk.glucodata.ui.screens.GlucoseScreen
-import tk.glucodata.ui.screens.LogbookScreen
 import tk.glucodata.ui.screens.SensorsScreen
 import tk.glucodata.ui.screens.SettingsScreen
 import tk.glucodata.ui.screens.StatsScreen
@@ -142,12 +141,6 @@ fun JugglucoApp(
                                 StatsScreen(
                                     repository = repository,
                                     onExportData = handleOpenExport
-                                )
-                            }
-                            NavigationTab.LOGBOOK -> {
-                                LogbookScreen(
-                                    repository = repository,
-                                    onOpenAddEntry = { showAddEntrySheet = true }
                                 )
                             }
                             NavigationTab.SENSORS -> {

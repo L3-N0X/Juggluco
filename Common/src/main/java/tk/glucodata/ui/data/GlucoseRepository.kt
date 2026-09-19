@@ -1,6 +1,7 @@
 package tk.glucodata.ui.data
 
 import android.app.Activity
+import android.content.Intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -10,10 +11,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import tk.glucodata.Applic
+import tk.glucodata.Backup
+import tk.glucodata.BleMirror
 import tk.glucodata.MainActivity
+import tk.glucodata.MessageSender
 import tk.glucodata.Natives
+import tk.glucodata.Nightscout
 import tk.glucodata.Notify
 import tk.glucodata.SensorBridge
+import tk.glucodata.XInfuus
 import tk.glucodata.nums.numio
 import tk.glucodata.ui.model.AgpProfile
 import tk.glucodata.ui.model.AlarmConfig
@@ -27,6 +33,7 @@ import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HardwareConfig
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
+import tk.glucodata.ui.model.MirrorConnection
 import tk.glucodata.ui.model.SensorDetail
 import tk.glucodata.ui.model.SensorInfo
 import tk.glucodata.ui.model.SensorState
@@ -47,6 +54,9 @@ class GlucoseRepository(
 
     private val _sensors = MutableStateFlow<List<SensorInfo>>(emptyList())
     val sensors: StateFlow<List<SensorInfo>> = _sensors.asStateFlow()
+
+    private val _mirrorConnections = MutableStateFlow<List<MirrorConnection>>(emptyList())
+    val mirrorConnections: StateFlow<List<MirrorConnection>> = _mirrorConnections.asStateFlow()
 
     private val _sensorDetails = MutableStateFlow<List<SensorDetail>>(emptyList())
     val sensorDetails: StateFlow<List<SensorDetail>> = _sensorDetails.asStateFlow()
@@ -204,6 +214,8 @@ class GlucoseRepository(
                     googleScan = try { Natives.getGoogleScan() } catch (_: Throwable) { false },
                     hasNfc = MainActivity.hasnfc
                 )
+
+                refreshMirrorConnections()
             }
         } catch (_: Throwable) {}
     }
@@ -609,6 +621,260 @@ class GlucoseRepository(
                 if (Applic.Nativesloaded) {
                     Natives.setusexdripwebserver(enabled)
                 }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setLibrelinkBroadcast(enabled: Boolean) {
+        _exchanges.value = _exchanges.value.copy(librelinkBroadcast = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    if (enabled) {
+                        val intent = Intent(XInfuus.glucoseaction)
+                        val receivers = Applic.app.packageManager.queryBroadcastReceivers(intent, 0)
+                        val names = receivers.mapNotNull { it.activityInfo?.packageName }.distinct()
+                        val targetNames = if (names.isNotEmpty()) names.toTypedArray() else arrayOf("tk.glucodata.dev", "com.freestylelibre.app")
+                        Natives.setlibrelinkRecepters(targetNames)
+                    } else {
+                        Natives.setlibrelinkRecepters(emptyArray())
+                    }
+                    XInfuus.setlibrenames()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // --- MIRROR & DATA RELAY ACTIONS ---
+
+    fun refreshMirrorConnections() {
+        scope.launch(Dispatchers.IO) {
+            val list = mutableListOf<MirrorConnection>()
+            try {
+                if (Applic.Nativesloaded) {
+                    val count = Natives.backuphostNr()
+                    for (i in 0 until count) {
+                        val rawIps = Natives.getbackupIPs(i)
+                        val ips = rawIps?.filterNotNull()?.filter { it.isNotBlank() } ?: emptyList()
+                        val label = Natives.getbackuplabel(i) ?: ""
+                        val port = Natives.getbackuphostport(i) ?: ""
+                        val isReceiver = Natives.getbackuphostreceive(i) != 0
+                        val sendAmounts = Natives.getbackuphostnums(i)
+                        val sendStream = Natives.getbackuphoststream(i)
+                        val sendScans = Natives.getbackuphostscans(i)
+                        val isActive = Natives.getbackuphostactive(i)
+                        val isPassive = Natives.getbackuphostpassive(i)
+                        val isDeactivated = try { Natives.getHostDeactivated(i) } catch (_: Throwable) { false }
+                        val status = try { Natives.mirrorStatus(i) ?: "" } catch (_: Throwable) { "" }
+                        list.add(
+                            MirrorConnection(
+                                index = i,
+                                label = label,
+                                ips = ips,
+                                port = port,
+                                isReceiver = isReceiver,
+                                sendAmounts = sendAmounts,
+                                sendStream = sendStream,
+                                sendScans = sendScans,
+                                isActive = isActive,
+                                isPassive = isPassive,
+                                isDeactivated = isDeactivated,
+                                status = status
+                            )
+                        )
+                    }
+                }
+            } catch (_: Throwable) {}
+            _mirrorConnections.value = list
+        }
+    }
+
+    fun addLocalReceiverConnection(targetPort: String = "17580", label: String = "Local Prod Sync"): Boolean {
+        return try {
+            if (!Applic.Nativesloaded) return false
+            val portStr = targetPort.trim().ifEmpty { "17580" }
+            val pos = Natives.changebackuphost(
+                -1,
+                arrayOf("127.0.0.1"),
+                1,
+                false,
+                portStr,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                false,
+                null,
+                0L,
+                label.trim().ifEmpty { "Local Prod Sync" },
+                false,
+                false,
+                null,
+                false,
+                BleMirror.TRANSPORT_TCP,
+                false
+            )
+            if (pos >= 0) {
+                BleMirror.configurationChanged(pos, true)
+                MessageSender.reinit()
+                Applic.switchSync()
+                refreshMirrorConnections()
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun addLocalSenderConnection(targetPort: String = "17581", label: String = "Local Dev Build"): Boolean {
+        return try {
+            if (!Applic.Nativesloaded) return false
+            val portStr = targetPort.trim().ifEmpty { "17581" }
+            val pos = Natives.changebackuphost(
+                -1,
+                arrayOf("127.0.0.1"),
+                1,
+                false,
+                portStr,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                null,
+                0L,
+                label.trim().ifEmpty { "Local Dev Build" },
+                false,
+                false,
+                null,
+                false,
+                BleMirror.TRANSPORT_TCP,
+                false
+            )
+            if (pos >= 0) {
+                BleMirror.configurationChanged(pos, true)
+                MessageSender.reinit()
+                Applic.switchSync()
+                refreshMirrorConnections()
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun addCustomMirrorConnection(
+        ip: String,
+        port: String,
+        isReceiver: Boolean,
+        label: String,
+        sendStream: Boolean = true,
+        sendScans: Boolean = true,
+        sendAmounts: Boolean = true
+    ): Boolean {
+        return try {
+            if (!Applic.Nativesloaded) return false
+            val cleanIp = ip.trim().ifEmpty { "127.0.0.1" }
+            val cleanPort = port.trim().ifEmpty { "17580" }
+            val pos = Natives.changebackuphost(
+                -1,
+                arrayOf(cleanIp),
+                1,
+                false,
+                cleanPort,
+                if (isReceiver) false else sendAmounts,
+                if (isReceiver) false else sendStream,
+                if (isReceiver) false else sendScans,
+                false,
+                isReceiver,
+                isReceiver,
+                false,
+                null,
+                0L,
+                label.trim().ifEmpty { if (isReceiver) "Receiver" else "Sender" },
+                false,
+                false,
+                null,
+                false,
+                BleMirror.TRANSPORT_TCP,
+                false
+            )
+            if (pos >= 0) {
+                BleMirror.configurationChanged(pos, true)
+                MessageSender.reinit()
+                Applic.switchSync()
+                refreshMirrorConnections()
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun deleteMirrorConnection(index: Int) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded && index >= 0) {
+                    Natives.deletebackuphost(index)
+                    BleMirror.configurationChanged()
+                    MessageSender.reinit()
+                    refreshMirrorConnections()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun resetMirrorConnection(index: Int) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded && index >= 0) {
+                    Natives.resetbackuphost(index)
+                    Applic.switchSync()
+                    MessageSender.reinit()
+                    refreshMirrorConnections()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setMirrorReceivePort(port: String): Boolean {
+        return try {
+            val cleanPort = port.trim()
+            val num = cleanPort.toIntOrNull()
+            if (num != null && num in 1024..65535) {
+                Natives.setreceiveport(cleanPort)
+                MessageSender.reinit()
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun openAdvancedMirrorView(activity: Activity) {
+        if (activity is MainActivity) {
+            try {
+                Backup().realmkbackupview(activity, false)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun openWebServerConfig(activity: Activity) {
+        if (activity is MainActivity) {
+            try {
+                Nightscout.show(activity, activity.window.decorView)
             } catch (_: Throwable) {}
         }
     }

@@ -3,6 +3,7 @@ package tk.glucodata.ui.screens
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
@@ -43,6 +45,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -65,6 +68,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -78,7 +82,9 @@ import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.graph.GlucoseGraph
 import tk.glucodata.ui.graph.TimeRangeSelector
 import tk.glucodata.ui.model.GlucosePoint
+import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogRecord
+import tk.glucodata.ui.model.LogType
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -130,6 +136,9 @@ fun GlucoseScreen(
     var isViewingPastData by remember { mutableStateOf(false) }
     var pastWindowStart by remember { mutableLongStateOf(0L) }
     var pastWindowEnd by remember { mutableLongStateOf(0L) }
+
+    var showFullLogbookSheet by remember { mutableStateOf(false) }
+    val fullLogbookSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isLandscape = maxWidth > maxHeight && maxWidth > 550.dp
@@ -243,6 +252,14 @@ fun GlucoseScreen(
                         stats = screenStats,
                         unit = unit,
                         timeRangeLabel = selectedRange.label,
+                        minimalistUnits = displayConfig.minimalistUnits
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LogbookSection(
+                        repository = repository,
+                        onOpenAddEntry = onOpenAddEntry,
+                        onViewAll = { showFullLogbookSheet = true },
+                        unit = unit,
                         minimalistUnits = displayConfig.minimalistUnits
                     )
                 }
@@ -427,6 +444,18 @@ fun GlucoseScreen(
                     unit = unit,
                     timeRangeLabel = selectedRange.label,
                     minimalistUnits = displayConfig.minimalistUnits
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 6. Diabetes Logbook / Tagebuch Section
+                LogbookSection(
+                    repository = repository,
+                    onOpenAddEntry = onOpenAddEntry,
+                    onViewAll = { showFullLogbookSheet = true },
+                    unit = unit,
+                    minimalistUnits = displayConfig.minimalistUnits,
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
         }
@@ -699,6 +728,21 @@ fun GlucoseScreen(
                 DatePicker(state = datePickerState)
             }
         }
+
+        // 11. Full Logbook Bottom Sheet
+        if (showFullLogbookSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showFullLogbookSheet = false },
+                sheetState = fullLogbookSheetState
+            ) {
+                LogbookScreen(
+                    repository = repository,
+                    onOpenAddEntry = onOpenAddEntry,
+                    onClose = { showFullLogbookSheet = false },
+                    modifier = Modifier.fillMaxHeight(0.85f)
+                )
+            }
+        }
     }
 }
 
@@ -964,3 +1008,198 @@ private fun ClinicalHelpSection(
         }
     }
 }
+
+@Composable
+fun LogbookSection(
+    repository: GlucoseRepository,
+    onOpenAddEntry: () -> Unit,
+    onViewAll: () -> Unit,
+    unit: GlucoseUnit,
+    minimalistUnits: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val logs by repository.logs.collectAsState()
+    val context = LocalContext.current
+    var selectedTypeFilter by remember { mutableStateOf<LogType?>(null) }
+
+    // Calculate today's time boundary
+    val now = System.currentTimeMillis()
+    val dayStart = remember(now) {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        cal.timeInMillis
+    }
+
+    val todayLogs = remember(logs, dayStart) {
+        logs.filter { it.timestamp >= dayStart }
+    }
+
+    // Daily totals KPI
+    val todayBolus = remember(todayLogs) {
+        todayLogs.filter { it.type == LogType.RAPID_INSULIN }.sumOf { it.value.toDouble() }
+    }
+    val todayBasal = remember(todayLogs) {
+        todayLogs.filter { it.type == LogType.BASAL_INSULIN }.sumOf { it.value.toDouble() }
+    }
+    val todayCarbs = remember(todayLogs) {
+        todayLogs.filter { it.type == LogType.CARBS || it.type == LogType.MEAL }.sumOf { it.value.toDouble() }
+    }
+    val todayChecks = remember(todayLogs) {
+        todayLogs.count { it.type == LogType.BLOOD_GLUCOSE }
+    }
+
+    // Display logs: prefer today's entries, fall back to recent logs if empty
+    val displayLogs = remember(logs, todayLogs, selectedTypeFilter) {
+        val sourceList = if (todayLogs.isNotEmpty()) todayLogs else logs.take(10)
+        val filtered = if (selectedTypeFilter != null) {
+            sourceList.filter { it.type == selectedTypeFilter }
+        } else {
+            sourceList
+        }
+        filtered.take(6)
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header: Icon + Title ("Tagebuch" / "Logbook") + "Alle anzeigen" / View All + Add
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ListAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.tab_logbook),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onViewAll) {
+                        Text(
+                            text = stringResource(R.string.logbook_view_all),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    IconButton(
+                        onClick = onOpenAddEntry,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = stringResource(R.string.new_amount),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Totals row (Today)
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    DailyTotalPill(label = "Bolus", value = "${String.format(Locale.US, "%.1f", todayBolus)} U", color = Color(0xFF2563EB))
+                    DailyTotalPill(label = "Basal", value = "${String.format(Locale.US, "%.1f", todayBasal)} U", color = Color(0xFF4F46E5))
+                    DailyTotalPill(label = "Carbs", value = "${todayCarbs.toInt()} g", color = Color(0xFFD97706))
+                    DailyTotalPill(label = "Checks", value = "$todayChecks", color = Color(0xFFDC2626))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Filter chips (All, Bolus, Basal, Carbs, BG)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                FilterChip(
+                    selected = selectedTypeFilter == null,
+                    onClick = { selectedTypeFilter = null },
+                    label = { Text("All", fontSize = 11.sp) }
+                )
+                FilterChip(
+                    selected = selectedTypeFilter == LogType.RAPID_INSULIN,
+                    onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.RAPID_INSULIN) null else LogType.RAPID_INSULIN },
+                    label = { Text("Bolus", fontSize = 11.sp) }
+                )
+                FilterChip(
+                    selected = selectedTypeFilter == LogType.BASAL_INSULIN,
+                    onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BASAL_INSULIN) null else LogType.BASAL_INSULIN },
+                    label = { Text("Basal", fontSize = 11.sp) }
+                )
+                FilterChip(
+                    selected = selectedTypeFilter == LogType.CARBS,
+                    onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.CARBS) null else LogType.CARBS },
+                    label = { Text("Carbs", fontSize = 11.sp) }
+                )
+                FilterChip(
+                    selected = selectedTypeFilter == LogType.BLOOD_GLUCOSE,
+                    onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BLOOD_GLUCOSE) null else LogType.BLOOD_GLUCOSE },
+                    label = { Text("BG", fontSize = 11.sp) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Recent log entries
+            if (displayLogs.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.logbook_no_entries_today),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    displayLogs.forEach { logItem ->
+                        LogItemCard(
+                            record = logItem,
+                            unit = unit,
+                            minimalistUnits = minimalistUnits,
+                            onDelete = {
+                                repository.deleteLogEntry(logItem)
+                                Toast.makeText(context, "Log entry deleted", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+

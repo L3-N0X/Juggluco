@@ -29,9 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import tk.glucodata.Natives
+import tk.glucodata.R
 
 @Composable
 fun TalkerConfigDialog(
@@ -61,7 +63,7 @@ fun TalkerConfigDialog(
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Voice & Speech Announcements", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.settings_voice_speech), fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -78,8 +80,8 @@ fun TalkerConfigDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text("Speak New Readings", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        Text("Announce glucose value when each reading arrives", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text(stringResource(R.string.dialog_speak_new_readings), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.dialog_speak_new_readings_desc), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     }
                     Switch(
                         checked = isVoiceActive,
@@ -101,8 +103,8 @@ fun TalkerConfigDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text("Speak Glucose Alarms", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        Text("Audibly speak low/high alarm messages", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text(stringResource(R.string.dialog_speak_alarms), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.dialog_speak_alarms_desc), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     }
                     Switch(
                         checked = speakAlarms,
@@ -123,7 +125,7 @@ fun TalkerConfigDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Speech Rate", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.dialog_speech_rate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         Text("${String.format(java.util.Locale.US, "%.1f", speechSpeed)}x", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                     Slider(
@@ -144,7 +146,7 @@ fun TalkerConfigDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Voice Pitch", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.dialog_voice_pitch), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         Text("${String.format(java.util.Locale.US, "%.1f", speechPitch)}x", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                     Slider(
@@ -164,7 +166,7 @@ fun TalkerConfigDialog(
             Button(
                 onClick = onDismiss
             ) {
-                Text("Done")
+                Text(stringResource(R.string.dialog_done))
             }
         }
     )

@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import tk.glucodata.ui.model.NavigationTab
 
@@ -43,9 +44,14 @@ fun JugglucoBottomNavBar(
                 label = {
                     Text(
                         text = localizedTitle,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall
                     )
                 },
+                alwaysShowLabel = true,
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -85,9 +91,14 @@ fun JugglucoNavigationRail(
                 label = {
                     Text(
                         text = localizedTitle,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall
                     )
                 },
+                alwaysShowLabel = true,
                 colors = NavigationRailItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     selectedTextColor = MaterialTheme.colorScheme.primary,

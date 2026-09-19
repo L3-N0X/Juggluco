@@ -566,6 +566,8 @@
     <string name="logbook_time_30d">30 Days</string>
     <string name="logbook_time_all">All Time</string>
     <string name="logbook_totals">Totals</string>
+    <string name="logbook_view_all">View All</string>
+    <string name="logbook_no_entries_today">No entries yet today</string>
 
     <string name="graph_layers">Graph Layers</string>
     <string name="graph_layers_desc">Customize data layers rendered on the glucose curve</string>
@@ -734,4 +736,144 @@
     <string name="export_time_range_title">Time Range</string>
     <string name="export_all_time">All Available Data</string>
     <string name="export_action_button">Export File Now</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings &amp; Config</string>
+    <string name="settings_subtitle">Thresholds, alarms, broadcasts, appearance and hardware</string>
+    <string name="settings_cat_glucose">GLUCOSE TARGETS &amp; UNITS</string>
+    <string name="settings_card_target_range">Target Range &amp; Units</string>
+    <string name="settings_unit_label">Glucose Unit</string>
+    <string name="settings_unit_mgdl_desc">mg/dL (Milligrams per deciliter)</string>
+    <string name="settings_unit_mmoll_desc">mmol/L (Millimoles per liter)</string>
+    <string name="settings_target_low">Target Low Threshold</string>
+    <string name="settings_target_high">Target High Threshold</string>
+
+    <string name="settings_cat_alarms">ALARMS &amp; NOTIFICATIONS</string>
+    <string name="settings_card_alarms">Glucose Alarms &amp; Chimes</string>
+    <string name="settings_alarm_low">Low Glucose Alarm</string>
+    <string name="settings_alarm_low_desc">Alert when glucose drops below %s</string>
+    <string name="settings_alarm_threshold_snooze">Threshold: %1$s • Snooze: %2$dm</string>
+    <string name="settings_alarm_snooze_duration">Snooze Duration</string>
+    <string name="settings_alarm_high">High Glucose Alarm</string>
+    <string name="settings_alarm_high_desc">Alert when glucose rises above %s</string>
+    <string name="settings_alarm_loss">Loss of Signal Alarm</string>
+    <string name="settings_alarm_loss_desc">Alert if CGM disconnects for more than %d minutes</string>
+    <string name="settings_alarm_loss_wait">Wait Duration Before Alarm</string>
+    <string name="settings_alarm_value_available">Value Available Notification</string>
+    <string name="settings_alarm_value_available_desc">Chime when fresh sensor reading arrives</string>
+    <string name="settings_alarm_stream">Alarm Audio Stream</string>
+    <string name="settings_alarm_active_channel">Active channel: %s</string>
+    <string name="settings_stream_alarm">Alarm Stream</string>
+    <string name="settings_stream_notification">Notification</string>
+    <string name="settings_stream_media">Media</string>
+
+    <string name="settings_cat_dev_testing">DEVELOPMENT &amp; TESTING</string>
+    <string name="settings_card_dev_testing">Side-by-Side Installation &amp; Relay</string>
+    <string name="settings_dev_testing_desc">Run a secondary build (e.g., tk.glucodata.dev) side-by-side with production without switching Bluetooth. Production stays connected to the sensor and relays live glucose via Mirror TCP/IP, local broadcast, or local web server.</string>
+    <string name="settings_dev_btn_setup_relay">Setup Side-by-Side Mirror</string>
+    <string name="settings_dev_btn_guide">Testing Guide</string>
+    <string name="settings_dev_role_receiver">Receiver Active (Receiving live data)</string>
+    <string name="settings_dev_role_sender">Sender Active (Relaying data)</string>
+    <string name="settings_dev_role_standalone">Standalone / Direct Sensor</string>
+    <string name="settings_dev_guide_title">Side-by-Side Dev Testing Guide</string>
+    <string name="settings_dev_guide_body"><b>Side-by-Side Installation (Different App ID)</b><br/><br/><b>Why this is recommended:</b><br/>Changing the applicationId on your dev build (e.g. tk.glucodata.dev) prevents data corruption or schema collisions from breaking your daily production install.<br/><br/><b>How to relay live data without switching Bluetooth:</b><br/><br/><b>1. Production App (Paired to sensor):</b><br/>• Keeps the physical Bluetooth connection to the CGM sensor.<br/>• Under Mirror settings, ensure its sync port is active (default 17580 or 8795).<br/>• Or tap \'Configure as Sender\' with target port 17581 to push data to the dev build.<br/>• Alternatively, enable <i>Patched Libre Broadcast (com.librelink.app)</i> or <i>Local xDrip Server</i>.<br/><br/><b>2. Development Build (tk.glucodata.dev):</b><br/>• Use a distinct listen port (e.g. 17581) to avoid socket binding collisions on the same device.<br/>• In Mirror Settings, tap <b>Connect as Receiver (Dev Mode)</b> with target IP 127.0.0.1 and target port 17580.<br/>• The dev build will immediately start receiving live readings, stream, and scans from production!</string>
+
+    <string name="settings_cat_integrations">INTEGRATIONS &amp; BROADCASTS</string>
+    <string name="settings_card_exchanges">Exchanges &amp; Local Sync</string>
+    <string name="settings_glucodata_broadcast">Glucodata Broadcast</string>
+    <string name="settings_glucodata_broadcast_desc">Broadcast glucose locally to Juggluco watchfaces &amp; apps</string>
+    <string name="settings_xdrip_broadcast">xDrip Broadcast</string>
+    <string name="settings_xdrip_broadcast_desc">Broadcast readings to xDrip+ and compatible apps</string>
+    <string name="settings_librelink_broadcast">Patched Libre Broadcast (com.librelink.app)</string>
+    <string name="settings_librelink_broadcast_desc">Broadcast live glucose readings via com.librelink.app intent for dev builds and local apps</string>
+    <string name="settings_health_connect">Google Health Connect</string>
+    <string name="settings_health_connect_desc">Sync blood glucose records with Android Health Connect</string>
+    <string name="settings_libreview">Abbott LibreView Upload</string>
+    <string name="settings_libreview_desc">Automatically sync sensor readings to LibreView cloud</string>
+    <string name="settings_xdrip_server">Local xDrip / Nightscout Server</string>
+    <string name="settings_xdrip_server_desc">Serve local REST API at http://127.0.0.1:17580/ for dev builds, emulators, and watchfaces</string>
+    <string name="settings_mirror_sync">Mirror &amp; Network Sync (TCP/IP)</string>
+    <string name="settings_mirror_sync_desc">Sync readings across devices or between local apps (127.0.0.1 loopback for side-by-side dev testing)</string>
+    <string name="settings_btn_config">Config</string>
+
+    <string name="settings_cat_display">DISPLAY &amp; THEME</string>
+    <string name="settings_card_display">Appearance &amp; Overlays</string>
+    <string name="settings_theme_pref">Theme Preference</string>
+    <string name="settings_theme_pref_desc">Select dark, light, or follow system theme</string>
+    <string name="settings_theme_dark">Dark Theme</string>
+    <string name="settings_theme_light">Light Theme</string>
+    <string name="settings_theme_system">System Default</string>
+    <string name="settings_floating_widget">Floating Glucose Widget</string>
+    <string name="settings_floating_widget_desc">Show movable floating glucose overlay above other apps</string>
+    <string name="settings_btn_configure_appearance">Configure Appearance</string>
+    <string name="settings_voice_speech">Voice &amp; Speech Announcements</string>
+    <string name="settings_voice_speech_desc">Spoken readings on arrival, alarms and speech rate</string>
+    <string name="settings_btn_configure">Configure</string>
+    <string name="settings_status_bar">Status Bar Glucose Notification</string>
+    <string name="settings_status_bar_desc">Keep live glucose and trend continuously in Android status bar</string>
+    <string name="settings_fullscreen">Fullscreen System UI</string>
+    <string name="settings_fullscreen_desc">Hide Android status and navigation bars for immersive curve</string>
+
+    <string name="settings_cat_hardware">NFC &amp; HARDWARE</string>
+    <string name="settings_card_hardware">Scanning &amp; Sound Options</string>
+    <string name="settings_nfc_sound">NFC Scan Sound</string>
+    <string name="settings_nfc_sound_desc">Play confirmation chime when NFC sensor is read</string>
+    <string name="settings_nfc_launch">Launch App on NFC Scan</string>
+    <string name="settings_nfc_launch_desc">Automatically open Juggluco when phone touches sensor</string>
+
+    <string name="settings_cat_data">DATA MANAGEMENT &amp; TOOLS</string>
+    <string name="settings_card_data">Export &amp; Legacy View</string>
+    <string name="settings_export_sensor_data">Export Sensor Data</string>
+    <string name="settings_export_sensor_data_desc">Export CSV or HTML records for amounts, scans, stream &amp; history</string>
+    <string name="settings_legacy_canvas">Legacy OpenGL Canvas View</string>
+    <string name="settings_legacy_canvas_desc">Switch to classic landscape OpenGL curve. Press Back anytime to return.</string>
+    <string name="settings_btn_switch">Switch</string>
+
+    <string name="settings_cat_about">ABOUT</string>
+    <string name="settings_card_about">About Juggluco</string>
+    <string name="settings_version_title">Juggluco v11.0.2</string>
+    <string name="settings_about_details">Modern Jetpack Compose Material 3 Edition\nOpen Source Software licensed under GPLv3\nCreated by Jaap Korthals Altes</string>
+
+    <!-- Config Dialogs -->
+    <string name="dialog_done">Done</string>
+    <string name="dialog_floating_desc">Configure appearance of the floating desktop overlay number:</string>
+    <string name="dialog_touchable_overlay">Touchable Overlay</string>
+    <string name="dialog_touchable_overlay_desc">Allow moving the widget by dragging (disable to click through)</string>
+    <string name="dialog_bg_opacity">Background Opacity</string>
+    <string name="dialog_floating_permission_note">Note: Android requires \'Display over other apps\' permission to show the floating overlay above other apps.</string>
+    <string name="dialog_speak_new_readings">Speak New Readings</string>
+    <string name="dialog_speak_new_readings_desc">Announce glucose value when each reading arrives</string>
+    <string name="dialog_speak_alarms">Speak Glucose Alarms</string>
+    <string name="dialog_speak_alarms_desc">Audibly speak low/high alarm messages</string>
+    <string name="dialog_speech_rate">Speech Rate</string>
+    <string name="dialog_voice_pitch">Voice Pitch</string>
+    <string name="dialog_mirror_title">Mirror &amp; Device Sync</string>
+    <string name="dialog_mirror_desc">Synchronize sensor readings across devices or between local apps on this phone (127.0.0.1 loopback for side-by-side dev testing):</string>
+    <string name="dialog_wlan_ip">WLAN IP Address:</string>
+    <string name="dialog_ip_unavailable">Unavailable</string>
+    <string name="dialog_tcp_port">This App\'s Listen Port:</string>
+    <string name="dialog_lock_amounts">Lock Log Amounts</string>
+    <string name="dialog_lock_amounts_desc">Prevent mirror peers from modifying logged insulin or amounts</string>
+    <string name="dialog_trigger_sync">Trigger Sync</string>
+    <string name="dialog_reinit">Reinit</string>
+    <string name="dialog_sync_toggled">Mirror sync toggled</string>
+    <string name="dialog_reinit_success">Network connections reinitialized</string>
+    <string name="dialog_mirror_quick_setup_title">Side-by-Side Local Relay (127.0.0.1)</string>
+    <string name="dialog_mirror_quick_setup_desc">Connect this build directly to another local Juggluco install without touching Bluetooth:</string>
+    <string name="dialog_mirror_target_host">Target IP / Host</string>
+    <string name="dialog_mirror_target_port">Target Sync Port</string>
+    <string name="dialog_mirror_conn_label">Connection Label</string>
+    <string name="dialog_mirror_btn_receiver">Connect as Receiver (Dev Mode)</string>
+    <string name="dialog_mirror_btn_sender">Configure as Sender (Prod Mode)</string>
+    <string name="dialog_mirror_active_list">Configured Connections (%d)</string>
+    <string name="dialog_mirror_no_conns">No mirror connections active.\nUse Quick Setup above to connect to your local production app.</string>
+    <string name="dialog_mirror_role_receiver_tag">Receiver (Incoming)</string>
+    <string name="dialog_mirror_role_sender_tag">Sender (Outgoing)</string>
+    <string name="dialog_mirror_delete_confirm">Delete mirror connection \"%s\"?</string>
+    <string name="dialog_mirror_save_port">Save Port</string>
+    <string name="dialog_mirror_port_saved">Listen port updated to %s</string>
+    <string name="dialog_mirror_port_invalid">Invalid port number (must be 1024-65535)</string>
+    <string name="dialog_mirror_conn_added">Mirror connection added successfully</string>
+    <string name="dialog_mirror_legacy_btn">Advanced Mirror Manager (Legacy UI / QR)</string>
+    <string name="dialog_mirror_port_hint">Note: If running two apps on one device, each must use a different listen port (e.g. 17580 for Prod, 17581 for Dev).</string>
 </resources>

@@ -69,3 +69,18 @@ data class WatchConfig(
     val gadgetbridgeEnabled: Boolean = false,
     val separateAlerts: Boolean = false
 )
+
+data class MirrorConnection(
+    val index: Int,
+    val label: String,
+    val ips: List<String>,
+    val port: String,
+    val isReceiver: Boolean,
+    val sendAmounts: Boolean,
+    val sendStream: Boolean,
+    val sendScans: Boolean,
+    val isActive: Boolean,
+    val isPassive: Boolean,
+    val isDeactivated: Boolean,
+    val status: String
+)
