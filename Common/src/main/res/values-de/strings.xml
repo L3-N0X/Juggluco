@@ -653,7 +653,11 @@
     <string name="target_gmi_sub" formatted="false">Zielwert: &lt; 7,0%</string>
     <string name="target_cv_sub" formatted="false">Zielwert: &lt; 36,0%</string>
     <string name="target_active_sub" formatted="false">Zielwert: &gt; 70,0%</string>
-    <string name="tir_title">Zeit im Zielbereich (TIR)</string>
+    <string name="tir_title">Zeit im Zielbereich</string>
+    <string name="stat_average">Mittelwert</string>
+    <string name="stat_gmi">GMI (gesch.)</string>
+    <string name="stat_min">Min</string>
+    <string name="stat_max">Max</string>
     <string name="tir_guidelines">Internationale Konsensrichtlinien</string>
     <string name="tir_no_readings">Keine Messwerte für diesen Zeitraum verfügbar</string>
     <string name="agp_card_title">Ambulantes Glukoseprofil (AGP)</string>

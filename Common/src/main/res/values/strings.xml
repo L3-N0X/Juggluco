@@ -678,7 +678,11 @@
     <string name="target_gmi_sub" formatted="false">Target: &lt; 7.0%</string>
     <string name="target_cv_sub" formatted="false">Target: &lt; 36.0%</string>
     <string name="target_active_sub" formatted="false">Target: &gt; 70.0%</string>
-    <string name="tir_title">Time In Range (TIR)</string>
+    <string name="tir_title">Time in Range</string>
+    <string name="stat_average">Average</string>
+    <string name="stat_gmi">GMI (est.)</string>
+    <string name="stat_min">Min</string>
+    <string name="stat_max">Max</string>
     <string name="tir_guidelines">International Consensus Guidelines</string>
     <string name="tir_no_readings">No readings available for this period</string>
     <string name="agp_card_title">Ambulatory Glucose Profile (AGP)</string>

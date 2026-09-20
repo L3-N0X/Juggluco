@@ -126,13 +126,35 @@ fun GlucoseScreen(
         viewportState.setDuration(selectedRange.durationMillis)
     }
 
-    // Dynamic stats calculated for the currently visible graph period
-    val visibleStats = remember(readings, viewportState.startTimeMillis, viewportState.endTimeMillis, targetLow, targetHigh) {
-        val windowPoints = readings.filter { it.timestamp in viewportState.startTimeMillis..viewportState.endTimeMillis && !it.isScan }
-        if (windowPoints.isNotEmpty()) {
-            tk.glucodata.ui.model.GlucoseStats.calculate(windowPoints, targetLow, targetHigh)
+    // Dynamic stats calculated strictly for the currently visible graph period
+    val visibleStats = remember(
+        readings,
+        viewportState.startTimeMillis,
+        viewportState.endTimeMillis,
+        viewportState.durationMillis,
+        selectedRange,
+        displayConfig,
+        targetLow,
+        targetHigh
+    ) {
+        val windowPoints = readings.filter { pt ->
+            pt.timestamp in viewportState.startTimeMillis..viewportState.endTimeMillis &&
+                when {
+                    pt.isScan -> displayConfig.showScans || (pt.isCalibrated && displayConfig.showCalibratedScans)
+                    pt.isHistory -> displayConfig.showHistory || (pt.isCalibrated && displayConfig.showCalibratedHistory)
+                    pt.isCalibrated -> displayConfig.showCalibratedStream
+                    else -> displayConfig.showStream
+                }
+        }
+        val pointsToUse = if (windowPoints.isNotEmpty()) {
+            windowPoints
         } else {
-            screenStats
+            readings.filter { it.timestamp in viewportState.startTimeMillis..viewportState.endTimeMillis }
+        }
+        if (pointsToUse.isNotEmpty()) {
+            tk.glucodata.ui.model.GlucoseStats.calculate(pointsToUse, targetLow, targetHigh)
+        } else {
+            tk.glucodata.ui.model.GlucoseStats()
         }
     }
 

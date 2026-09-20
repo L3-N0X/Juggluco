@@ -18,17 +18,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.stringResource
 import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
@@ -38,7 +39,7 @@ import tk.glucodata.ui.theme.LocalClinicalColors
 fun GlucoseStatsCard(
     stats: GlucoseStats,
     unit: GlucoseUnit,
-    timeRangeLabel: String = "6h",
+    timeRangeLabel: String = "",
     minimalistUnits: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -49,50 +50,35 @@ fun GlucoseStatsCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(20.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp)
         ) {
-            // Header: Title & Time in target with clinical badge
+            // Header: Title & Time in target
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${stringResource(R.string.tir_title)} ($timeRangeLabel)",
+                    text = stringResource(R.string.tir_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (hasData) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = (if (stats.timeInRangePercent >= 70) clinicalColors.inRange else clinicalColors.high).copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                text = if (stats.timeInRangePercent >= 70) "≥70% ✓" else "<70%",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (stats.timeInRangePercent >= 70) clinicalColors.inRange else clinicalColors.high,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "${stats.timeInRangePercent}%",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = clinicalColors.inRange
-                        )
-                    }
+                    Text(
+                        text = "${stats.timeInRangePercent}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = clinicalColors.inRange
+                    )
                 }
             }
 
@@ -154,28 +140,28 @@ fun GlucoseStatsCard(
                 // 4 Equal-Height Stat Tiles Grid: Average, GMI, Min, Max
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     StatTile(
-                        title = stringResource(R.string.kpi_average_glucose),
+                        title = stringResource(R.string.stat_average),
                         value = unit.format(stats.averageMgDl),
                         unit = glucoseUnitLabel,
                         modifier = Modifier.weight(1f)
                     )
                     StatTile(
-                        title = stringResource(R.string.kpi_gmi),
-                        value = String.format(java.util.Locale.US, "%.1f", stats.estimatedA1c),
-                        unit = "%",
+                        title = stringResource(R.string.stat_gmi),
+                        value = if (stats.estimatedA1c > 0) String.format(java.util.Locale.US, "%.1f", stats.estimatedA1c) else "—",
+                        unit = if (stats.estimatedA1c > 0) "%" else "",
                         modifier = Modifier.weight(1f)
                     )
                     StatTile(
-                        title = "Min",
+                        title = stringResource(R.string.stat_min),
                         value = unit.format(stats.minMgDl),
                         unit = glucoseUnitLabel,
                         modifier = Modifier.weight(1f)
                     )
                     StatTile(
-                        title = "Max",
+                        title = stringResource(R.string.stat_max),
                         value = unit.format(stats.maxMgDl),
                         unit = glucoseUnitLabel,
                         modifier = Modifier.weight(1f)
@@ -201,8 +187,8 @@ private fun TimeInRangeBar(stats: GlucoseStats) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(14.dp)
-            .clip(RoundedCornerShape(7.dp))
+            .height(16.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
         if (vLow > 0) {
@@ -272,7 +258,10 @@ private fun TirLegendItem(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 1
         )
     }
 }
@@ -294,18 +283,25 @@ private fun StatTile(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(vertical = 8.dp, horizontal = 4.dp),
+                .padding(vertical = 8.dp, horizontal = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelSmall,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(2.dp))
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.Center
             ) {
@@ -313,18 +309,21 @@ private fun StatTile(
                     text = value,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
                 )
                 if (unit.isNotEmpty()) {
-                    Spacer(modifier = Modifier.width(2.dp))
+                    Spacer(modifier = Modifier.width(1.dp))
                     Text(
                         text = unit,
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.outline,
                         maxLines = 1,
-                        softWrap = false
+                        softWrap = false,
+                        modifier = Modifier.padding(bottom = 1.dp)
                     )
                 }
             }
