@@ -311,28 +311,28 @@ fun GlucoseScreen(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                    GraphNavigationToolbar(
-                        isFullscreen = false,
-                        onToggleFullscreen = onToggleFullscreen,
-                        onNavigateDay = { delta ->
-                            viewportState.navigateDays(delta)
-                        },
-                        canNavigateForward = !viewportState.isLive,
-                        onShowLastScan = {
-                            handleShowLastScan(readings, viewportState, repository, context)
-                        },
-                        onOpenLayers = { showLayersSheet = true },
-                        onOpenSearch = { showSearchDialog = true },
-                        onOpenDatePicker = { showDatePicker = true },
-                        onOpenHelp = { showHelpSheet = true }
-                    )
+                GraphNavigationToolbar(
+                    isFullscreen = false,
+                    onToggleFullscreen = onToggleFullscreen,
+                    onNavigateDay = { delta ->
+                        viewportState.navigateDays(delta)
+                    },
+                    canNavigateForward = !viewportState.isLive,
+                    onShowLastScan = {
+                        handleShowLastScan(readings, viewportState, repository, context)
+                    },
+                    onOpenLayers = { showLayersSheet = true },
+                    onOpenSearch = { showSearchDialog = true },
+                    onOpenDatePicker = { showDatePicker = true },
+                    onOpenHelp = { showHelpSheet = true }
+                )
             }
         } else if (isLandscape) {
             // Landscape layout: side-by-side
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(8.dp)
+                    .padding(ScreenLayout.Gutter)
             ) {
                 // Left pane: Hero & Stats
                 Column(
@@ -340,7 +340,8 @@ fun GlucoseScreen(
                         .weight(0.40f)
                         .fillMaxHeight()
                         .verticalScroll(rememberScrollState())
-                        .padding(end = 6.dp)
+                        .padding(end = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Always show current real-time sensor reading
                     CurrentGlucoseHeroCard(
@@ -358,7 +359,6 @@ fun GlucoseScreen(
                         timeRangeLabel = statsTimeRangeLabel,
                         minimalistUnits = displayConfig.minimalistUnits
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
                     LogbookSection(
                         repository = repository,
                         onOpenAddEntry = onOpenAddEntry,
@@ -375,7 +375,7 @@ fun GlucoseScreen(
                     modifier = Modifier
                         .weight(0.60f)
                         .fillMaxHeight()
-                        .padding(start = 6.dp)
+                        .padding(start = 8.dp)
                 ) {
                     TimeRangeSelector(
                         selectedRange = selectedRange,
@@ -448,7 +448,12 @@ fun GlucoseScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(bottom = 96.dp)
+                    .padding(
+                        start = ScreenLayout.Gutter,
+                        end = ScreenLayout.Gutter,
+                        top = ScreenLayout.TopPadding,
+                        bottom = ScreenLayout.BottomPadding
+                    )
             ) {
                 // 1. Hero Card at top (ALWAYS real-time reading)
                 CurrentGlucoseHeroCard(
@@ -460,6 +465,8 @@ fun GlucoseScreen(
                     targetHigh = targetHigh,
                     minimalistUnits = displayConfig.minimalistUnits
                 )
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // 2. Time Range Selector pills
                 TimeRangeSelector(
@@ -474,28 +481,26 @@ fun GlucoseScreen(
 
                 // Search Active Banner
                 if (isSearchActive && searchMatches.isNotEmpty()) {
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        SearchActiveBar(
-                            summaryText = "Match ${searchMatchIndex + 1} of ${searchMatches.size} ($searchSummaryText)",
-                            onPrev = {
-                                if (searchMatches.isNotEmpty()) {
-                                    searchMatchIndex = (searchMatchIndex - 1 + searchMatches.size) % searchMatches.size
-                                    viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
-                                }
-                            },
-                            onNext = {
-                                if (searchMatches.isNotEmpty()) {
-                                    searchMatchIndex = (searchMatchIndex + 1) % searchMatches.size
-                                    viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
-                                }
-                            },
-                            onClose = {
-                                isSearchActive = false
-                                searchMatches = emptyList()
-                                repository.stopSearch()
+                    SearchActiveBar(
+                        summaryText = "Match ${searchMatchIndex + 1} of ${searchMatches.size} ($searchSummaryText)",
+                        onPrev = {
+                            if (searchMatches.isNotEmpty()) {
+                                searchMatchIndex = (searchMatchIndex - 1 + searchMatches.size) % searchMatches.size
+                                viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
                             }
-                        )
-                    }
+                        },
+                        onNext = {
+                            if (searchMatches.isNotEmpty()) {
+                                searchMatchIndex = (searchMatchIndex + 1) % searchMatches.size
+                                viewportState.jumpTo(searchMatches[searchMatchIndex] + (viewportState.durationMillis / 2))
+                            }
+                        },
+                        onClose = {
+                            isSearchActive = false
+                            searchMatches = emptyList()
+                            repository.stopSearch()
+                        }
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
                 }
 
@@ -512,29 +517,26 @@ fun GlucoseScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(310.dp)
-                        .padding(horizontal = 16.dp)
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
 
                 // 4. Quick Graph Navigation Controls
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    GraphNavigationToolbar(
-                        isFullscreen = false,
-                        onToggleFullscreen = onToggleFullscreen,
-                        onNavigateDay = { delta ->
-                            viewportState.navigateDays(delta)
-                        },
-                        canNavigateForward = !viewportState.isLive,
-                        onShowLastScan = {
-                            handleShowLastScan(readings, viewportState, repository, context)
-                        },
-                        onOpenLayers = { showLayersSheet = true },
-                        onOpenSearch = { showSearchDialog = true },
-                        onOpenDatePicker = { showDatePicker = true },
-                        onOpenHelp = { showHelpSheet = true }
-                    )
-                }
+                GraphNavigationToolbar(
+                    isFullscreen = false,
+                    onToggleFullscreen = onToggleFullscreen,
+                    onNavigateDay = { delta ->
+                        viewportState.navigateDays(delta)
+                    },
+                    canNavigateForward = !viewportState.isLive,
+                    onShowLastScan = {
+                        handleShowLastScan(readings, viewportState, repository, context)
+                    },
+                    onOpenLayers = { showLayersSheet = true },
+                    onOpenSearch = { showSearchDialog = true },
+                    onOpenDatePicker = { showDatePicker = true },
+                    onOpenHelp = { showHelpSheet = true }
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -571,7 +573,7 @@ fun GlucoseScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp)
+                        .padding(horizontal = ScreenLayout.Gutter)
                         .padding(bottom = 36.dp)
                 ) {
                     Text(
@@ -677,7 +679,7 @@ fun GlucoseScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp)
+                        .padding(horizontal = ScreenLayout.Gutter)
                         .padding(bottom = 40.dp)
                 ) {
                     Text(
@@ -1123,138 +1125,124 @@ fun LogbookSection(
         filtered.take(6)
     }
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ListAlt,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+    // Rendered as a flat section rather than a card wrapping cards, so the log
+    // rows keep the same indent as every other card on the screen.
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ListAlt,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                SectionTitle(text = stringResource(R.string.tab_logbook))
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onViewAll) {
                     Text(
-                        text = stringResource(R.string.tab_logbook),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        text = stringResource(R.string.logbook_view_all),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onViewAll) {
-                        Text(
-                            text = stringResource(R.string.logbook_view_all),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    IconButton(
-                        onClick = onOpenAddEntry,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = stringResource(R.string.new_amount),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            val logbookColors = LocalLogbookColors.current
-            Card(
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                IconButton(
+                    onClick = onOpenAddEntry,
+                    modifier = Modifier.size(32.dp)
                 ) {
-                    DailyTotalPill(label = "Bolus", value = "${String.format(Locale.US, "%.1f", todayBolus)} U", color = logbookColors.bolus.primary)
-                    DailyTotalPill(label = "Basal", value = "${String.format(Locale.US, "%.1f", todayBasal)} U", color = logbookColors.basal.primary)
-                    DailyTotalPill(label = "Carbs", value = "${todayCarbs.toInt()} g", color = logbookColors.carbs.primary)
-                    DailyTotalPill(label = "Checks", value = "$todayChecks", color = logbookColors.bloodGlucose.primary)
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.new_amount),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
+        val logbookColors = LocalLogbookColors.current
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            DailyTotalPill(label = "Bolus", value = "${String.format(Locale.US, "%.1f", todayBolus)} U", color = logbookColors.bolus.primary)
+            DailyTotalPill(label = "Basal", value = "${String.format(Locale.US, "%.1f", todayBasal)} U", color = logbookColors.basal.primary)
+            DailyTotalPill(label = "Carbs", value = "${todayCarbs.toInt()} g", color = logbookColors.carbs.primary)
+            DailyTotalPill(label = "Checks", value = "$todayChecks", color = logbookColors.bloodGlucose.primary)
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            FilterChip(
+                selected = selectedTypeFilter == null,
+                onClick = { selectedTypeFilter = null },
+                label = { Text("All", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = selectedTypeFilter == LogType.RAPID_INSULIN,
+                onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.RAPID_INSULIN) null else LogType.RAPID_INSULIN },
+                label = { Text("Bolus", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = selectedTypeFilter == LogType.BASAL_INSULIN,
+                onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BASAL_INSULIN) null else LogType.BASAL_INSULIN },
+                label = { Text("Basal", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = selectedTypeFilter == LogType.CARBS,
+                onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.CARBS) null else LogType.CARBS },
+                label = { Text("Carbs", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = selectedTypeFilter == LogType.BLOOD_GLUCOSE,
+                onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BLOOD_GLUCOSE) null else LogType.BLOOD_GLUCOSE },
+                label = { Text("BG", fontSize = 11.sp) }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (displayLogs.isEmpty()) {
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                FilterChip(
-                    selected = selectedTypeFilter == null,
-                    onClick = { selectedTypeFilter = null },
-                    label = { Text("All", fontSize = 11.sp) }
-                )
-                FilterChip(
-                    selected = selectedTypeFilter == LogType.RAPID_INSULIN,
-                    onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.RAPID_INSULIN) null else LogType.RAPID_INSULIN },
-                    label = { Text("Bolus", fontSize = 11.sp) }
-                )
-                FilterChip(
-                    selected = selectedTypeFilter == LogType.BASAL_INSULIN,
-                    onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BASAL_INSULIN) null else LogType.BASAL_INSULIN },
-                    label = { Text("Basal", fontSize = 11.sp) }
-                )
-                FilterChip(
-                    selected = selectedTypeFilter == LogType.CARBS,
-                    onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.CARBS) null else LogType.CARBS },
-                    label = { Text("Carbs", fontSize = 11.sp) }
-                )
-                FilterChip(
-                    selected = selectedTypeFilter == LogType.BLOOD_GLUCOSE,
-                    onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BLOOD_GLUCOSE) null else LogType.BLOOD_GLUCOSE },
-                    label = { Text("BG", fontSize = 11.sp) }
+                Text(
+                    text = stringResource(R.string.logbook_no_entries_today),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (displayLogs.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(R.string.logbook_no_entries_today),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                displayLogs.forEach { logItem ->
+                    LogItemCard(
+                        record = logItem,
+                        unit = unit,
+                        minimalistUnits = minimalistUnits,
+                        onDelete = {
+                            repository.deleteLogEntry(logItem)
+                            Toast.makeText(context, "Log entry deleted", Toast.LENGTH_SHORT).show()
+                        }
                     )
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    displayLogs.forEach { logItem ->
-                        LogItemCard(
-                            record = logItem,
-                            unit = unit,
-                            minimalistUnits = minimalistUnits,
-                            onDelete = {
-                                repository.deleteLogEntry(logItem)
-                                Toast.makeText(context, "Log entry deleted", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    }
                 }
             }
         }

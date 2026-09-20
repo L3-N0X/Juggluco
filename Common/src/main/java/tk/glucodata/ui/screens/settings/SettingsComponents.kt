@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import tk.glucodata.ui.screens.ScreenLayout
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,9 +99,13 @@ fun SettingsDetailScaffold(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .padding(bottom = 36.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(
+                    start = ScreenLayout.Gutter,
+                    end = ScreenLayout.Gutter,
+                    top = ScreenLayout.TopPadding,
+                    bottom = 36.dp
+                ),
+            verticalArrangement = Arrangement.spacedBy(ScreenLayout.SectionSpacing)
         ) {
             content()
         }
@@ -122,7 +127,7 @@ fun SettingsSection(
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 16.dp, bottom = 6.dp)
+                modifier = Modifier.padding(start = ScreenLayout.CardPadding, bottom = 6.dp)
             )
         }
         Surface(

@@ -36,6 +36,7 @@ import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.TrendArrow
+import tk.glucodata.ui.screens.ScreenLayout
 import tk.glucodata.ui.theme.LocalClinicalColors
 
 @Composable
@@ -94,9 +95,7 @@ fun CurrentGlucoseHeroCard(
     } else null
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -104,7 +103,7 @@ fun CurrentGlucoseHeroCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(18.dp)
+            modifier = Modifier.padding(ScreenLayout.CardPadding)
         ) {
             // Top Row: Sensor Name & Status Chip
             Row(

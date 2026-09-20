@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.CheckCircle
@@ -95,27 +94,7 @@ fun StatsScreen(
     var infoDialogTitle by remember { mutableStateOf<String?>(null) }
     var infoDialogText by remember { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-            .padding(bottom = 96.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.stats_agp_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = stringResource(R.string.stats_agp_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
+    ScreenContent(modifier = modifier, spacing = 12.dp) {
         var showCustomPeriodDialog by remember { mutableStateOf(false) }
 
         // 1. Period Selector Pills (Horizontally scrollable to prevent wrapping on small screens)
@@ -185,8 +164,6 @@ fun StatsScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
         // Stream vs History Toggle
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -228,8 +205,6 @@ fun StatsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         // 2. Clinical KPI Metrics Grid
         ClinicalKpiCards(
             stats = stats,
@@ -239,8 +214,6 @@ fun StatsScreen(
                 infoDialogText = text
             }
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
 
         // 3. Time in Range Breakdown Card
         TimeInRangeBreakdownCard(
@@ -254,8 +227,6 @@ fun StatsScreen(
             }
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         // 4. Ambulatory Glucose Profile (AGP) Card
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -263,7 +234,7 @@ fun StatsScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Column(modifier = Modifier.padding(18.dp)) {
+            Column(modifier = Modifier.padding(ScreenLayout.CardPadding)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -313,8 +284,6 @@ fun StatsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         // 5. Actions Card: Web Report & Export
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -322,7 +291,7 @@ fun StatsScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Column(modifier = Modifier.padding(18.dp)) {
+            Column(modifier = Modifier.padding(ScreenLayout.CardPadding)) {
                 Text(
                     text = stringResource(R.string.reports_export_title),
                     style = MaterialTheme.typography.titleMedium,
@@ -605,7 +574,7 @@ private fun KpiCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(ScreenLayout.CardPadding)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -672,7 +641,7 @@ private fun TimeInRangeBreakdownCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(modifier = Modifier.padding(ScreenLayout.CardPadding)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

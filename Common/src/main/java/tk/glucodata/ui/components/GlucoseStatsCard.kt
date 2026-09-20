@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.ui.screens.ScreenLayout
 import tk.glucodata.ui.theme.LocalClinicalColors
 
 @Composable
@@ -48,9 +49,7 @@ fun GlucoseStatsCard(
     val glucoseUnitLabel = if (!minimalistUnits) unit.label else ""
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -58,7 +57,7 @@ fun GlucoseStatsCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp)
+            modifier = Modifier.padding(ScreenLayout.CardPadding)
         ) {
             // Header: Title & Time in target
             Row(

@@ -176,7 +176,7 @@ fun JugglucoApp(
                 null -> {}
             }
         } else {
-            val showTopBar = !isFullscreenGraph && (!isLandscape || selectedTab != NavigationTab.GLUCOSE) && selectedTab != NavigationTab.SENSORS
+            val showTopBar = !isFullscreenGraph && (!isLandscape || selectedTab != NavigationTab.GLUCOSE)
             val showBottomBar = !isFullscreenGraph && !isLandscape
             val showNavRail = !isFullscreenGraph && isLandscape
 
@@ -188,7 +188,7 @@ fun JugglucoApp(
                                 Text(
                                     text = if (selectedTab == NavigationTab.GLUCOSE) "Juggluco" else stringResource(selectedTab.titleRes),
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
@@ -210,13 +210,7 @@ fun JugglucoApp(
                     SnackbarHost(hostState = snackbarHostState)
                 }
             ) { innerPadding ->
-                val contentPadding = when {
-                    isFullscreenGraph -> PaddingValues(0.dp)
-                    selectedTab == NavigationTab.SENSORS -> PaddingValues(
-                        bottom = innerPadding.calculateBottomPadding()
-                    )
-                    else -> innerPadding
-                }
+                val contentPadding = if (isFullscreenGraph) PaddingValues(0.dp) else innerPadding
 
                 Row(
                     modifier = Modifier
