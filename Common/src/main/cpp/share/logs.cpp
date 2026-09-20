@@ -25,6 +25,9 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <algorithm>
+#include <atomic>
+#include <limits.h>
+#include <pthread.h>
 #include <string.h>
 #include <charconv>
 #include <sys/uio.h>
@@ -48,39 +51,108 @@ LOGGER("bufaddress: %p: %s",buf,buf);
 #define anlog(...)  __android_log_print(ANDROID_LOG_INFO,"logs",__VA_ARGS__)
 
 extern int getlogfile();
-int getlogfile() {
-#pragma  message "basedir" BASEDIR
-	static int handle=-1;
-        if(handle!=-1) 
-                return handle;
-	if(sys_mkdir(BASEDIR,0700)!=0&&errno!=EEXIST) {
-extern		pathconcat logbasedir;
-extern          pathconcat logfile;
-		if(logbasedir.data()) {
-			
-	//		pathconcat file(logbasedir,LASTDIR ".log");
-			if(logfile.data())
-				handle=sys_opener( logfile.data(),O_APPEND|O_CREAT|O_WRONLY, S_IRUSR |S_IWUSR);
-			else
-				return STDERR_FILENO;
+
+/*	Everything the native code logs, everything Java sends through
+	Natives.log() and everything written to stdout/stderr ends up appended
+	to one trace.log that was never rotated or capped. On a logging build
+	that file keeps growing until the device runs out of storage, so keep
+	at most maxtracelog bytes live plus a single rotated generation.	*/
+#ifndef MAXTRACELOG
+#define MAXTRACELOG (4*1024*1024L)
+#endif
+
+static char tracelogpath[PATH_MAX];
+static int loghandle=-1;
+static std::atomic<long> logbytes{0};
+static pthread_mutex_t logrotatelock=PTHREAD_MUTEX_INITIALIZER;
+
+extern "C" const char *gettracelogpath() {
+	return tracelogpath[0]?tracelogpath:nullptr;
+	}
+
+/*	Called after the log was emptied from the settings screen.	*/
+extern "C" void tracelogemptied() {
+	logbytes=0;
+	}
+
+static int opentracelog() {
+	const int handle=sys_opener(tracelogpath,O_APPEND|O_CREAT|O_WRONLY, S_IRUSR |S_IWUSR);
+	if(handle<0)
+		return -1;
+	struct stat st;
+	long size=fstat(handle,&st)==0?(long)st.st_size:0L;
+	if(size>MAXTRACELOG) {		/*Left over from a build without a cap*/
+		if(ftruncate(handle,0)==0)
+			size=0;
+		}
+	logbytes=size;
+	return handle;
+	}
+
+/*	Keeps trace.log.1 as the previous generation so a problem report still
+	has history, without ever holding more than two capped files.	*/
+static void rotatetracelog() {
+	pthread_mutex_lock(&logrotatelock);
+	if(loghandle!=-1&&tracelogpath[0]&&logbytes>MAXTRACELOG) {
+		char previous[PATH_MAX];
+		snprintf(previous,sizeof(previous),"%s.1",tracelogpath);
+		unlink(previous);
+		if(rename(tracelogpath,previous)!=0) {
+			if(ftruncate(loghandle,0)==0)
+				logbytes=0;
 			}
 		else {
-			return STDERR_FILENO;
+			const int handle=opentracelog();
+			if(handle<0) {
+			/*Keep using the rotated file instead of retrying on every line*/
+				logbytes=0;
+				}
+			else {
+			/*	Point the descriptor numbers that are already in
+				use at the new file instead of closing them: a
+				thread writing concurrently must never end up
+				with a closed or recycled handle.	*/
+				dup2(handle,loghandle);
+				dup2(handle,STDERR_FILENO);
+				dup2(handle,STDOUT_FILENO);
+				close(handle);
+				}
 			}
 		}
-	else {
+	pthread_mutex_unlock(&logrotatelock);
+	}
+
+static void countlogged(const int handle,const ssize_t written) {
+	if(handle==STDERR_FILENO||written<=0)
+		return;
+	if((logbytes+=written)>MAXTRACELOG)
+		rotatetracelog();
+	}
+
+int getlogfile() {
+#pragma  message "basedir" BASEDIR
+        if(loghandle!=-1) 
+                return loghandle;
+	if(!tracelogpath[0]) {
+		if(sys_mkdir(BASEDIR,0700)!=0&&errno!=EEXIST) {
+extern			pathconcat logbasedir;
+extern			pathconcat logfile;
+			if(!logbasedir.data()||!logfile.data())
+				return STDERR_FILENO;
+			snprintf(tracelogpath,sizeof(tracelogpath),"%s",logfile.data());
+			}
+		else {
 		#define LOGBASE BASEDIR "/logs"
-		if(sys_mkdir(LOGBASE,0700)!=0&&errno!=EEXIST)
-			return STDERR_FILENO;
-		if(sys_mkdir(LOGBASE,0700)!=0&&errno!=EEXIST)
-			return STDERR_FILENO;
-		  const char logfile[]= LOGBASE "/" LASTDIR ".log";
-         	handle=sys_opener( logfile,O_APPEND|O_CREAT|O_WRONLY, S_IRUSR |S_IWUSR);
-	 	}
-        // int handle=open( logfile,O_APPEND|O_CREAT|O_WRONLY, S_IRUSR |S_IWUSR);
+			if(sys_mkdir(LOGBASE,0700)!=0&&errno!=EEXIST)
+				return STDERR_FILENO;
+			snprintf(tracelogpath,sizeof(tracelogpath),"%s",LOGBASE "/" LASTDIR ".log");
+			}
+		}
+	const int handle=opentracelog();
 	 if(handle<0) {
 		  return STDERR_FILENO;
 		  }
+	loghandle=handle;	/*Set before logging anything: LOGAR() comes back here*/
          if(dup2(handle,STDERR_FILENO)<0) {
 		LOGAR("dup2(handle,STDERR_FILENO) failed");
 		}
@@ -109,7 +181,7 @@ extern          pathconcat logfile;
 #endif
 " NDK_DEBUG\n" ,timestr, (int)syscall(SYS_gettid),pid);
 
-       sys_write(handle, buf,buflen);
+       countlogged(handle,sys_write(handle, buf,buflen));
        return handle;
        }
        #endif
@@ -134,12 +206,12 @@ extern bool dolog;
 bool dolog=true;
 void logwriter(const char *buf,const int len) {
 	if(dolog) {
-		static int handle=STDERR_FILENO;
 	#ifndef NOTAPP
-		 if(handle==STDERR_FILENO)
-			handle=getlogfile();
+		const int handle=getlogfile();
+		countlogged(handle,sys_write(handle,buf,len));
+	#else
+	       sys_write(STDERR_FILENO,buf,len);
 	#endif
-	       sys_write(handle,buf,len);
        	}
 	}
 
@@ -147,12 +219,12 @@ void logwriter(const char *buf,const int len) {
 
 static void logwritev(const struct iovec *iov, int iovcnt) {
 	if(dolog) {
-		static int handle=STDERR_FILENO;
 	#ifndef NOTAPP
-		 if(handle==STDERR_FILENO)
-			handle=getlogfile();
+		const int handle=getlogfile();
+		countlogged(handle,writev(handle,iov,iovcnt));
+	#else
+	       writev(STDERR_FILENO,iov,iovcnt);
 	#endif
-	       writev(handle,iov,iovcnt);
        	}
 	}
 

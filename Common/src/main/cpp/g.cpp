@@ -180,6 +180,10 @@ static void            logscanresult( const AlgorithmResults *alg) {
                     LOGGER("mkdir(%s) failed\n",logbasedir.data());
                     }
                 else {
+                    constexpr const off_t maxscanlog=1024L*1024L;
+                    struct stat st;	/*Appended for every scan, so cap it*/
+                    if(stat(logfile.data(),&st)==0&&st.st_size>maxscanlog)
+                        truncate(logfile.data(),0);
                     FILE *fp=fopen(logfile.data(),"a");
                     alg->showresults(fp,datptr);
                     fclose(fp);

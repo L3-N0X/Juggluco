@@ -29,6 +29,16 @@ extern bool dolog;
 #endif
 
 #include "destruct.hpp"
+#ifndef NOLOG
+extern "C" const char *gettracelogpath();
+extern "C" void tracelogemptied();
+#endif
+#include <dirent.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 extern pathconcat logbasedir;
 
  #include <dlfcn.h>
@@ -82,15 +92,111 @@ void killlogcat() {
 
 static destruct _([]{killlogcat();});
 
+/*	logcat used to be piped into logcat.txt with a plain shell append: no
+	size limit, the whole ring buffer re-dumped on every start, and the
+	child outliving an app process that gets killed without running the
+	static destructor. Several of those writers appending forever is what
+	fills up the device. Let logcat do its own bounded rotation instead,
+	and only tail new lines.					*/
+#ifndef LOGCATROTATEKB
+#define LOGCATROTATEKB 2048
+#endif
+#ifndef LOGCATROTATEFILES
+#define LOGCATROTATEFILES 3
+#endif
+constexpr const long maxlogcatbytes=(long)LOGCATROTATEKB*1024L*(LOGCATROTATEFILES+1);
+
+/*	rotated generations are logcat.txt.1 ... logcat.txt.<LOGCATROTATEFILES>	*/
+static void logcatrotation(char *buf,int max,const char *base,int nr) {
+    snprintf(buf,max,"%s.%d",base,nr);
+    }
+
+static long logcatbytes(const char *base) {
+    long total=0;
+    struct stat st;
+    if(stat(base,&st)==0)
+        total=st.st_size;
+    constexpr const int maxpath=PATH_MAX;
+    char rotated[maxpath];
+    for(int i=1;i<=LOGCATROTATEFILES;i++) {
+        logcatrotation(rotated,maxpath,base,i);
+        if(stat(rotated,&st)==0)
+            total+=st.st_size;
+        }
+    return total;
+    }
+
+static void removelogcatrotations(const char *base) {
+    constexpr const int maxpath=PATH_MAX;
+    char rotated[maxpath];
+    for(int i=1;i<=LOGCATROTATEFILES;i++) {
+        logcatrotation(rotated,maxpath,base,i);
+        unlink(rotated);
+        }
+    }
+
+/*	An app process killed by the system never runs killlogcat(), so a
+	previous logcat can still be appending to the same file. Only our own
+	uid is visible in /proc, so anything left running logcat is ours.  */
+static void killstalelogcat() {
+    DIR *dir=opendir("/proc");
+    if(!dir) {
+        lerror("opendir(/proc)");
+        return;
+        }
+    destruct _dirdes([dir]{closedir(dir);});
+    const pid_t self=getpid();
+    const uid_t us=getuid();
+    while(const struct dirent *ent=readdir(dir)) {
+        const char *name=ent->d_name;
+        if(name[0]<'0'||name[0]>'9')
+            continue;
+        const pid_t pid=atoi(name);
+        if(pid<=0||pid==self)
+            continue;
+        constexpr const int maxpath=64;
+        char procpath[maxpath];
+        snprintf(procpath,maxpath,"/proc/%d",pid);
+        struct stat st;
+        if(stat(procpath,&st)!=0||st.st_uid!=us)
+            continue;
+        snprintf(procpath,maxpath,"/proc/%d/cmdline",pid);
+        const int handle=open(procpath,O_RDONLY);
+        if(handle<0)
+            continue;
+        constexpr const int maxcmd=512;
+        char cmdline[maxcmd];
+        const ssize_t len=read(handle,cmdline,maxcmd-1);
+        close(handle);
+        if(len<=0)
+            continue;
+        cmdline[len]='\0';
+        for(ssize_t i=0;i<len-1;i++) {	/*arguments are NUL separated*/
+            if(cmdline[i]=='\0')
+                cmdline[i]=' ';
+            }
+        if(strstr(cmdline,"logcat")) {
+            LOGGER("killing stale logcat %d: %s\n",pid,cmdline);
+            kill(pid,SIGKILL);
+            }
+        }
+    }
+
 void startlogcat() {
     LOGGER("startlogcat %p",logbasedir.data());
     if(logbasedir.data()) {
         pathconcat logcatfile(logbasedir,"logcat.txt");
-        constexpr const int maxcom=400;
-        char command[maxcom];
-        snprintf(command,maxcom,"exec /system/bin/logcat  >> %s",logcatfile.data());
-        logcatpid=process("/system/bin/sh","-c",command);
-//        logcatpid=process("/system/bin/logcat","-f",logcatfile.data());
+        const char *base=logcatfile.data();
+        killstalelogcat();
+        if(logcatbytes(base)>maxlogcatbytes) {	/*Grown without a cap before*/
+            truncate(base,0);
+            removelogcatrotations(base);
+            }
+        constexpr const int maxnum=16;
+        char kbytes[maxnum],generations[maxnum];
+        snprintf(kbytes,maxnum,"%d",LOGCATROTATEKB);
+        snprintf(generations,maxnum,"%d",LOGCATROTATEFILES);
+        logcatpid=process("/system/bin/logcat","-T","1","-f",base,"-r",kbytes,"-n",generations);
         LOGGER("logcatpid=%d\n",logcatpid);
         }
     }
@@ -177,17 +283,15 @@ extern "C"  JNIEXPORT void JNICALL fromjava(zeroLogcat)(JNIEnv *env, jclass thiz
 #ifndef NOLOG 
      pathconcat logfile(logbasedir,"logcat.txt");
      truncate(logfile.data(),0);
+     removelogcatrotations(logfile.data());
 #endif
      }
 extern "C"  JNIEXPORT jlong JNICALL fromjava(getLogcatfilesize)(JNIEnv *env, jclass thiz) {
 #ifndef NOLOG
     pathconcat logcatfile(logbasedir,"logcat.txt");
-    struct stat st;
     if(!logcatfile.data())
         return -1L;
-    if(stat(logcatfile.data(),&st)==0)
-        return st.st_size;
-     return -1L;
+    return logcatbytes(logcatfile.data());
 #else
     return -1L;
 #endif
@@ -232,13 +336,31 @@ extern "C"  JNIEXPORT void JNICALL fromjava(zeroLog)(JNIEnv *env, jclass thiz) {
 #ifndef NOLOG 
     if(const int handle=getlogfile();handle!=-1) 
         ftruncate(handle,0);
+    if(const char *path=gettracelogpath()) {
+        constexpr const int maxpath=PATH_MAX;
+        char previous[maxpath];
+        snprintf(previous,maxpath,"%s.1",path);
+        unlink(previous);
+        }
+    tracelogemptied();
 #endif
      }
 
 
 extern "C"  JNIEXPORT jlong JNICALL fromjava(getLogfilesize)(JNIEnv *env, jclass thiz) {
 #ifndef NOLOG
-    return logfilesize();
+    auto total=logfilesize();
+    if(total>0)  {
+        if(const char *path=gettracelogpath()) {
+            constexpr const int maxpath=PATH_MAX;
+            char previous[maxpath];
+            snprintf(previous,maxpath,"%s.1",path);
+            struct stat st;
+            if(stat(previous,&st)==0)
+                total+=st.st_size;
+            }
+        }
+    return total;
 #else
     return -1L;
 #endif
