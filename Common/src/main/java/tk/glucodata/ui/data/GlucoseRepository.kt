@@ -1,6 +1,7 @@
 package tk.glucodata.ui.data
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,8 +77,8 @@ class GlucoseRepository(
     private val _targetHigh = MutableStateFlow(180f)
     val targetHigh: StateFlow<Float> = _targetHigh.asStateFlow()
 
-    private val _selectedTimeRange = MutableStateFlow(TimeRange.SIX_HOURS)
-    val selectedTimeRange: StateFlow<TimeRange> = _selectedTimeRange.asStateFlow()
+    private val _selectedTimeRange = MutableStateFlow<TimeRange?>(TimeRange.SIX_HOURS)
+    val selectedTimeRange: StateFlow<TimeRange?> = _selectedTimeRange.asStateFlow()
 
     private val _stats = MutableStateFlow(GlucoseStats())
     val stats: StateFlow<GlucoseStats> = _stats.asStateFlow()
@@ -115,7 +116,7 @@ class GlucoseRepository(
         startPolling()
     }
 
-    fun setTimeRange(range: TimeRange) {
+    fun setTimeRange(range: TimeRange?) {
         _selectedTimeRange.value = range
         recalculateStats()
     }
@@ -205,7 +206,10 @@ class GlucoseRepository(
                     showHistory = Natives.getshowhistories(),
                     showCalibratedHistory = Natives.getshowcalibratedhistories(),
                     showAmounts = Natives.getshownumbers(),
-                    showMeals = Natives.getshowmeals()
+                    showMeals = Natives.getshowmeals(),
+                    calibrationEnabled = try { Natives.getDoCalibrate() } catch (_: Throwable) { false },
+                    calibratePastReadings = try { Natives.getCalibratePast() } catch (_: Throwable) { false },
+                    calibrateAllValues = try { Natives.getAllValues() } catch (_: Throwable) { false }
                 )
 
                 // Read Hardware
@@ -380,6 +384,26 @@ class GlucoseRepository(
                             else -> SensorStatus.CONNECTED_IDLE
                         }
 
+                        var start = info.startTime
+                        if (start <= 0L && info.dataptr != 0L) {
+                            try {
+                                start = Natives.getSensorStartmsec(info.dataptr)
+                            } catch (_: Throwable) {}
+                        }
+                        var end = 0L
+                        if (!info.serial.isNullOrEmpty()) {
+                            try {
+                                val endData = Natives.getSensorEndData(info.serial)
+                                val expectedSec = endData and 0xFFFFFFFFL
+                                if (expectedSec > 0L) {
+                                    end = expectedSec * 1000L
+                                }
+                            } catch (_: Throwable) {}
+                        }
+                        if (end <= 0L && start > 0L) {
+                            end = start + 14 * 24 * 3600 * 1000L
+                        }
+
                         detailsList.add(
                             SensorDetail(
                                 id = info.serial ?: "Unknown",
@@ -391,8 +415,8 @@ class GlucoseRepository(
                                 macAddress = info.macAddress,
                                 rssi = info.rssi,
                                 signalQuality = if (info.isConnected && info.rssi != null && info.rssi != 0) SignalQuality.fromRssi(info.rssi) else SignalQuality.LOST,
-                                startTime = info.startTime,
-                                endTime = if (info.startTime > 0) info.startTime + 14 * 24 * 3600 * 1000L else 0L,
+                                startTime = start,
+                                endTime = end,
                                 lastReadingTime = if (info.isConnected) System.currentTimeMillis() else 0L,
                                 warmupMinutes = info.warmupMinutes,
                                 minWarmupMinutes = info.minWarmupMinutes,
@@ -411,8 +435,8 @@ class GlucoseRepository(
                                 id = info.serial ?: "Unknown",
                                 name = info.serial ?: typeName,
                                 state = if (info.isConnected) SensorState.ACTIVE else SensorState.DISCONNECTED,
-                                startTime = info.startTime,
-                                endTime = if (info.startTime > 0) info.startTime + 14 * 24 * 3600 * 1000L else 0L,
+                                startTime = start,
+                                endTime = end,
                                 lastReadingTime = if (info.isConnected) System.currentTimeMillis() else 0L,
                                 sensorType = typeName,
                                 isStreaming = info.isStreaming,
@@ -435,6 +459,16 @@ class GlucoseRepository(
                             val isHidden = try { Natives.getHidefromSensorptr(ptr) } catch (_: Throwable) { false }
                             val hasCali = try { Natives.calibrateNR(ptr, 0) > 0 || Natives.calibrateNR(ptr, 1) > 0 } catch (_: Throwable) { false }
 
+                            var end = 0L
+                            try {
+                                val endData = Natives.getSensorEndData(name)
+                                val expectedSec = endData and 0xFFFFFFFFL
+                                if (expectedSec > 0L) {
+                                    end = expectedSec * 1000L
+                                }
+                            } catch (_: Throwable) {}
+                            val start = if (end > 0L) end - 14 * 24 * 3600 * 1000L else 0L
+
                             detailsList.add(
                                 SensorDetail(
                                     id = name,
@@ -446,8 +480,8 @@ class GlucoseRepository(
                                     macAddress = null,
                                     rssi = null,
                                     signalQuality = SignalQuality.GOOD,
-                                    startTime = 0L,
-                                    endTime = 0L,
+                                    startTime = start,
+                                    endTime = end,
                                     lastReadingTime = System.currentTimeMillis(),
                                     warmupMinutes = warmup,
                                     minWarmupMinutes = minWarmup,
@@ -466,6 +500,9 @@ class GlucoseRepository(
                                     id = name,
                                     name = name,
                                     state = SensorState.ACTIVE,
+                                    startTime = start,
+                                    endTime = end,
+                                    lastReadingTime = System.currentTimeMillis(),
                                     sensorType = if (infoText.isNotEmpty()) infoText else "Active Sensor",
                                     isConnected = true,
                                     isStreaming = true
@@ -511,10 +548,6 @@ class GlucoseRepository(
                 }
             }
         } catch (_: Throwable) {}
-
-        if (logList.isEmpty()) {
-            logList = ArrayList(MockDataGenerator.generateLogs(days = 7))
-        }
 
         logList.sortByDescending { it.timestamp }
         _logs.value = logList
@@ -891,6 +924,60 @@ class GlucoseRepository(
         }
     }
 
+    fun saveMirrorConnection(
+        index: Int,
+        ips: List<String>,
+        port: String,
+        isReceiver: Boolean,
+        label: String,
+        sendStream: Boolean = true,
+        sendScans: Boolean = true,
+        sendAmounts: Boolean = true,
+        isActiveOnly: Boolean = false,
+        isPassiveOnly: Boolean = false,
+        password: String? = null
+    ): Boolean {
+        return try {
+            if (!Applic.Nativesloaded) return false
+            val cleanIps = ips.map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { listOf("127.0.0.1") }
+            val cleanPort = port.trim().ifEmpty { "17580" }
+            val pos = Natives.changebackuphost(
+                index,
+                cleanIps.toTypedArray(),
+                cleanIps.size,
+                false,
+                cleanPort,
+                if (isReceiver) false else sendAmounts,
+                if (isReceiver) false else sendStream,
+                if (isReceiver) false else sendScans,
+                false,
+                isReceiver,
+                isActiveOnly || isReceiver,
+                isPassiveOnly,
+                password?.ifBlank { null },
+                0L,
+                label.trim().ifEmpty { if (isReceiver) "Receiver" else "Sender" },
+                false,
+                false,
+                null,
+                false,
+                BleMirror.TRANSPORT_TCP,
+                false
+            )
+            if (pos >= 0) {
+                BleMirror.configurationChanged(pos, true)
+                MessageSender.reinit()
+                Applic.switchSync()
+                refreshMirrorConnections()
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     fun deleteMirrorConnection(index: Int) {
         scope.launch(Dispatchers.IO) {
             try {
@@ -991,6 +1078,60 @@ class GlucoseRepository(
         }
     }
 
+    fun setCalibrationEnabled(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(calibrationEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setDoCalibrate(enabled)
+                    Natives.setshowcalibratedstream(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setCalibratePastReadings(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(calibratePastReadings = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setCalibratePast(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setCalibrateAllValues(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(calibrateAllValues = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setAllValues(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // Only true once: before the user has ever been asked, and only while the feature is off.
+    fun shouldPromptCalibrationEnable(): Boolean {
+        if (_displayConfig.value.calibrationEnabled) return false
+        return try {
+            !Applic.app.getSharedPreferences(CALIBRATION_PREFS, Context.MODE_PRIVATE)
+                .getBoolean(KEY_CALIBRATION_PROMPT_SHOWN, false)
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun markCalibrationPromptShown() {
+        try {
+            Applic.app.getSharedPreferences(CALIBRATION_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_CALIBRATION_PROMPT_SHOWN, true)
+                .apply()
+        } catch (_: Throwable) {}
+    }
+
     fun toggleGraphLayer(layer: String, enabled: Boolean) {
         val current = _displayConfig.value
         val updated = when (layer) {
@@ -1036,7 +1177,6 @@ class GlucoseRepository(
                     Natives.settonow()
                 }
             } catch (_: Throwable) {}
-            refreshAll()
         }
     }
 
@@ -1047,7 +1187,6 @@ class GlucoseRepository(
                     if (days < 0) Natives.prevday(-days) else Natives.nextday(days)
                 }
             } catch (_: Throwable) {}
-            refreshAll()
         }
     }
 
@@ -1058,7 +1197,6 @@ class GlucoseRepository(
                     Natives.showlastscan()
                 }
             } catch (_: Throwable) {}
-            refreshAll()
         }
     }
 
@@ -1070,7 +1208,6 @@ class GlucoseRepository(
                     Natives.movedate(start, year, month, day)
                 }
             } catch (_: Throwable) {}
-            refreshAll()
         }
     }
 
@@ -1172,7 +1309,8 @@ class GlucoseRepository(
         _agpProfile.value = AgpProfile.calculate(toUse, _statsPeriod.value)
 
         // Calculate screen stats specifically for the selected time range window (e.g. 1h, 6h, or custom duration)
-        val screenCutoff = System.currentTimeMillis() - _selectedTimeRange.value.durationMillis
+        val screenDuration = _selectedTimeRange.value?.durationMillis ?: (6 * 3600 * 1000L)
+        val screenCutoff = System.currentTimeMillis() - screenDuration
         val screenFiltered = all.filter { it.timestamp >= screenCutoff }
         val screenToUse = if (screenFiltered.isNotEmpty()) screenFiltered else all
         _screenStats.value = GlucoseStats.calculate(screenToUse, _targetLow.value, _targetHigh.value)
@@ -1219,5 +1357,10 @@ class GlucoseRepository(
                 } catch (_: Throwable) {}
             }
         }
+    }
+
+    private companion object {
+        const val CALIBRATION_PREFS = "calibration_prefs"
+        const val KEY_CALIBRATION_PROMPT_SHOWN = "calibration_prompt_shown"
     }
 }

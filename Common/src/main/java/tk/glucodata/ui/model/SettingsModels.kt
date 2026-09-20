@@ -51,7 +51,10 @@ data class DisplayConfig(
     val showCalibratedHistory: Boolean = false,
     val showAmounts: Boolean = true,
     val showMeals: Boolean = true,
-    val minimalistUnits: Boolean = true
+    val minimalistUnits: Boolean = true,
+    val calibrationEnabled: Boolean = false,
+    val calibratePastReadings: Boolean = false,
+    val calibrateAllValues: Boolean = false
 )
 
 data class HardwareConfig(

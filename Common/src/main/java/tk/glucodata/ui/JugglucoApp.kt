@@ -40,6 +40,20 @@ import tk.glucodata.ui.screens.GlucoseScreen
 import tk.glucodata.ui.screens.SensorsScreen
 import tk.glucodata.ui.screens.SettingsScreen
 import tk.glucodata.ui.screens.StatsScreen
+import tk.glucodata.ui.screens.settings.AboutSettingsScreen
+import tk.glucodata.ui.screens.settings.AlarmsSettingsScreen
+import tk.glucodata.ui.screens.settings.BroadcastsSettingsScreen
+import tk.glucodata.ui.screens.settings.DataSettingsScreen
+import tk.glucodata.ui.screens.settings.DisplaySettingsScreen
+import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
+import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
+import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
+import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
+import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
+import tk.glucodata.ui.screens.settings.SettingsDestination
+import tk.glucodata.ui.screens.settings.TurnServerSettingsScreen
+import tk.glucodata.ui.screens.settings.VoiceSettingsScreen
+import tk.glucodata.ui.screens.settings.WebServerSettingsScreen
 import tk.glucodata.ui.theme.JugglucoTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,6 +66,8 @@ fun JugglucoApp(
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(NavigationTab.GLUCOSE) }
     var isExportScreenOpen by rememberSaveable { mutableStateOf(false) }
+    var activeSettingsDestination by rememberSaveable { mutableStateOf<SettingsDestination?>(null) }
+    var selectedMirrorIndex by rememberSaveable { mutableStateOf(-1) }
     var showAddEntrySheet by rememberSaveable { mutableStateOf(false) }
     var isFullscreenGraph by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -76,8 +92,79 @@ fun JugglucoApp(
                 repository = repository,
                 onNavigateBack = { isExportScreenOpen = false }
             )
+        } else if (activeSettingsDestination != null) {
+            when (activeSettingsDestination) {
+                SettingsDestination.GLUCOSE_TARGETS -> GlucoseTargetsSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.ALARMS -> AlarmsSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.DISPLAY -> DisplaySettingsScreen(
+                    repository = repository,
+                    darkThemeOverride = isDarkThemeOverride,
+                    onDarkThemeChanged = {
+                        isDarkThemeOverride = it
+                        repository.setInvertColors(it ?: systemDark)
+                    },
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.VOICE -> VoiceSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.BROADCASTS -> BroadcastsSettingsScreen(
+                    repository = repository,
+                    onOpenWebServerConfig = { activeSettingsDestination = SettingsDestination.WEB_SERVER },
+                    onOpenLibreViewConfig = { activeSettingsDestination = SettingsDestination.LIBRE_VIEW },
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.MIRROR -> MirrorSettingsScreen(
+                    repository = repository,
+                    onOpenConnectionEdit = { idx ->
+                        selectedMirrorIndex = idx
+                        activeSettingsDestination = SettingsDestination.MIRROR_CONNECTION_EDIT
+                    },
+                    onOpenTurnServerConfig = { activeSettingsDestination = SettingsDestination.TURN_SERVER },
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.HARDWARE -> HardwareSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.DATA -> DataSettingsScreen(
+                    repository = repository,
+                    onOpenLegacyView = onOpenLegacyView,
+                    onExportData = handleOpenExport,
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.ABOUT -> AboutSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.WEB_SERVER -> WebServerSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.BROADCASTS }
+                )
+                SettingsDestination.LIBRE_VIEW -> LibreViewSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.BROADCASTS }
+                )
+                SettingsDestination.MIRROR_CONNECTION_EDIT -> MirrorConnectionEditScreen(
+                    repository = repository,
+                    connectionIndex = selectedMirrorIndex,
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.MIRROR }
+                )
+                SettingsDestination.TURN_SERVER -> TurnServerSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.MIRROR }
+                )
+                null -> {}
+            }
         } else {
-            val showTopBar = !isFullscreenGraph && (!isLandscape || selectedTab != NavigationTab.GLUCOSE)
+            val showTopBar = !isFullscreenGraph && (!isLandscape || selectedTab != NavigationTab.GLUCOSE) && selectedTab != NavigationTab.SENSORS
             val showBottomBar = !isFullscreenGraph && !isLandscape
             val showNavRail = !isFullscreenGraph && isLandscape
 
@@ -111,10 +198,18 @@ fun JugglucoApp(
                     SnackbarHost(hostState = snackbarHostState)
                 }
             ) { innerPadding ->
+                val contentPadding = when {
+                    isFullscreenGraph -> PaddingValues(0.dp)
+                    selectedTab == NavigationTab.SENSORS -> PaddingValues(
+                        bottom = innerPadding.calculateBottomPadding()
+                    )
+                    else -> innerPadding
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(if (isFullscreenGraph) PaddingValues(0.dp) else innerPadding)
+                        .padding(contentPadding)
                 ) {
                     if (showNavRail) {
                         JugglucoNavigationRail(
@@ -159,7 +254,11 @@ fun JugglucoApp(
                                         repository.setInvertColors(it ?: systemDark)
                                     },
                                     onOpenLegacyView = onOpenLegacyView,
-                                    onExportData = handleOpenExport
+                                    onExportData = handleOpenExport,
+                                    currentDestination = activeSettingsDestination,
+                                    onNavigateToDestination = { activeSettingsDestination = it },
+                                    selectedMirrorIndex = selectedMirrorIndex,
+                                    onSelectMirrorIndex = { selectedMirrorIndex = it }
                                 )
                             }
                         }

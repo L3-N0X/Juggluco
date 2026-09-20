@@ -26,6 +26,11 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 val LocalClinicalColors = staticCompositionLocalOf { LightClinicalColors }
+val LocalLogbookColors = staticCompositionLocalOf { LightLogbookColors }
+
+val MaterialTheme.logbookColors: LogbookColors
+    @Composable
+    get() = LocalLogbookColors.current
 
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryLight,
@@ -89,6 +94,7 @@ fun JugglucoTheme(
     }
 
     val clinicalColors = if (darkTheme) DarkClinicalColors else LightClinicalColors
+    val logbookColors = if (darkTheme) DarkLogbookColors else LightLogbookColors
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -111,7 +117,8 @@ fun JugglucoTheme(
     }
 
     CompositionLocalProvider(
-        LocalClinicalColors provides clinicalColors
+        LocalClinicalColors provides clinicalColors,
+        LocalLogbookColors provides logbookColors
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

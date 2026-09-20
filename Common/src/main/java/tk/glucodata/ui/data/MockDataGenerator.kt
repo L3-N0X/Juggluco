@@ -2,8 +2,6 @@ package tk.glucodata.ui.data
 
 import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.GlucoseStatus
-import tk.glucodata.ui.model.LogRecord
-import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.model.SensorDetail
 import tk.glucodata.ui.model.SensorInfo
 import tk.glucodata.ui.model.SensorState
@@ -143,126 +141,6 @@ object MockDataGenerator {
         return list
     }
 
-    /**
-     * Generates log records spanning multiple days:
-     * - Rapid insulin boluses
-     * - Basal insulin injections
-     * - Meals and carbs
-     * - Blood glucose fingerstick calibrations
-     */
-    fun generateLogs(days: Int = 7): List<LogRecord> {
-        val list = ArrayList<LogRecord>()
-        val now = System.currentTimeMillis()
-        val totalMinutes = days * 24 * 60
-        val baseStartTime = now - (totalMinutes * 60 * 1000L)
-        val cal = Calendar.getInstance()
-        var idCounter = 1L
-
-        for (d in 0 until days) {
-            val dayStart = baseStartTime + (d * 24 * 60 * 60 * 1000L)
-
-            // Morning breakfast + rapid insulin
-            cal.timeInMillis = dayStart
-            cal.set(Calendar.HOUR_OF_DAY, 8)
-            cal.set(Calendar.MINUTE, 0)
-            list.add(
-                LogRecord(
-                    id = idCounter++,
-                    timestamp = cal.timeInMillis,
-                    type = LogType.CARBS,
-                    value = 45f,
-                    note = "Oatmeal & berries"
-                )
-            )
-            list.add(
-                LogRecord(
-                    id = idCounter++,
-                    timestamp = cal.timeInMillis + 2 * 60 * 1000L,
-                    type = LogType.RAPID_INSULIN,
-                    value = 5f,
-                    note = "Breakfast bolus"
-                )
-            )
-
-            // Lunch + rapid insulin
-            cal.set(Calendar.HOUR_OF_DAY, 12)
-            cal.set(Calendar.MINUTE, 30)
-            list.add(
-                LogRecord(
-                    id = idCounter++,
-                    timestamp = cal.timeInMillis,
-                    type = LogType.CARBS,
-                    value = 65f,
-                    note = "Sandwich & Apple"
-                )
-            )
-            list.add(
-                LogRecord(
-                    id = idCounter++,
-                    timestamp = cal.timeInMillis + 2 * 60 * 1000L,
-                    type = LogType.RAPID_INSULIN,
-                    value = 7f,
-                    note = "Lunch bolus"
-                )
-            )
-
-            // Dinner + rapid insulin
-            cal.set(Calendar.HOUR_OF_DAY, 19)
-            cal.set(Calendar.MINUTE, 0)
-            val dinnerCarbs = if (d % 2 == 0) 75f else 50f
-            val dinnerNote = if (d % 2 == 0) "Pizza Margherita" else "Grilled Chicken Salad"
-            list.add(
-                LogRecord(
-                    id = idCounter++,
-                    timestamp = cal.timeInMillis,
-                    type = LogType.CARBS,
-                    value = dinnerCarbs,
-                    note = dinnerNote
-                )
-            )
-            list.add(
-                LogRecord(
-                    id = idCounter++,
-                    timestamp = cal.timeInMillis + 2 * 60 * 1000L,
-                    type = LogType.RAPID_INSULIN,
-                    value = if (d % 2 == 0) 9f else 6f,
-                    note = "Dinner bolus"
-                )
-            )
-
-            // Nighttime basal insulin
-            cal.set(Calendar.HOUR_OF_DAY, 22)
-            cal.set(Calendar.MINUTE, 30)
-            list.add(
-                LogRecord(
-                    id = idCounter++,
-                    timestamp = cal.timeInMillis,
-                    type = LogType.BASAL_INSULIN,
-                    value = 16f,
-                    note = "Lantus"
-                )
-            )
-
-            // Blood glucose check
-            if (d % 2 == 1) {
-                cal.set(Calendar.HOUR_OF_DAY, 17)
-                cal.set(Calendar.MINUTE, 15)
-                list.add(
-                    LogRecord(
-                        id = idCounter++,
-                        timestamp = cal.timeInMillis,
-                        type = LogType.BLOOD_GLUCOSE,
-                        value = 118f,
-                        note = "Contour Next Meter"
-                    )
-                )
-            }
-        }
-
-        list.sortBy { it.timestamp }
-        return list
-    }
-
     fun generateSensor(): SensorInfo {
         val now = System.currentTimeMillis()
         val start = now - (3 * 24 * 3600 * 1000L) // 3 days ago
@@ -304,20 +182,13 @@ object MockDataGenerator {
             isStreaming = true,
             isHidden = false,
             hasCalibration = false,
-            batteryPercent = 96,
+            batteryPercent = null,
             connectionStatusStr = "Connected",
             lastConnectTime = now - (36 * 3600 * 1000L),
             lastDisconnectTime = 0L,
-            handshakeStatusStr = "AES Session Established",
+            handshakeStatusStr = "Authenticated",
             lastHandshakeTime = now - (36 * 3600 * 1000L),
-            rawDiagnosticText = """
-                <b>Sensor Model:</b> FreeStyle Libre 3<br>
-                <b>Serial Number:</b> 0M007894K2L<br>
-                <b>Firmware:</b> 3.4.1<br>
-                <b>Active Connection:</b> Bluetooth Low Energy (LE 2M PHY)<br>
-                <b>Stream Status:</b> 1-minute streaming active<br>
-                <b>Security:</b> Cryptographic mutual authentication verified
-            """.trimIndent()
+            rawDiagnosticText = "<h1>&nbsp;&nbsp;0M007894K2L</h1><br><br>Sensor started:\t\t${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(start))}<br><br>Last stream:\t\t${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(now - 45000))}<br><br>Expected end:\t\t${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(end))}"
         )
     }
 }

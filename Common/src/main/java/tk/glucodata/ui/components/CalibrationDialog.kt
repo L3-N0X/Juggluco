@@ -19,12 +19,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,26 +38,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.ui.res.stringResource
 import tk.glucodata.R
-import tk.glucodata.Natives
 import tk.glucodata.ui.model.GlucoseUnit
 
 @Composable
 fun CalibrationDialog(
     sensorPtr: Long,
     unit: GlucoseUnit,
+    calibrationEnabled: Boolean,
     onDismiss: () -> Unit,
     onSaveCalibration: (Float) -> Unit
 ) {
-    var isCalibrateActive by remember {
-        mutableStateOf(try { Natives.getDoCalibrate() } catch (_: Throwable) { false })
-    }
-    var calibratePast by remember {
-        mutableStateOf(try { Natives.getCalibratePast() } catch (_: Throwable) { false })
-    }
-    var allValues by remember {
-        mutableStateOf(try { Natives.getAllValues() } catch (_: Throwable) { false })
-    }
-
     var bloodGlucoseText by remember { mutableStateOf("") }
     var showAddPoint by remember { mutableStateOf(false) }
 
@@ -116,72 +103,19 @@ fun CalibrationDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Calibration Active Toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text(stringResource(R.string.calibration_enable), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.calibration_enable_desc), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                if (!calibrationEnabled) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.calibration_off_notice),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(10.dp)
+                        )
                     }
-                    Switch(
-                        checked = isCalibrateActive,
-                        onCheckedChange = {
-                            isCalibrateActive = it
-                            try {
-                                Natives.setDoCalibrate(it)
-                                Natives.setshowcalibratedstream(it)
-                            } catch (_: Throwable) {}
-                        }
-                    )
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-
-                // Calibrate Past Values Toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text(stringResource(R.string.calibration_past), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.calibration_past_desc), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                    }
-                    Switch(
-                        checked = calibratePast,
-                        onCheckedChange = {
-                            calibratePast = it
-                            try {
-                                Natives.setCalibratePast(it)
-                            } catch (_: Throwable) {}
-                        }
-                    )
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-
-                // Use All Values Toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text(stringResource(R.string.calibration_all_values), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.calibration_all_values_desc), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                    }
-                    Switch(
-                        checked = allValues,
-                        onCheckedChange = {
-                            allValues = it
-                            try {
-                                Natives.setAllValues(it)
-                            } catch (_: Throwable) {}
-                        }
-                    )
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))

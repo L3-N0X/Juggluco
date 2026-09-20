@@ -76,10 +76,31 @@ data class SensorDetail(
 
     val progressPercent: Float
         get() {
-            if (endTime <= startTime || startTime <= 0L) return 0f
-            val total = (endTime - startTime).toFloat()
-            val elapsed = (System.currentTimeMillis() - startTime).toFloat()
+            val effectiveStart = if (startTime > 0L) startTime else if (endTime > 0L) endTime - 14 * 24 * 3600 * 1000L else 0L
+            if (endTime <= effectiveStart || effectiveStart <= 0L) return 0f
+            val total = (endTime - effectiveStart).toFloat()
+            val elapsed = (System.currentTimeMillis() - effectiveStart).toFloat()
             return (elapsed / total).coerceIn(0f, 1f)
+        }
+
+    val formattedExpectedEnd: String
+        get() {
+            if (endTime <= 0L) return ""
+            return try {
+                java.text.SimpleDateFormat("EEE, MMM d, yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(endTime))
+            } catch (_: Throwable) {
+                ""
+            }
+        }
+
+    val formattedStartTime: String
+        get() {
+            if (startTime <= 0L) return ""
+            return try {
+                java.text.SimpleDateFormat("EEE, MMM d, yyyy", java.util.Locale.getDefault()).format(java.util.Date(startTime))
+            } catch (_: Throwable) {
+                ""
+            }
         }
 
     val warmupRemainingMinutes: Int

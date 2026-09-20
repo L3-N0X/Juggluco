@@ -2,8 +2,9 @@ package tk.glucodata.ui.theme
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import tk.glucodata.ui.model.LogType
 
-// Primary & Brand Colors (Medical / Clean Tech feel)
+// Primary & Brand Colors (Modern Material 3 palette)
 val PrimaryLight = Color(0xFF006688)
 val OnPrimaryLight = Color(0xFFFFFFFF)
 val PrimaryContainerLight = Color(0xFFC2E8FF)
@@ -53,7 +54,7 @@ val OnSurfaceVariantDark = Color(0xFFC0C8CD)
 val OutlineDark = Color(0xFF8A9297)
 val OutlineVariantDark = Color(0xFF40484D)
 
-// Clinical Status Colors (Accessible, High Contrast, Colorblind-Friendly)
+// Glucose Target Range Colors (Accessible, High Contrast)
 @Immutable
 data class ClinicalColors(
     val inRange: Color,
@@ -113,4 +114,109 @@ val DarkClinicalColors = ClinicalColors(
     onVeryHighContainer = Color(0xFFFECDD3),
     targetRangeShade = Color(0x1A7CB69D),
     graphGrid = Color(0x208A9297)
+)
+
+// Logbook Event & Tracking Color Tokens (Material 3 container pairs, dark-mode adaptive)
+@Immutable
+data class LogTypeColors(
+    val primary: Color,
+    val container: Color,
+    val onContainer: Color
+)
+
+@Immutable
+data class LogbookColors(
+    val bolus: LogTypeColors,
+    val basal: LogTypeColors,
+    val carbs: LogTypeColors,
+    val bloodGlucose: LogTypeColors,
+    val note: LogTypeColors
+) {
+    fun forType(type: LogType): LogTypeColors = when (type) {
+        LogType.RAPID_INSULIN -> bolus
+        LogType.BASAL_INSULIN -> basal
+        LogType.CARBS, LogType.MEAL -> carbs
+        LogType.BLOOD_GLUCOSE -> bloodGlucose
+        LogType.NOTE -> note
+    }
+
+    val rapidInsulin: Color get() = bolus.primary
+    val rapidInsulinContainer: Color get() = bolus.container
+    val onRapidInsulinContainer: Color get() = bolus.onContainer
+
+    val basalInsulin: Color get() = basal.primary
+    val basalInsulinContainer: Color get() = basal.container
+    val onBasalInsulinContainer: Color get() = basal.onContainer
+
+    val carbsPrimary: Color get() = carbs.primary
+    val carbsContainer: Color get() = carbs.container
+    val onCarbsContainer: Color get() = carbs.onContainer
+
+    val bloodGlucosePrimary: Color get() = bloodGlucose.primary
+    val bloodGlucoseContainer: Color get() = bloodGlucose.container
+    val onBloodGlucoseContainer: Color get() = bloodGlucose.onContainer
+
+    val notePrimary: Color get() = note.primary
+    val noteContainer: Color get() = note.container
+    val onNoteContainer: Color get() = note.onContainer
+
+    fun colorFor(type: LogType): Color = forType(type).primary
+    fun containerColorFor(type: LogType): Color = forType(type).container
+    fun onContainerColorFor(type: LogType): Color = forType(type).onContainer
+}
+
+val LightLogbookColors = LogbookColors(
+    bolus = LogTypeColors(
+        primary = Color(0xFF0277BD), // Cerulean blue
+        container = Color(0xFFE1F0F8),
+        onContainer = Color(0xFF00384E)
+    ),
+    basal = LogTypeColors(
+        primary = Color(0xFF564AB1), // Slate violet
+        container = Color(0xFFECE8F8),
+        onContainer = Color(0xFF2C2263)
+    ),
+    carbs = LogTypeColors(
+        primary = Color(0xFFB45309), // Warm amber
+        container = Color(0xFFFEF3C7),
+        onContainer = Color(0xFF78350F)
+    ),
+    bloodGlucose = LogTypeColors(
+        primary = Color(0xFFB91C1C), // Crimson
+        container = Color(0xFFFEE2E2),
+        onContainer = Color(0xFF7F1D1D)
+    ),
+    note = LogTypeColors(
+        primary = Color(0xFF63567A), // Slate plum
+        container = Color(0xFFEFEBF3),
+        onContainer = Color(0xFF322846)
+    )
+)
+
+val DarkLogbookColors = LogbookColors(
+    bolus = LogTypeColors(
+        primary = Color(0xFF67B5E8), // Soft sky blue, never blinding
+        container = Color(0xFF12344D), // Dark slate blue container, blends into dark surface
+        onContainer = Color(0xFFBAE6FD)
+    ),
+    basal = LogTypeColors(
+        primary = Color(0xFFA594F9), // Soft muted periwinkle
+        container = Color(0xFF2A244E), // Dark slate violet container
+        onContainer = Color(0xFFE2DCFB)
+    ),
+    carbs = LogTypeColors(
+        primary = Color(0xFFE0A34E), // Soft warm gold
+        container = Color(0xFF452E10), // Dark warm amber container
+        onContainer = Color(0xFFFDE68A)
+    ),
+    bloodGlucose = LogTypeColors(
+        primary = Color(0xFFE57373), // Soft muted coral
+        container = Color(0xFF4C1D24), // Dark wine container
+        onContainer = Color(0xFFFECDD6)
+    ),
+    note = LogTypeColors(
+        primary = Color(0xFFBFAFD9), // Soft muted mauve
+        container = Color(0xFF332A42), // Dark slate mauve container
+        onContainer = Color(0xFFEDE5F6)
+    )
 )

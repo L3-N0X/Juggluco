@@ -63,6 +63,7 @@ import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
+import tk.glucodata.ui.theme.LocalLogbookColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -91,6 +92,8 @@ fun LogbookScreen(
     var selectedTimeFilter by remember { mutableStateOf(LogbookTimeFilter.TODAY) }
     var customDays by remember { mutableStateOf<Int?>(null) }
     var showCustomRangeDialog by remember { mutableStateOf(false) }
+
+    val logbookColors = LocalLogbookColors.current
 
     val now = System.currentTimeMillis()
     val timeFilteredLogs = remember(logs, selectedTimeFilter, customDays) {
@@ -242,10 +245,10 @@ fun LogbookScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        DailyTotalPill(label = "Bolus", value = "${String.format(Locale.US, "%.1f", windowBolus)} U", color = Color(0xFF2563EB))
-                        DailyTotalPill(label = "Basal", value = "${String.format(Locale.US, "%.1f", windowBasal)} U", color = Color(0xFF4F46E5))
-                        DailyTotalPill(label = "Carbs", value = "${windowCarbs.toInt()} g", color = Color(0xFFD97706))
-                        DailyTotalPill(label = "Checks", value = "$windowChecks", color = Color(0xFFDC2626))
+                        DailyTotalPill(label = "Bolus", value = "${String.format(Locale.US, "%.1f", windowBolus)} U", color = logbookColors.bolus.primary)
+                        DailyTotalPill(label = "Basal", value = "${String.format(Locale.US, "%.1f", windowBasal)} U", color = logbookColors.basal.primary)
+                        DailyTotalPill(label = "Carbs", value = "${windowCarbs.toInt()} g", color = logbookColors.carbs.primary)
+                        DailyTotalPill(label = "Checks", value = "$windowChecks", color = logbookColors.bloodGlucose.primary)
                     }
                 }
             }
@@ -368,12 +371,15 @@ fun LogItemCard(
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
 
-    val (icon, iconColor, bgColor) = when (record.type) {
-        LogType.RAPID_INSULIN -> Triple(Icons.Default.Medication, Color(0xFF2563EB), Color(0xFFDBEAFE))
-        LogType.BASAL_INSULIN -> Triple(Icons.Default.Vaccines, Color(0xFF4F46E5), Color(0xFFE0E7FF))
-        LogType.CARBS, LogType.MEAL -> Triple(Icons.Default.Fastfood, Color(0xFFD97706), Color(0xFFFEF3C7))
-        LogType.BLOOD_GLUCOSE -> Triple(Icons.Default.Bloodtype, Color(0xFFDC2626), Color(0xFFFEE2E2))
-        LogType.NOTE -> Triple(Icons.AutoMirrored.Filled.Notes, Color(0xFF7C3AED), Color(0xFFEDE9FE))
+    val logbookColors = LocalLogbookColors.current
+    val itemColors = logbookColors.forType(record.type)
+
+    val icon = when (record.type) {
+        LogType.RAPID_INSULIN -> Icons.Default.Medication
+        LogType.BASAL_INSULIN -> Icons.Default.Vaccines
+        LogType.CARBS, LogType.MEAL -> Icons.Default.Fastfood
+        LogType.BLOOD_GLUCOSE -> Icons.Default.Bloodtype
+        LogType.NOTE -> Icons.AutoMirrored.Filled.Notes
     }
 
     // Clean value display without repetitive cluttered units
@@ -398,13 +404,13 @@ fun LogItemCard(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(bgColor, CircleShape),
+                    .background(itemColors.container, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = record.type.label,
-                    tint = iconColor,
+                    tint = itemColors.onContainer,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -427,7 +433,7 @@ fun LogItemCard(
                         text = valueDisplay,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = iconColor
+                        color = itemColors.primary
                     )
                 }
 

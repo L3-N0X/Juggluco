@@ -654,6 +654,9 @@
     <string name="target_cv_sub" formatted="false">Zielwert: &lt; 36,0%</string>
     <string name="target_active_sub" formatted="false">Zielwert: &gt; 70,0%</string>
     <string name="tir_title">Zeit im Zielbereich</string>
+    <string name="live_label">Live</string>
+    <string name="graph_no_data_title">Keine Glukosedaten</string>
+    <string name="graph_no_data_hint">Scanne einen Sensor oder warte auf Messwerte</string>
     <string name="stat_average">Mittelwert</string>
     <string name="stat_gmi">GMI (gesch.)</string>
     <string name="stat_min">Min</string>
@@ -686,6 +689,12 @@
     <string name="calibration_new_ref">Neue Referenzmessung</string>
     <string name="calibration_guidance">Nur bei stabilem Glukosespiegel (waagerechter Trendpfeil) kalibrieren. Schnelle Änderungen führen zu Fehlmessungen.</string>
     <string name="calibration_factor">Kalibrierungsfaktor: %s</string>
+    <string name="calibration_off_notice">Die Kalibrierung ist derzeit deaktiviert, daher wird diese Referenz noch nicht auf deine Sensorkurve angewendet. Speichere sie unten und entscheide dann, ob du die Kalibrierung aktivieren möchtest.</string>
+    <string name="calibration_enable_prompt_title">Kalibrierung aktivieren?</string>
+    <string name="calibration_enable_prompt_desc">Du hast gerade eine Kalibrierungsreferenz gespeichert. Möchtest du die Kalibrierung jetzt aktivieren, damit sie auf deine Glukosekurve angewendet wird?</string>
+    <string name="calibration_enable_prompt_confirm">Aktivieren</string>
+    <string name="calibration_enable_prompt_dismiss">Nicht jetzt</string>
+    <string name="settings_calibration_section">KALIBRIERUNG</string>
 
     <!-- Export Dialog -->
     <string name="export_glucose_data">Glukosedaten exportieren</string>

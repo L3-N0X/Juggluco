@@ -2,6 +2,7 @@ package tk.glucodata.ui.model
 
 import androidx.annotation.StringRes
 import tk.glucodata.R
+import kotlin.math.abs
 
 data class TimeRange(
     val label: String,
@@ -18,6 +19,24 @@ data class TimeRange(
         val SEVEN_DAYS = TimeRange("7d", 7 * 24 * 3600 * 1000L, R.string.timerange_all)
 
         val PRESETS = listOf(ONE_HOUR, THREE_HOURS, SIX_HOURS, TWELVE_HOURS, TWENTY_FOUR_HOURS, SEVEN_DAYS)
+
+        fun matchPreset(durationMillis: Long): TimeRange? {
+            for (preset in PRESETS) {
+                val presetMillis = preset.durationMillis
+                if (preset == SEVEN_DAYS) {
+                    // For SEVEN_DAYS (labeled "All" / 7d), match anything from ~6 days and up
+                    if (durationMillis >= (presetMillis * 0.85).toLong()) {
+                        return preset
+                    }
+                } else {
+                    val tolerance = (presetMillis * 0.15).toLong()
+                    if (abs(durationMillis - presetMillis) <= tolerance) {
+                        return preset
+                    }
+                }
+            }
+            return null
+        }
 
         fun fromHours(hours: Int): TimeRange {
             val h = hours.coerceIn(1, 168)

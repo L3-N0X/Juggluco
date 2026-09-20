@@ -643,6 +643,11 @@
     <string name="sensor_reconnect">Reconnect Sensor</string>
     <string name="sensor_use_again">Use Sensor Again</string>
     <string name="sensor_forget">Forget &amp; Rescan</string>
+    <string name="sensor_expected_end">Expected End</string>
+    <string name="sensor_started">Sensor Started</string>
+    <string name="sensor_start_new">Start New Sensor</string>
+    <string name="sensor_current_state">Current Sensor State</string>
+    <string name="sensor_diagnostic_details">Sensor Diagnostic Details</string>
     <string name="status_in_range">In Range</string>
     <string name="status_low">Low</string>
     <string name="status_very_low">Very Low</string>
@@ -679,6 +684,9 @@
     <string name="target_cv_sub" formatted="false">Target: &lt; 36.0%</string>
     <string name="target_active_sub" formatted="false">Target: &gt; 70.0%</string>
     <string name="tir_title">Time in Range</string>
+    <string name="live_label">Live</string>
+    <string name="graph_no_data_title">No glucose data</string>
+    <string name="graph_no_data_hint">Scan a sensor or wait for readings to appear</string>
     <string name="stat_average">Average</string>
     <string name="stat_gmi">GMI (est.)</string>
     <string name="stat_min">Min</string>
@@ -711,6 +719,12 @@
     <string name="calibration_new_ref">New Reference Check</string>
     <string name="calibration_guidance">Only calibrate when glucose is stable (flat trend arrow). Calibrating during rapid changes leads to inaccuracies.</string>
     <string name="calibration_factor">Calibration Factor: %s</string>
+    <string name="calibration_off_notice">Calibration is currently off, so this reference won\'t be applied to your sensor curve yet. Save it below, then choose whether to turn calibration on.</string>
+    <string name="calibration_enable_prompt_title">Enable calibration?</string>
+    <string name="calibration_enable_prompt_desc">You just saved a calibration reference. Would you like to turn on calibration now so it\'s applied to your glucose curve?</string>
+    <string name="calibration_enable_prompt_confirm">Enable</string>
+    <string name="calibration_enable_prompt_dismiss">Not now</string>
+    <string name="settings_calibration_section">CALIBRATION</string>
 
     <!-- Export Dialog -->
     <string name="export_glucose_data">Export Glucose Data</string>
@@ -837,6 +851,34 @@
     <string name="settings_card_about">About Juggluco</string>
     <string name="settings_version_title">Juggluco v11.0.2</string>
     <string name="settings_about_details">Modern Jetpack Compose Material 3 Edition\nOpen Source Software licensed under GPLv3\nCreated by Jaap Korthals Altes</string>
+
+    <!-- Group Navigation Buttons -->
+    <string name="settings_group_glucose_title">Target Range &amp; Units</string>
+    <string name="settings_group_glucose_desc">Set mmol/L or mg/dL and target range thresholds</string>
+    <string name="settings_group_alarms_title">Alarms &amp; Audio</string>
+    <string name="settings_group_alarms_desc">Low and high glucose alerts, snooze and audio stream</string>
+    <string name="settings_group_display_title">Display &amp; Appearance</string>
+    <string name="settings_group_display_desc">App theme, floating glucose widget, status bar and fullscreen</string>
+    <string name="settings_group_voice_title">Voice &amp; Speech</string>
+    <string name="settings_group_voice_desc">Spoken glucose readings, speech rate and pitch</string>
+    <string name="settings_group_broadcasts_title">Broadcasts &amp; Integrations</string>
+    <string name="settings_group_broadcasts_desc">Glucodata, xDrip, Health Connect, LibreView and local web server</string>
+    <string name="settings_group_mirror_title">Mirror &amp; Network Sharing</string>
+    <string name="settings_group_mirror_desc">Multi-device synchronization, local relay and testing connections</string>
+    <string name="settings_group_hardware_title">NFC &amp; Hardware</string>
+    <string name="settings_group_hardware_desc">NFC scanning chimes and auto-launch options</string>
+    <string name="settings_group_data_title">Data Management</string>
+    <string name="settings_group_data_desc">Export glucose data records and switch to legacy OpenGL view</string>
+    <string name="settings_group_about_title">About Juggluco</string>
+    <string name="settings_group_about_desc">App version, license, sensor support and development guide</string>
+    <string name="settings_title_web_server">Local REST Web Server</string>
+    <string name="settings_desc_web_server">Configure local HTTP/SSL ports and API secret</string>
+    <string name="settings_title_libre_view">Abbott LibreView Upload</string>
+    <string name="settings_desc_libre_view">Configure LibreView cloud upload and credentials</string>
+    <string name="settings_title_mirror_edit">Mirror Peer Connection</string>
+    <string name="settings_desc_mirror_edit">Configure host address, port, and sync direction</string>
+    <string name="settings_title_turn_server">TURN Relay Server</string>
+    <string name="settings_desc_turn_server">Configure TURN server for cellular &amp; NAT traversal</string>
 
     <!-- Config Dialogs -->
     <string name="dialog_done">Done</string>

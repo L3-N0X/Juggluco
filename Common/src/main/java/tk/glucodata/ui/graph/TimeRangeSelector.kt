@@ -42,7 +42,7 @@ import tk.glucodata.ui.model.TimeRange
 
 @Composable
 fun TimeRangeSelector(
-    selectedRange: TimeRange,
+    selectedRange: TimeRange?,
     onRangeSelected: (TimeRange) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -77,7 +77,7 @@ fun TimeRangeSelector(
         }
 
         // Custom range chip
-        val isCustomRange = selectedRange.isCustom && TimeRange.PRESETS.none { it.durationMillis == selectedRange.durationMillis }
+        val isCustomRange = selectedRange?.isCustom == true && TimeRange.PRESETS.none { it.durationMillis == selectedRange.durationMillis }
         FilterChip(
             selected = isCustomRange,
             onClick = { showCustomDialog = true },
@@ -105,7 +105,7 @@ fun TimeRangeSelector(
 
     if (showCustomDialog) {
         CustomTimeRangeDialog(
-            currentRange = selectedRange,
+            currentRange = selectedRange ?: TimeRange.SIX_HOURS,
             onDismiss = { showCustomDialog = false },
             onApply = { customRange ->
                 showCustomDialog = false

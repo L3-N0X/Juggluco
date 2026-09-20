@@ -49,6 +49,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +93,7 @@ fun ExportScreen(
 
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    val displayConfig by repository.displayConfig.collectAsState()
 
     // Calculate maximum available history days
     val maxHistoryDays = remember {
@@ -424,7 +426,7 @@ fun ExportScreen(
             }
 
             // 3. Calibration Toggle Card
-            if (activeOption.supportsCalibration) {
+            if (activeOption.supportsCalibration && displayConfig.calibrationEnabled) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),

@@ -60,8 +60,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import tk.glucodata.ui.graph.rememberSettledWindow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -88,6 +92,7 @@ import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.screens.DailyTotalPill
 import tk.glucodata.ui.screens.LogItemCard
+import tk.glucodata.ui.theme.LocalLogbookColors
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -119,51 +124,82 @@ fun GlucoseScreen(
     val previousReading = if (readings.size >= 2) readings[readings.size - 2] else null
 
     // 1. Unified Graph Viewport State
-    val viewportState = rememberGraphViewportState(initialDurationMillis = selectedRange.durationMillis)
+    val viewportState = rememberGraphViewportState(initialDurationMillis = selectedRange?.durationMillis ?: tk.glucodata.ui.model.TimeRange.SIX_HOURS.durationMillis)
 
     // Sync viewport duration when time range pill changes from external controls
     LaunchedEffect(selectedRange) {
-        viewportState.setDuration(selectedRange.durationMillis)
+        val range = selectedRange ?: return@LaunchedEffect
+        val currentDuration = viewportState.durationMillis
+        val tolerance = (range.durationMillis * 0.15).toLong()
+        if (abs(currentDuration - range.durationMillis) > tolerance) {
+            viewportState.setDuration(range.durationMillis)
+        }
     }
 
-    // Dynamic stats calculated strictly for the currently visible graph period
-    val visibleStats = remember(
+    // Settled window for off-thread stats calculation and logbook filtering without recomposition churn
+    val settledWindow = rememberSettledWindow(viewportState)
+
+    // Sync selected range badge when the graph viewport duration settles after gesture (pinch zoom)
+    LaunchedEffect(settledWindow.durationMillis) {
+        val currentDuration = settledWindow.durationMillis
+        val matched = tk.glucodata.ui.model.TimeRange.matchPreset(currentDuration)
+        if (matched != null) {
+            if (selectedRange != matched) {
+                repository.setTimeRange(matched)
+            }
+        } else if (selectedRange?.isCustom == true) {
+            val tolerance = (selectedRange!!.durationMillis * 0.15).toLong()
+            if (abs(currentDuration - selectedRange!!.durationMillis) > tolerance) {
+                repository.setTimeRange(null)
+            }
+        } else if (selectedRange != null) {
+            repository.setTimeRange(null)
+        }
+    }
+
+    // Dynamic stats calculated asynchronously on Dispatchers.Default for the settled window
+    val visibleStats by produceState(
+        initialValue = tk.glucodata.ui.model.GlucoseStats(),
         readings,
-        viewportState.startTimeMillis,
-        viewportState.endTimeMillis,
-        viewportState.durationMillis,
-        selectedRange,
+        settledWindow,
         displayConfig,
         targetLow,
         targetHigh
     ) {
-        val windowPoints = readings.filter { pt ->
-            pt.timestamp in viewportState.startTimeMillis..viewportState.endTimeMillis &&
-                when {
+        value = withContext(Dispatchers.Default) {
+            if (readings.isEmpty()) return@withContext tk.glucodata.ui.model.GlucoseStats()
+            val range = findIndexRange(readings, settledWindow.startMillis, settledWindow.endMillis)
+            if (range.isEmpty()) return@withContext tk.glucodata.ui.model.GlucoseStats()
+
+            val filtered = ArrayList<GlucosePoint>(range.last - range.first + 1)
+            for (i in range) {
+                val pt = readings[i]
+                val include = when {
                     pt.isScan -> displayConfig.showScans || (pt.isCalibrated && displayConfig.showCalibratedScans)
                     pt.isHistory -> displayConfig.showHistory || (pt.isCalibrated && displayConfig.showCalibratedHistory)
                     pt.isCalibrated -> displayConfig.showCalibratedStream
                     else -> displayConfig.showStream
                 }
-        }
-        val pointsToUse = if (windowPoints.isNotEmpty()) {
-            windowPoints
-        } else {
-            readings.filter { it.timestamp in viewportState.startTimeMillis..viewportState.endTimeMillis }
-        }
-        if (pointsToUse.isNotEmpty()) {
+                if (include) filtered.add(pt)
+            }
+            val pointsToUse = if (filtered.isNotEmpty()) filtered else {
+                readings.subList(range.first, range.last + 1)
+            }
             tk.glucodata.ui.model.GlucoseStats.calculate(pointsToUse, targetLow, targetHigh)
-        } else {
-            tk.glucodata.ui.model.GlucoseStats()
         }
     }
 
-    val statsTimeRangeLabel = remember(viewportState.isLive, selectedRange, viewportState.startTimeMillis, viewportState.endTimeMillis) {
-        if (viewportState.isLive) {
-            selectedRange.label
+    val statsTimeRangeLabel = remember(settledWindow.isLive, selectedRange, settledWindow.startMillis, settledWindow.endMillis, settledWindow.durationMillis) {
+        if (settledWindow.isLive) {
+            val range = selectedRange
+            if (range != null) {
+                if (range.labelRes != null) context.getString(range.labelRes) else range.label
+            } else {
+                formatDurationLabel(settledWindow.durationMillis)
+            }
         } else {
             val dateFmt = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
-            "${dateFmt.format(Date(viewportState.startTimeMillis))} - ${dateFmt.format(Date(viewportState.endTimeMillis))}"
+            "${dateFmt.format(Date(settledWindow.startMillis))} - ${dateFmt.format(Date(settledWindow.endMillis))}"
         }
     }
 
@@ -275,21 +311,21 @@ fun GlucoseScreen(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                GraphNavigationToolbar(
-                    isFullscreen = true,
-                    onToggleFullscreen = onToggleFullscreen,
-                    onNavigateDay = { delta ->
-                        viewportState.navigateDays(delta)
-                        repository.navigateDays(delta)
-                    },
-                    onShowLastScan = {
-                        handleShowLastScan(readings, viewportState, repository, context)
-                    },
-                    onOpenLayers = { showLayersSheet = true },
-                    onOpenSearch = { showSearchDialog = true },
-                    onOpenDatePicker = { showDatePicker = true },
-                    onOpenHelp = { showHelpSheet = true }
-                )
+                    GraphNavigationToolbar(
+                        isFullscreen = false,
+                        onToggleFullscreen = onToggleFullscreen,
+                        onNavigateDay = { delta ->
+                            viewportState.navigateDays(delta)
+                        },
+                        canNavigateForward = !viewportState.isLive,
+                        onShowLastScan = {
+                            handleShowLastScan(readings, viewportState, repository, context)
+                        },
+                        onOpenLayers = { showLayersSheet = true },
+                        onOpenSearch = { showSearchDialog = true },
+                        onOpenDatePicker = { showDatePicker = true },
+                        onOpenHelp = { showHelpSheet = true }
+                    )
             }
         } else if (isLandscape) {
             // Landscape layout: side-by-side
@@ -329,8 +365,8 @@ fun GlucoseScreen(
                         onViewAll = { showFullLogbookSheet = true },
                         unit = unit,
                         minimalistUnits = displayConfig.minimalistUnits,
-                        viewStartTime = viewportState.startTimeMillis,
-                        viewEndTime = viewportState.endTimeMillis
+                        viewStartTime = settledWindow.startMillis,
+                        viewEndTime = settledWindow.endMillis
                     )
                 }
 
@@ -394,8 +430,8 @@ fun GlucoseScreen(
                         onToggleFullscreen = onToggleFullscreen,
                         onNavigateDay = { delta ->
                             viewportState.navigateDays(delta)
-                            repository.navigateDays(delta)
                         },
+                        canNavigateForward = !viewportState.isLive,
                         onShowLastScan = {
                             handleShowLastScan(readings, viewportState, repository, context)
                         },
@@ -488,8 +524,8 @@ fun GlucoseScreen(
                         onToggleFullscreen = onToggleFullscreen,
                         onNavigateDay = { delta ->
                             viewportState.navigateDays(delta)
-                            repository.navigateDays(delta)
                         },
+                        canNavigateForward = !viewportState.isLive,
                         onShowLastScan = {
                             handleShowLastScan(readings, viewportState, repository, context)
                         },
@@ -519,8 +555,8 @@ fun GlucoseScreen(
                     onViewAll = { showFullLogbookSheet = true },
                     unit = unit,
                     minimalistUnits = displayConfig.minimalistUnits,
-                    viewStartTime = viewportState.startTimeMillis,
-                    viewEndTime = viewportState.endTimeMillis
+                    viewStartTime = settledWindow.startMillis,
+                    viewEndTime = settledWindow.endMillis
                 )
             }
         }
@@ -559,14 +595,16 @@ fun GlucoseScreen(
                         onCheckedChange = { repository.toggleGraphLayer("stream", it) }
                     )
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    if (displayConfig.calibrationEnabled) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                    LayerToggleItem(
-                        title = stringResource(R.string.layer_calibrated_stream),
-                        subtitle = stringResource(R.string.layer_calibrated_stream_desc),
-                        checked = displayConfig.showCalibratedStream,
-                        onCheckedChange = { repository.toggleGraphLayer("calibratedstream", it) }
-                    )
+                        LayerToggleItem(
+                            title = stringResource(R.string.layer_calibrated_stream),
+                            subtitle = stringResource(R.string.layer_calibrated_stream_desc),
+                            checked = displayConfig.showCalibratedStream,
+                            onCheckedChange = { repository.toggleGraphLayer("calibratedstream", it) }
+                        )
+                    }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
@@ -577,14 +615,16 @@ fun GlucoseScreen(
                         onCheckedChange = { repository.toggleGraphLayer("scans", it) }
                     )
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    if (displayConfig.calibrationEnabled) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                    LayerToggleItem(
-                        title = stringResource(R.string.layer_calibrated_scans),
-                        subtitle = stringResource(R.string.layer_calibrated_scans_desc),
-                        checked = displayConfig.showCalibratedScans,
-                        onCheckedChange = { repository.toggleGraphLayer("calibratedscans", it) }
-                    )
+                        LayerToggleItem(
+                            title = stringResource(R.string.layer_calibrated_scans),
+                            subtitle = stringResource(R.string.layer_calibrated_scans_desc),
+                            checked = displayConfig.showCalibratedScans,
+                            onCheckedChange = { repository.toggleGraphLayer("calibratedscans", it) }
+                        )
+                    }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
@@ -595,14 +635,16 @@ fun GlucoseScreen(
                         onCheckedChange = { repository.toggleGraphLayer("history", it) }
                     )
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    if (displayConfig.calibrationEnabled) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                    LayerToggleItem(
-                        title = stringResource(R.string.layer_calibrated_history),
-                        subtitle = stringResource(R.string.layer_calibrated_history_desc),
-                        checked = displayConfig.showCalibratedHistory,
-                        onCheckedChange = { repository.toggleGraphLayer("calibratedhistory", it) }
-                    )
+                        LayerToggleItem(
+                            title = stringResource(R.string.layer_calibrated_history),
+                            subtitle = stringResource(R.string.layer_calibrated_history_desc),
+                            checked = displayConfig.showCalibratedHistory,
+                            onCheckedChange = { repository.toggleGraphLayer("calibratedhistory", it) }
+                        )
+                    }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
@@ -903,6 +945,7 @@ private fun GraphNavigationToolbar(
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onNavigateDay: (Int) -> Unit,
+    canNavigateForward: Boolean = true,
     onShowLastScan: () -> Unit,
     onOpenLayers: () -> Unit,
     onOpenSearch: () -> Unit,
@@ -964,12 +1007,16 @@ private fun GraphNavigationToolbar(
             }
 
             // Day Forward
-            IconButton(onClick = { onNavigateDay(1) }, modifier = Modifier.size(36.dp)) {
+            IconButton(
+                onClick = { onNavigateDay(1) },
+                enabled = canNavigateForward,
+                modifier = Modifier.size(36.dp)
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = stringResource(R.string.day_later),
                     modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = if (canNavigateForward) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
                 )
             }
         }
@@ -1127,6 +1174,7 @@ fun LogbookSection(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            val logbookColors = LocalLogbookColors.current
             Card(
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
@@ -1137,10 +1185,10 @@ fun LogbookSection(
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    DailyTotalPill(label = "Bolus", value = "${String.format(Locale.US, "%.1f", todayBolus)} U", color = Color(0xFF2563EB))
-                    DailyTotalPill(label = "Basal", value = "${String.format(Locale.US, "%.1f", todayBasal)} U", color = Color(0xFF4F46E5))
-                    DailyTotalPill(label = "Carbs", value = "${todayCarbs.toInt()} g", color = Color(0xFFD97706))
-                    DailyTotalPill(label = "Checks", value = "$todayChecks", color = Color(0xFFDC2626))
+                    DailyTotalPill(label = "Bolus", value = "${String.format(Locale.US, "%.1f", todayBolus)} U", color = logbookColors.bolus.primary)
+                    DailyTotalPill(label = "Basal", value = "${String.format(Locale.US, "%.1f", todayBasal)} U", color = logbookColors.basal.primary)
+                    DailyTotalPill(label = "Carbs", value = "${todayCarbs.toInt()} g", color = logbookColors.carbs.primary)
+                    DailyTotalPill(label = "Checks", value = "$todayChecks", color = logbookColors.bloodGlucose.primary)
                 }
             }
 
@@ -1210,5 +1258,35 @@ fun LogbookSection(
                 }
             }
         }
+    }
+}
+
+private fun findIndexRange(readings: List<GlucosePoint>, startTime: Long, endTime: Long): IntRange {
+    if (readings.isEmpty()) return IntRange.EMPTY
+    var low = 0
+    var high = readings.size
+    while (low < high) {
+        val mid = (low + high) ushr 1
+        if (readings[mid].timestamp < startTime) low = mid + 1 else high = mid
+    }
+    val startIdx = low
+
+    low = startIdx
+    high = readings.size
+    while (low < high) {
+        val mid = (low + high) ushr 1
+        if (readings[mid].timestamp <= endTime) low = mid + 1 else high = mid
+    }
+    val endIdx = low
+    return if (startIdx < endIdx) startIdx until endIdx else IntRange.EMPTY
+}
+
+private fun formatDurationLabel(durationMillis: Long): String {
+    val hours = (durationMillis / (3600 * 1000L)).toInt()
+    return when {
+        hours >= 24 && hours % 24 == 0 -> "${hours / 24}d"
+        hours >= 24 -> "${hours / 24}d ${hours % 24}h"
+        hours > 0 -> "${hours}h"
+        else -> "${durationMillis / 60_000L}m"
     }
 }
