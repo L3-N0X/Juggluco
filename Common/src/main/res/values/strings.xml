@@ -802,8 +802,8 @@
     <string name="settings_glucodata_broadcast_desc">Broadcast glucose locally to Juggluco watchfaces &amp; apps</string>
     <string name="settings_xdrip_broadcast">xDrip Broadcast</string>
     <string name="settings_xdrip_broadcast_desc">Broadcast readings to xDrip+ and compatible apps</string>
-    <string name="settings_librelink_broadcast">Patched Libre Broadcast (com.librelink.app)</string>
-    <string name="settings_librelink_broadcast_desc">Broadcast live glucose readings via com.librelink.app intent for dev builds and local apps</string>
+    <string name="settings_librelink_broadcast">Patched Libre Broadcast</string>
+    <string name="settings_librelink_broadcast_desc">Broadcast readings via com.librelink.app</string>
     <string name="settings_health_connect">Google Health Connect</string>
     <string name="settings_health_connect_desc">Sync blood glucose records with Android Health Connect</string>
     <string name="settings_libreview">Abbott LibreView Upload</string>

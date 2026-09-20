@@ -171,7 +171,7 @@ fun SettingsIcon(
 /**
  * A setting row that opens a dedicated screen or section.
  * Renders an icon on the left, text in the middle, and on the right:
- * a vertical line and caret (+ optionally a toggle switch).
+ * a caret, vertical line, and optionally a toggle switch.
  */
 @Composable
 fun SettingsNavRow(
@@ -224,19 +224,6 @@ fun SettingsNavRow(
         }
 
         if (hasToggle) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                enabled = enabled
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Box(
-                modifier = Modifier
-                    .height(28.dp)
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
-            )
             Spacer(modifier = Modifier.width(6.dp))
             IconButton(
                 onClick = onClick,
@@ -250,6 +237,19 @@ fun SettingsNavRow(
                     modifier = Modifier.size(20.dp)
                 )
             }
+            Spacer(modifier = Modifier.width(6.dp))
+            Box(
+                modifier = Modifier
+                    .height(28.dp)
+                    .width(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled
+            )
         } else {
             Spacer(modifier = Modifier.width(8.dp))
             Box(
