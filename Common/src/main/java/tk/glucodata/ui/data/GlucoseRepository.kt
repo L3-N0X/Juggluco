@@ -255,7 +255,11 @@ class GlucoseRepository(
                             rate = strGl.rate,
                             status = GlucoseStatus.fromValue(valMgDl, _targetLow.value, _targetHigh.value)
                         )
+                    } else {
+                        _currentReading.value = null
                     }
+                } else {
+                    _currentReading.value = null
                 }
 
                 // Read stream points from all sensors (falling back to active)
@@ -342,14 +346,7 @@ class GlucoseRepository(
             }
         } catch (_: Throwable) {}
 
-        // If no real readings found, provide rich multi-day test data
-        if (loadedList.isEmpty()) {
-            loadedList = ArrayList(MockDataGenerator.generateReadings(days = 7, targetLow = _targetLow.value, targetHigh = _targetHigh.value))
-            if (_currentReading.value == null && loadedList.isNotEmpty()) {
-                val latest = loadedList.filter { !it.isScan && !it.isCalibrated }.lastOrNull() ?: loadedList.last()
-                _currentReading.value = latest
-            }
-        } else if (_currentReading.value == null) {
+        if (_currentReading.value == null && loadedList.isNotEmpty()) {
             val latest = loadedList.filter { !it.isScan && !it.isCalibrated }.lastOrNull() ?: loadedList.last()
             _currentReading.value = latest
         }
