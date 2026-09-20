@@ -514,9 +514,9 @@ fun SettingsSegmentedRow(
  */
 @Composable
 fun SettingsInfoCard(
-    text: String,
     modifier: Modifier = Modifier,
-    icon: ImageVector = Icons.Default.Info
+    icon: ImageVector = Icons.Default.Info,
+    content: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -536,13 +536,32 @@ fun SettingsInfoCard(
                     .padding(top = 1.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 20.sp
-            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                content()
+            }
         }
+    }
+}
+
+@Composable
+fun SettingsInfoCard(
+    text: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Default.Info
+) {
+    SettingsInfoCard(
+        modifier = modifier,
+        icon = icon
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 20.sp
+        )
     }
 }
 

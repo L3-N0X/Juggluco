@@ -1,7 +1,6 @@
 package tk.glucodata.ui.screens
 
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,12 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Medication
@@ -32,22 +27,14 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -71,6 +58,12 @@ import tk.glucodata.MainActivity
 import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.screens.settings.SettingsDetailScaffold
+import tk.glucodata.ui.screens.settings.SettingsDivider
+import tk.glucodata.ui.screens.settings.SettingsIcon
+import tk.glucodata.ui.screens.settings.SettingsInfoCard
+import tk.glucodata.ui.screens.settings.SettingsSection
+import tk.glucodata.ui.screens.settings.SettingsSwitchRow
 
 data class ExportStreamOption(
     val typeIndex: Int,
@@ -81,18 +74,12 @@ data class ExportStreamOption(
     val supportsCalibration: Boolean = true
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportScreen(
     repository: GlucoseRepository,
     onNavigateBack: () -> Unit
 ) {
-    BackHandler {
-        onNavigateBack()
-    }
-
     val context = LocalContext.current
-    val scrollState = rememberScrollState()
     val displayConfig by repository.displayConfig.collectAsState()
 
     // Calculate maximum available history days
@@ -182,146 +169,40 @@ fun ExportScreen(
         selectedPresetDays?.toFloat() ?: maxHistoryDays.toFloat()
     }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.export_screen_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.closename)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Header Info Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+    SettingsDetailScaffold(
+        title = stringResource(R.string.export_screen_title),
+        onNavigateBack = onNavigateBack
+    ) {
+        // Header Info Card
+        SettingsInfoCard(
+            text = "${stringResource(R.string.export_glucose_data)}: ${stringResource(R.string.export_screen_desc)}",
+            icon = Icons.Default.Assessment
+        )
+
+        // 1. Time Range Section
+        SettingsSection(title = stringResource(R.string.export_time_range_title)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
             ) {
+                // Range preset chips
                 Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Assessment,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column {
-                        Text(
-                            text = stringResource(R.string.export_glucose_data),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = stringResource(R.string.export_screen_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // 1. Time Range Section
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = stringResource(R.string.export_time_range_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Range preset chips
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val presets = listOf(7, 14, 30, 90)
-                        presets.forEach { days ->
-                            FilterChip(
-                                selected = !isCustomRangeActive && selectedPresetDays == days,
-                                onClick = {
-                                    isCustomRangeActive = false
-                                    selectedPresetDays = days
-                                    customDaysText = days.toString()
-                                },
-                                label = { Text("$days ${stringResource(R.string.days)}", fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            )
-                        }
-
-                        // All Available Data preset
+                    val presets = listOf(7, 14, 30, 90)
+                    presets.forEach { days ->
                         FilterChip(
-                            selected = !isCustomRangeActive && selectedPresetDays == maxHistoryDays,
+                            selected = !isCustomRangeActive && selectedPresetDays == days,
                             onClick = {
                                 isCustomRangeActive = false
-                                selectedPresetDays = maxHistoryDays
-                                customDaysText = maxHistoryDays.toString()
+                                selectedPresetDays = days
+                                customDaysText = days.toString()
                             },
-                            label = { Text(stringResource(R.string.timerange_all), fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        )
-
-                        // Custom chip
-                        FilterChip(
-                            selected = isCustomRangeActive,
-                            onClick = { isCustomRangeActive = true },
-                            label = {
-                                Text(
-                                    if (isCustomRangeActive) "$customDaysText ${stringResource(R.string.days)}" else stringResource(R.string.timerange_custom),
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isCustomRangeActive) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Tune,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            },
+                            label = { Text("$days ${stringResource(R.string.days)}", fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -329,187 +210,181 @@ fun ExportScreen(
                         )
                     }
 
-                    if (isCustomRangeActive) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = customDaysText,
-                            onValueChange = { input ->
-                                val filtered = input.filter { it.isDigit() || it == '.' }
-                                customDaysText = filtered
-                            },
-                            label = { Text(stringResource(R.string.export_days_count)) },
-                            suffix = { Text(stringResource(R.string.days)) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth()
+                    // All Available Data preset
+                    FilterChip(
+                        selected = !isCustomRangeActive && selectedPresetDays == maxHistoryDays,
+                        onClick = {
+                            isCustomRangeActive = false
+                            selectedPresetDays = maxHistoryDays
+                            customDaysText = maxHistoryDays.toString()
+                        },
+                        label = { Text(stringResource(R.string.timerange_all), fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                    }
-                }
-            }
-
-            // 2. Data Stream & Format Section
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = stringResource(R.string.export_select_stream),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
 
-                    streamOptions.forEach { option ->
-                        val isSelected = selectedTypeIndex == option.typeIndex
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clickable { selectedTypeIndex = option.typeIndex },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = { selectedTypeIndex = option.typeIndex }
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(
-                                    imageVector = option.icon,
-                                    contentDescription = null,
-                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = stringResource(option.titleRes),
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = MaterialTheme.colorScheme.surfaceVariant
-                                        ) {
-                                            Text(
-                                                text = option.fileExtension,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                    Text(
-                                        text = stringResource(option.descRes),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    // Custom chip
+                    FilterChip(
+                        selected = isCustomRangeActive,
+                        onClick = { isCustomRangeActive = true },
+                        label = {
+                            Text(
+                                if (isCustomRangeActive) "$customDaysText ${stringResource(R.string.days)}" else stringResource(R.string.timerange_custom),
+                                fontSize = 12.sp,
+                                fontWeight = if (isCustomRangeActive) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
+
+                if (isCustomRangeActive) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = customDaysText,
+                        onValueChange = { input ->
+                            val filtered = input.filter { it.isDigit() || it == '.' }
+                            customDaysText = filtered
+                        },
+                        label = { Text(stringResource(R.string.export_days_count)) },
+                        suffix = { Text(stringResource(R.string.days)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
+        }
 
-            // 3. Calibration Toggle Card
-            if (activeOption.supportsCalibration && displayConfig.calibrationEnabled) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        // 2. Data Stream & Format Section
+        SettingsSection(title = stringResource(R.string.export_select_stream)) {
+            streamOptions.forEachIndexed { index, option ->
+                if (index > 0) {
+                    SettingsDivider()
+                }
+                val isSelected = selectedTypeIndex == option.typeIndex
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedTypeIndex = option.typeIndex }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = { selectedTypeIndex = option.typeIndex }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    SettingsIcon(
+                        icon = option.icon,
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = stringResource(R.string.export_include_calibrated),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
+                                text = stringResource(option.titleRes),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Text(
-                                text = stringResource(R.string.export_calibrated_help),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = isCalibrated,
-                            onCheckedChange = { isCalibrated = it }
-                        )
-                    }
-                }
-            }
-
-            // 4. Summary & Action Button
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Summary: ${stringResource(activeOption.titleRes)} (${activeOption.fileExtension}) • ${effectiveDays.toInt()} ${stringResource(R.string.days)}" +
-                            if (activeOption.supportsCalibration && isCalibrated) " • ${stringResource(R.string.calibrated)}" else "",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Button(
-                        onClick = {
-                            val activity = context as? MainActivity
-                            if (activity != null) {
-                                try {
-                                    Dialogs.runExport(activity, selectedTypeIndex, isCalibrated, effectiveDays)
-                                } catch (e: Throwable) {
-                                    Applic.argToaster(activity, "Export error: ${e.message}", Toast.LENGTH_SHORT)
-                                }
-                            } else {
-                                Toast.makeText(context, "Export initialized for ${effectiveDays.toInt()} days", Toast.LENGTH_SHORT).show()
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    text = option.fileExtension,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(vertical = 14.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        }
                         Text(
-                            text = stringResource(R.string.export_action_button),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
+                            text = stringResource(option.descRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
                         )
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
+        // 3. Calibration Toggle Card
+        if (activeOption.supportsCalibration && displayConfig.calibrationEnabled) {
+            SettingsSection(title = stringResource(R.string.settings_calibration_section)) {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.export_include_calibrated),
+                    subtitle = stringResource(R.string.export_calibrated_help),
+                    icon = Icons.Default.Tune,
+                    checked = isCalibrated,
+                    onCheckedChange = { isCalibrated = it }
+                )
+            }
+        }
+
+        // 4. Summary & Action Button
+        SettingsSection(title = "Summary & export") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Summary: ${stringResource(activeOption.titleRes)} (${activeOption.fileExtension}) • ${effectiveDays.toInt()} ${stringResource(R.string.days)}" +
+                        if (activeOption.supportsCalibration && isCalibrated) " • ${stringResource(R.string.calibrated)}" else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = {
+                        val activity = context as? MainActivity
+                        if (activity != null) {
+                            try {
+                                Dialogs.runExport(activity, selectedTypeIndex, isCalibrated, effectiveDays)
+                            } catch (e: Throwable) {
+                                Applic.argToaster(activity, "Export error: ${e.message}", Toast.LENGTH_SHORT)
+                            }
+                        } else {
+                            Toast.makeText(context, "Export initialized for ${effectiveDays.toInt()} days", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(vertical = 14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.export_action_button),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

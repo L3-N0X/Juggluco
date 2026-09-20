@@ -1,14 +1,20 @@
 package tk.glucodata.ui.screens.settings
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 
@@ -48,27 +54,45 @@ fun HardwareSettingsScreen(
             )
         }
 
-        // RADIO & HARDWARE PROTOCOLS
-        SettingsSection(title = "Hardware interfacing protocols") {
-            SettingsActionRow(
-                title = "NFC sensor activation",
-                subtitle = "Tap phone against sensor to begin warm-up and transfer encryption keys",
-                icon = Icons.Default.Nfc
+        // HARDWARE PROTOCOLS & TIPS (COMMENT)
+        SettingsInfoCard(icon = Icons.Default.Info) {
+            Text(
+                text = "Hardware interfacing protocols",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            SettingsDivider()
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)) {
+                        append("NFC sensor activation: ")
+                    }
+                    append("Tap phone against sensor to begin warm-up and transfer encryption keys.")
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp
+            )
 
-            SettingsActionRow(
-                title = "Bluetooth Low Energy (BLE)",
-                subtitle = "Continuous readings are decrypted directly by Juggluco every minute without re-scanning",
-                icon = Icons.Default.Bluetooth
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)) {
+                        append("Bluetooth Low Energy (BLE): ")
+                    }
+                    append("Continuous readings are decrypted directly by Juggluco every minute without re-scanning.")
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp
+            )
+
+            Text(
+                text = "If NFC scans fail to register, verify that your phone's NFC toggle is switched on in Android System Settings and remove thick metal cases that might shield the internal antenna.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                lineHeight = 18.sp
             )
         }
-
-        // TIPS
-        SettingsInfoCard(
-            text = "If NFC scans fail to register, verify that your phone's NFC toggle is switched on in Android System Settings and remove thick metal cases that might shield the internal antenna.",
-            icon = Icons.Default.Info
-        )
     }
 }
