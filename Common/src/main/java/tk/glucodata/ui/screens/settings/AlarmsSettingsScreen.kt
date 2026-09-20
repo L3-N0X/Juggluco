@@ -50,8 +50,8 @@ fun AlarmsSettingsScreen(
         title = stringResource(R.string.settings_group_alarms_title),
         onNavigateBack = onNavigateBack
     ) {
-        // LOW GLUCOSE ALARM
-        SettingsSection(title = "Low glucose alert") {
+        // GLUCOSE ALERTS
+        SettingsSection(title = "Glucose alerts") {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_alarm_low),
                 subtitle = stringResource(R.string.settings_alarm_low_desc, unit.format(alarms.lowThreshold)),
@@ -133,10 +133,9 @@ fun AlarmsSettingsScreen(
                     }
                 }
             }
-        }
 
-        // HIGH GLUCOSE ALARM
-        SettingsSection(title = "High glucose alert") {
+            SettingsDivider()
+
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_alarm_high),
                 subtitle = stringResource(R.string.settings_alarm_high_desc, unit.format(alarms.highThreshold)),
@@ -289,23 +288,42 @@ fun AlarmsSettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                SettingsActionRow(
-                    title = stringResource(R.string.settings_alarm_stream),
-                    subtitle = stringResource(R.string.settings_alarm_active_channel, currentStreamLabel),
-                    icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    modifier = Modifier.padding(0.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SettingsIcon(icon = Icons.AutoMirrored.Filled.VolumeUp)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_alarm_stream),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.settings_alarm_active_channel, currentStreamLabel),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 52.dp)
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     AlarmSoundStream.entries.forEach { stream ->
                         val isSelected = stream == alarms.soundStream
@@ -317,7 +335,7 @@ fun AlarmsSettingsScreen(
                         FilterChip(
                             selected = isSelected,
                             onClick = { repository.updateAlarms(alarms.copy(soundStream = stream)) },
-                            label = { Text(shortLabel, fontSize = 12.sp) },
+                            label = { Text(shortLabel, fontSize = 11.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
