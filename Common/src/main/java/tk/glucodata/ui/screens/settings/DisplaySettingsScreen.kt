@@ -1,18 +1,12 @@
 package tk.glucodata.ui.screens.settings
 
 import android.app.Activity
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShortText
+import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Layers
@@ -20,8 +14,11 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -30,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 
@@ -52,47 +48,70 @@ fun DisplaySettingsScreen(
     ) {
         // THEME PREFERENCE
         SettingsSection(title = "Appearance") {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            SettingsSegmentedRow(
+                title = stringResource(R.string.settings_theme_pref),
+                subtitle = stringResource(R.string.settings_theme_pref_desc),
+                icon = Icons.Default.Palette
             ) {
-                SettingsActionRow(
-                    title = stringResource(R.string.settings_theme_pref),
-                    subtitle = stringResource(R.string.settings_theme_pref_desc),
-                    icon = Icons.Default.Palette,
-                    modifier = Modifier.padding(0.dp)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
+                @OptIn(ExperimentalMaterial3Api::class)
+                SingleChoiceSegmentedButtonRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 52.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 16.dp)
                 ) {
-                    FilterChip(
-                        selected = darkThemeOverride == true,
-                        onClick = { onDarkThemeChanged(true) },
-                        label = { Text(stringResource(R.string.settings_theme_dark), fontSize = 12.sp) },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.size(16.dp))
-                        }
-                    )
-                    FilterChip(
-                        selected = darkThemeOverride == false,
-                        onClick = { onDarkThemeChanged(false) },
-                        label = { Text(stringResource(R.string.settings_theme_light), fontSize = 12.sp) },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.LightMode, contentDescription = null, modifier = Modifier.size(16.dp))
-                        }
-                    )
-                    FilterChip(
+                    SegmentedButton(
                         selected = darkThemeOverride == null,
                         onClick = { onDarkThemeChanged(null) },
-                        label = { Text(stringResource(R.string.settings_theme_system), fontSize = 12.sp) }
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.BrightnessAuto,
+                                contentDescription = null,
+                                modifier = Modifier.size(SegmentedButtonDefaults.IconSize)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = stringResource(R.string.settings_theme_system),
+                                maxLines = 1
+                            )
+                        }
+                    )
+                    SegmentedButton(
+                        selected = darkThemeOverride == false,
+                        onClick = { onDarkThemeChanged(false) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.LightMode,
+                                contentDescription = null,
+                                modifier = Modifier.size(SegmentedButtonDefaults.IconSize)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = stringResource(R.string.settings_theme_light),
+                                maxLines = 1
+                            )
+                        }
+                    )
+                    SegmentedButton(
+                        selected = darkThemeOverride == true,
+                        onClick = { onDarkThemeChanged(true) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.DarkMode,
+                                contentDescription = null,
+                                modifier = Modifier.size(SegmentedButtonDefaults.IconSize)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = stringResource(R.string.settings_theme_dark),
+                                maxLines = 1
+                            )
+                        }
                     )
                 }
             }
