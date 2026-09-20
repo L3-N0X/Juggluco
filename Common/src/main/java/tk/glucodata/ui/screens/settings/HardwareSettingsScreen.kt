@@ -1,26 +1,14 @@
 package tk.glucodata.ui.screens.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Nfc
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 
@@ -33,29 +21,26 @@ fun HardwareSettingsScreen(
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_group_hardware_title),
-        subtitle = stringResource(R.string.settings_cat_hardware),
         onNavigateBack = onNavigateBack
     ) {
         // NFC SCANNING OPTIONS
-        SettingsCard(
-            title = stringResource(R.string.settings_card_hardware),
-            icon = Icons.Default.Nfc,
-            categorySubtitle = "NFC SCANNER"
-        ) {
-            SettingsToggleRow(
+        SettingsSection(title = "NFC scanner options") {
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_nfc_sound),
                 subtitle = stringResource(R.string.settings_nfc_sound_desc),
+                icon = Icons.Default.Nfc,
                 checked = hardwareConfig.nfcSound,
                 onCheckedChange = {
                     // Update NFC sound
                 }
             )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            SettingsDivider()
 
-            SettingsToggleRow(
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_nfc_launch),
                 subtitle = stringResource(R.string.settings_nfc_launch_desc),
+                icon = Icons.Default.TouchApp,
                 checked = hardwareConfig.globalScanStartsApp,
                 onCheckedChange = {
                     // Update global scan
@@ -63,44 +48,26 @@ fun HardwareSettingsScreen(
             )
         }
 
-        // BLUETOOTH LE & HARDWARE SCANNING INFO
-        SettingsCard(
-            title = "Hardware Sensor Interfacing",
-            icon = Icons.Default.Bluetooth,
-            categorySubtitle = "RADIO PROTOCOLS"
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "NFC Sensor Activation",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Holding the upper-back area of your phone against your sensor starts the warm-up period and transfers encryption keys. Once paired, readings stream continuously via Bluetooth Low Energy without needing further NFC scans.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        // RADIO & HARDWARE PROTOCOLS
+        SettingsSection(title = "Hardware interfacing protocols") {
+            SettingsActionRow(
+                title = "NFC sensor activation",
+                subtitle = "Tap phone against sensor to begin warm-up and transfer encryption keys",
+                icon = Icons.Default.Nfc
+            )
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            SettingsDivider()
 
-                Text(
-                    text = "Bluetooth Low Energy (BLE)",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Continuous readings are decrypted directly by Juggluco's native C++ engine every minute. Bluetooth must remain enabled on your phone at all times.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            SettingsActionRow(
+                title = "Bluetooth Low Energy (BLE)",
+                subtitle = "Continuous readings are decrypted directly by Juggluco every minute without re-scanning",
+                icon = Icons.Default.Bluetooth
+            )
         }
 
         // TIPS
         SettingsInfoCard(
-            text = "If NFC scans fail to register, verify that your phone's NFC toggle is switched on in Android System Settings and remove thick metal cases that might shield the internal NFC antenna.",
+            text = "If NFC scans fail to register, verify that your phone's NFC toggle is switched on in Android System Settings and remove thick metal cases that might shield the internal antenna.",
             icon = Icons.Default.Info
         )
     }

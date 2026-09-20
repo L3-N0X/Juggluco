@@ -15,18 +15,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -34,7 +31,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -45,7 +41,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import tk.glucodata.Applic
 import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
@@ -86,162 +81,141 @@ fun WebServerSettingsScreen(
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_title_web_server),
-        subtitle = stringResource(R.string.settings_desc_web_server),
         onNavigateBack = onNavigateBack
     ) {
         // SERVER STATUS & TOGGLE
-        SettingsCard(
-            title = "REST API Server Status",
-            icon = Icons.Default.Code,
-            categorySubtitle = "SERVICE CONTROL"
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text(
-                        text = "Embedded Web Server",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Text(
-                        text = if (exchanges.xdripWebServer) "Active and listening" else "Disabled",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (exchanges.xdripWebServer) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                    )
-                }
-                Switch(
-                    checked = exchanges.xdripWebServer,
-                    onCheckedChange = { repository.setXdripWebServer(it) }
-                )
-            }
+        SettingsSection(title = "Service status") {
+            SettingsSwitchRow(
+                title = "Embedded REST API server",
+                subtitle = if (exchanges.xdripWebServer) "Active and listening on port $httpPort" else "Server is currently disabled",
+                icon = Icons.Default.Code,
+                checked = exchanges.xdripWebServer,
+                onCheckedChange = { repository.setXdripWebServer(it) }
+            )
         }
 
         // PORT & AUTH CONFIGURATION
-        SettingsCard(
-            title = "Network Ports & Authentication",
-            categorySubtitle = "HTTP & SECURITY"
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+        SettingsSection(title = "Network ports & authentication") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
-                OutlinedTextField(
-                    value = httpPort,
-                    onValueChange = { httpPort = it },
-                    label = { Text("HTTP Port") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = httpPort,
+                        onValueChange = { httpPort = it },
+                        label = { Text("HTTP Port") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    OutlinedTextField(
+                        value = sslPort,
+                        onValueChange = { sslPort = it },
+                        label = { Text("SSL Port") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
-                    value = sslPort,
-                    onValueChange = { sslPort = it },
-                    label = { Text("SSL Port") },
+                    value = apiSecret,
+                    onValueChange = { apiSecret = it },
+                    label = { Text("API Secret (Password)") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            OutlinedTextField(
-                value = apiSecret,
-                onValueChange = { apiSecret = it },
-                label = { Text("API Secret (Password)") },
-                singleLine = true,
-                visualTransformation = if (showSecret) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { showSecret = !showSecret }) {
-                        Icon(
-                            imageVector = if (showSecret) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = "Toggle Secret"
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            OutlinedTextField(
-                value = pollInterval,
-                onValueChange = { pollInterval = it },
-                label = { Text("Update Interval (seconds)") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Button(
-                onClick = {
-                    val hp = httpPort.toIntOrNull()
-                    val sp = sslPort.toIntOrNull()
-                    val iv = pollInterval.toIntOrNull() ?: 60
-
-                    if (hp == null || hp !in 1024..65535 || sp == null || sp !in 1024..65535) {
-                        Toast.makeText(context, "Ports must be valid numbers between 1024 and 65535", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    if (hp == sp) {
-                        Toast.makeText(context, "HTTP and SSL ports cannot be identical", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-
-                    try {
-                        Natives.sethttpport(hp)
-                        Natives.setsslport(sp)
-                        Natives.setinterval(iv)
-                        Natives.setApiSecret(apiSecret)
-                        if (exchanges.xdripWebServer) {
-                            repository.setXdripWebServer(false)
-                            repository.setXdripWebServer(true)
+                    visualTransformation = if (showSecret) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showSecret = !showSecret }) {
+                            Icon(
+                                imageVector = if (showSecret) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = "Toggle Secret"
+                            )
                         }
-                        Toast.makeText(context, "Web server configuration saved", Toast.LENGTH_SHORT).show()
-                    } catch (e: Throwable) {
-                        Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Save & Restart Server", fontWeight = FontWeight.Bold)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = pollInterval,
+                    onValueChange = { pollInterval = it },
+                    label = { Text("Update Interval (seconds)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = {
+                        val hp = httpPort.toIntOrNull()
+                        val sp = sslPort.toIntOrNull()
+                        val iv = pollInterval.toIntOrNull() ?: 60
+
+                        if (hp == null || hp !in 1024..65535 || sp == null || sp !in 1024..65535) {
+                            Toast.makeText(context, "Ports must be valid numbers between 1024 and 65535", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (hp == sp) {
+                            Toast.makeText(context, "HTTP and SSL ports cannot be identical", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
+                        try {
+                            Natives.sethttpport(hp)
+                            Natives.setsslport(sp)
+                            Natives.setinterval(iv)
+                            Natives.setApiSecret(apiSecret)
+                            if (exchanges.xdripWebServer) {
+                                repository.setXdripWebServer(false)
+                                repository.setXdripWebServer(true)
+                            }
+                            Toast.makeText(context, "Web server configuration saved", Toast.LENGTH_SHORT).show()
+                        } catch (e: Throwable) {
+                            Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Save & Restart Server", fontWeight = FontWeight.Bold)
+                }
             }
         }
 
         // ENDPOINT REFERENCE CARD
-        SettingsCard(
-            title = "REST API Endpoints",
-            categorySubtitle = "COMPATIBILITY"
-        ) {
+        SettingsSection(title = "REST API compatibility") {
             val cleanPort = httpPort.ifBlank { "17580" }
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "Nightscout & xDrip Compatible Endpoints:",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "• Entries: http://127.0.0.1:$cleanPort/api/v1/entries.json\n• Status: http://127.0.0.1:$cleanPort/api/v1/status.json\n• AGP Report: http://127.0.0.1:$cleanPort/x/report",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        lineHeight = 20.sp
-                    )
-                }
+                Text(
+                    text = "Nightscout & xDrip Endpoints:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "• Entries: http://127.0.0.1:$cleanPort/api/v1/entries.json\n• Status: http://127.0.0.1:$cleanPort/api/v1/status.json\n• AGP Report: http://127.0.0.1:$cleanPort/x/report",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 20.sp
+                )
             }
         }
 

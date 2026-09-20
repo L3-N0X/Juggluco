@@ -8,14 +8,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Snooze
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -42,35 +48,39 @@ fun AlarmsSettingsScreen(
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_group_alarms_title),
-        subtitle = stringResource(R.string.settings_cat_alarms),
         onNavigateBack = onNavigateBack
     ) {
         // LOW GLUCOSE ALARM
-        SettingsCard(
-            title = stringResource(R.string.settings_alarm_low),
-            icon = Icons.Default.NotificationsActive,
-            categorySubtitle = "CRITICAL ALERTS"
-        ) {
-            SettingsToggleRow(
+        SettingsSection(title = "Low glucose alert") {
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_alarm_low),
                 subtitle = stringResource(R.string.settings_alarm_low_desc, unit.format(alarms.lowThreshold)),
+                icon = Icons.Default.NotificationsActive,
                 checked = alarms.lowAlarmEnabled,
                 onCheckedChange = { repository.updateAlarms(alarms.copy(lowAlarmEnabled = it)) }
             )
 
             if (alarms.lowAlarmEnabled) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+                SettingsDivider()
 
-                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                // Low Threshold Slider
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        SettingsIcon(icon = Icons.AutoMirrored.Filled.TrendingDown)
+                        Spacer(modifier = Modifier.width(16.dp))
                         Text(
-                            text = "Low Alert Threshold",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "Low alert threshold",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
                         )
                         Text(
                             text = unit.format(alarms.lowThreshold),
@@ -82,20 +92,34 @@ fun AlarmsSettingsScreen(
                     Slider(
                         value = alarms.lowThreshold,
                         onValueChange = { repository.updateAlarms(alarms.copy(lowThreshold = it)) },
-                        valueRange = 55f..95f
+                        valueRange = 55f..95f,
+                        modifier = Modifier.padding(start = 52.dp, top = 2.dp)
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                SettingsDivider()
 
-                    Text(
-                        text = stringResource(R.string.settings_alarm_snooze_duration),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                // Snooze selection
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SettingsIcon(icon = Icons.Default.Snooze)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = stringResource(R.string.settings_alarm_snooze_duration),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(start = 52.dp)
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -112,31 +136,36 @@ fun AlarmsSettingsScreen(
         }
 
         // HIGH GLUCOSE ALARM
-        SettingsCard(
-            title = stringResource(R.string.settings_alarm_high),
-            icon = Icons.Default.NotificationsActive,
-            categorySubtitle = "THRESHOLD ALERTS"
-        ) {
-            SettingsToggleRow(
+        SettingsSection(title = "High glucose alert") {
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_alarm_high),
                 subtitle = stringResource(R.string.settings_alarm_high_desc, unit.format(alarms.highThreshold)),
+                icon = Icons.Default.NotificationsActive,
                 checked = alarms.highAlarmEnabled,
                 onCheckedChange = { repository.updateAlarms(alarms.copy(highAlarmEnabled = it)) }
             )
 
             if (alarms.highAlarmEnabled) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+                SettingsDivider()
 
-                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                // High Threshold Slider
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        SettingsIcon(icon = Icons.AutoMirrored.Filled.TrendingUp)
+                        Spacer(modifier = Modifier.width(16.dp))
                         Text(
-                            text = "High Alert Threshold",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "High alert threshold",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
                         )
                         Text(
                             text = unit.format(alarms.highThreshold),
@@ -148,20 +177,34 @@ fun AlarmsSettingsScreen(
                     Slider(
                         value = alarms.highThreshold,
                         onValueChange = { repository.updateAlarms(alarms.copy(highThreshold = it)) },
-                        valueRange = 140f..250f
+                        valueRange = 140f..250f,
+                        modifier = Modifier.padding(start = 52.dp, top = 2.dp)
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                SettingsDivider()
 
-                    Text(
-                        text = stringResource(R.string.settings_alarm_snooze_duration),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                // Snooze selection
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SettingsIcon(icon = Icons.Default.Snooze)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = stringResource(R.string.settings_alarm_snooze_duration),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(start = 52.dp)
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -178,28 +221,38 @@ fun AlarmsSettingsScreen(
         }
 
         // SIGNAL LOSS & CHIMES
-        SettingsCard(
-            title = "Connection & Chimes",
-            categorySubtitle = "CONNECTION MONITOR"
-        ) {
-            SettingsToggleRow(
+        SettingsSection(title = "Connection & chimes") {
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_alarm_loss),
                 subtitle = stringResource(R.string.settings_alarm_loss_desc, alarms.lossWaitMinutes),
+                icon = Icons.Default.WifiOff,
                 checked = alarms.lossAlarmEnabled,
                 onCheckedChange = { repository.updateAlarms(alarms.copy(lossAlarmEnabled = it)) }
             )
 
             if (alarms.lossAlarmEnabled) {
-                Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp)) {
-                    Text(
-                        text = stringResource(R.string.settings_alarm_loss_wait),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                SettingsDivider()
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SettingsIcon(icon = Icons.Default.Timer)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = stringResource(R.string.settings_alarm_loss_wait),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(start = 52.dp)
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -214,58 +267,63 @@ fun AlarmsSettingsScreen(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            SettingsDivider()
 
-            SettingsToggleRow(
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_alarm_value_available),
                 subtitle = stringResource(R.string.settings_alarm_value_available_desc),
+                icon = Icons.Default.MusicNote,
                 checked = alarms.valueAvailableNotification,
                 onCheckedChange = { repository.updateAlarms(alarms.copy(valueAvailableNotification = it)) }
             )
         }
 
         // AUDIO OUTPUT STREAM
-        SettingsCard(
-            title = stringResource(R.string.settings_alarm_stream),
-            icon = Icons.AutoMirrored.Filled.VolumeUp,
-            categorySubtitle = "AUDIO HARDWARE ROUTING"
-        ) {
+        SettingsSection(title = "Audio hardware routing") {
             val currentStreamLabel = when (alarms.soundStream) {
                 AlarmSoundStream.ALARM -> stringResource(R.string.settings_stream_alarm)
                 AlarmSoundStream.NOTIFICATION -> stringResource(R.string.settings_stream_notification)
                 AlarmSoundStream.MEDIA -> stringResource(R.string.settings_stream_media)
             }
 
-            Text(
-                text = stringResource(R.string.settings_alarm_active_channel, currentStreamLabel),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
-                AlarmSoundStream.entries.forEach { stream ->
-                    val isSelected = stream == alarms.soundStream
-                    val shortLabel = when (stream) {
-                        AlarmSoundStream.ALARM -> stringResource(R.string.settings_stream_alarm)
-                        AlarmSoundStream.NOTIFICATION -> stringResource(R.string.settings_stream_notification)
-                        AlarmSoundStream.MEDIA -> stringResource(R.string.settings_stream_media)
-                    }
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { repository.updateAlarms(alarms.copy(soundStream = stream)) },
-                        label = { Text(shortLabel, fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                SettingsActionRow(
+                    title = stringResource(R.string.settings_alarm_stream),
+                    subtitle = stringResource(R.string.settings_alarm_active_channel, currentStreamLabel),
+                    icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    modifier = Modifier.padding(0.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 52.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AlarmSoundStream.entries.forEach { stream ->
+                        val isSelected = stream == alarms.soundStream
+                        val shortLabel = when (stream) {
+                            AlarmSoundStream.ALARM -> stringResource(R.string.settings_stream_alarm)
+                            AlarmSoundStream.NOTIFICATION -> stringResource(R.string.settings_stream_notification)
+                            AlarmSoundStream.MEDIA -> stringResource(R.string.settings_stream_media)
+                        }
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { repository.updateAlarms(alarms.copy(soundStream = stream)) },
+                            label = { Text(shortLabel, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         )
-                    )
+                    }
                 }
             }
         }

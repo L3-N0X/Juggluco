@@ -1,39 +1,16 @@
 package tk.glucodata.ui.screens.settings
 
 import android.app.Activity
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 
@@ -49,156 +26,70 @@ fun BroadcastsSettingsScreen(
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_group_broadcasts_title),
-        subtitle = stringResource(R.string.settings_cat_integrations),
         onNavigateBack = onNavigateBack
     ) {
         // LOCAL INTER-APP BROADCASTS
-        SettingsCard(
-            title = "Local App Broadcasts",
-            icon = Icons.Default.CloudSync,
-            categorySubtitle = "INTER-APP INTENTS"
-        ) {
-            SettingsToggleRow(
+        SettingsSection(title = "Local app broadcasts") {
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_glucodata_broadcast),
                 subtitle = stringResource(R.string.settings_glucodata_broadcast_desc),
+                icon = Icons.Default.CloudSync,
                 checked = exchanges.glucodataBroadcast,
                 onCheckedChange = { repository.setGlucodataBroadcast(it) }
             )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            SettingsDivider()
 
-            SettingsToggleRow(
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_xdrip_broadcast),
                 subtitle = stringResource(R.string.settings_xdrip_broadcast_desc),
+                icon = Icons.Default.CloudSync,
                 checked = exchanges.xdripBroadcast,
                 onCheckedChange = { repository.setXdripBroadcast(it) }
             )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            SettingsDivider()
 
-            SettingsToggleRow(
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_librelink_broadcast),
                 subtitle = stringResource(R.string.settings_librelink_broadcast_desc),
+                icon = Icons.Default.CloudSync,
                 checked = exchanges.librelinkBroadcast,
                 onCheckedChange = { repository.setLibrelinkBroadcast(it) }
             )
         }
 
-        // HEALTH CLOUD & SERVICES
-        SettingsCard(
-            title = "Cloud & System Health",
-            categorySubtitle = "HEALTH ECOSYSTEM"
-        ) {
-            SettingsToggleRow(
+        // HEALTH CLOUD & LOCAL SERVERS
+        SettingsSection(title = "Cloud & local servers") {
+            SettingsSwitchRow(
                 title = stringResource(R.string.settings_health_connect),
                 subtitle = stringResource(R.string.settings_health_connect_desc),
+                icon = Icons.Default.CloudUpload,
                 checked = exchanges.healthConnect,
                 onCheckedChange = { repository.setHealthConnect(it, context as? Activity) }
             )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            SettingsDivider()
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text(
-                        text = stringResource(R.string.settings_libreview),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_libreview_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(
-                        checked = exchanges.libreViewEnabled,
-                        onCheckedChange = { repository.setLibreViewEnabled(it) }
-                    )
-                    if (exchanges.libreViewEnabled) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        OutlinedButton(onClick = onOpenLibreViewConfig) {
-                            Text(stringResource(R.string.settings_btn_config), fontSize = 11.sp)
-                        }
-                    }
-                }
-            }
-        }
+            SettingsNavRow(
+                title = stringResource(R.string.settings_libreview),
+                subtitle = stringResource(R.string.settings_libreview_desc),
+                icon = Icons.Default.CloudUpload,
+                checked = exchanges.libreViewEnabled,
+                onCheckedChange = { repository.setLibreViewEnabled(it) },
+                onClick = onOpenLibreViewConfig
+            )
 
-        // LOCAL REST WEB SERVER
-        SettingsCard(
-            title = stringResource(R.string.settings_xdrip_server),
-            icon = Icons.Default.Code,
-            categorySubtitle = "EMBEDDED WEB SERVER"
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text(
-                        text = stringResource(R.string.settings_xdrip_server),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_xdrip_server_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(
-                        checked = exchanges.xdripWebServer,
-                        onCheckedChange = { repository.setXdripWebServer(it) }
-                    )
-                    if (exchanges.xdripWebServer) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        OutlinedButton(onClick = onOpenWebServerConfig) {
-                            Icon(imageVector = Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(R.string.settings_btn_config), fontSize = 11.sp)
-                        }
-                    }
-                }
-            }
+            SettingsDivider()
 
-            if (exchanges.xdripWebServer) {
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "URL: http://127.0.0.1:${exchanges.webServerPort}/",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        OutlinedButton(onClick = onOpenWebServerConfig) {
-                            Text("Endpoints", fontSize = 11.sp)
-                        }
-                    }
-                }
-            }
+            SettingsNavRow(
+                title = stringResource(R.string.settings_xdrip_server),
+                subtitle = "Local REST API on port ${exchanges.webServerPort}",
+                icon = Icons.Default.Code,
+                checked = exchanges.xdripWebServer,
+                onCheckedChange = { repository.setXdripWebServer(it) },
+                onClick = onOpenWebServerConfig
+            )
         }
 
         // INFO

@@ -43,8 +43,10 @@ import tk.glucodata.ui.screens.StatsScreen
 import tk.glucodata.ui.screens.settings.AboutSettingsScreen
 import tk.glucodata.ui.screens.settings.AlarmsSettingsScreen
 import tk.glucodata.ui.screens.settings.BroadcastsSettingsScreen
+import tk.glucodata.ui.screens.settings.CalibrationSettingsScreen
 import tk.glucodata.ui.screens.settings.DataSettingsScreen
 import tk.glucodata.ui.screens.settings.DisplaySettingsScreen
+import tk.glucodata.ui.screens.settings.FloatingWidgetSettingsScreen
 import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
@@ -109,7 +111,17 @@ fun JugglucoApp(
                         isDarkThemeOverride = it
                         repository.setInvertColors(it ?: systemDark)
                     },
+                    onOpenFloatingWidgetConfig = { activeSettingsDestination = SettingsDestination.FLOATING_WIDGET },
+                    onOpenCalibrationConfig = { activeSettingsDestination = SettingsDestination.CALIBRATION },
                     onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.FLOATING_WIDGET -> FloatingWidgetSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.DISPLAY }
+                )
+                SettingsDestination.CALIBRATION -> CalibrationSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.DISPLAY }
                 )
                 SettingsDestination.VOICE -> VoiceSettingsScreen(
                     repository = repository,

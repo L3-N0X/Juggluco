@@ -1,36 +1,39 @@
 package tk.glucodata.ui.screens.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,8 +41,8 @@ import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
-import tk.glucodata.ui.theme.LocalClinicalColors
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlucoseTargetsSettingsScreen(
     repository: GlucoseRepository,
@@ -54,147 +57,158 @@ fun GlucoseTargetsSettingsScreen(
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_card_target_range),
-        subtitle = stringResource(R.string.settings_cat_glucose),
         onNavigateBack = onNavigateBack
     ) {
-        // UNIT SELECTION CARD
-        SettingsCard(
-            title = stringResource(R.string.settings_unit_label),
-            icon = Icons.Default.Straighten,
-            categorySubtitle = stringResource(R.string.settings_cat_glucose)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        // UNIT SELECTION
+        SettingsSection(title = "Unit") {
+            var expanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = it }
             ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text(
-                        text = if (unit == GlucoseUnit.MG_DL) stringResource(R.string.mgdL) else stringResource(R.string.mmolL),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = if (unit == GlucoseUnit.MG_DL) stringResource(R.string.settings_unit_mgdl_desc) else stringResource(R.string.settings_unit_mmoll_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = unit.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (unit == GlucoseUnit.MG_DL) "e.g. 100" else "e.g. 5.5",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(R.string.mgdL),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (unit == GlucoseUnit.MG_DL) FontWeight.Bold else FontWeight.Normal,
-                        color = if (unit == GlucoseUnit.MG_DL) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Switch(
-                        checked = unit == GlucoseUnit.MMOL_L,
-                        onCheckedChange = { isMmol ->
-                            repository.setUnit(if (isMmol) GlucoseUnit.MMOL_L else GlucoseUnit.MG_DL)
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(
+                                    text = "mg/dL",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "e.g. 100",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        },
+                        trailingIcon = if (unit == GlucoseUnit.MG_DL) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else null,
+                        onClick = {
+                            repository.setUnit(GlucoseUnit.MG_DL)
+                            expanded = false
                         }
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = stringResource(R.string.mmolL),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (unit == GlucoseUnit.MMOL_L) FontWeight.Bold else FontWeight.Normal,
-                        color = if (unit == GlucoseUnit.MMOL_L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(
+                                    text = "mmol/L",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "e.g. 5.5",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        },
+                        trailingIcon = if (unit == GlucoseUnit.MMOL_L) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else null,
+                        onClick = {
+                            repository.setUnit(GlucoseUnit.MMOL_L)
+                            expanded = false
+                        }
                     )
                 }
             }
         }
 
-        // TARGET THRESHOLDS CARD
-        SettingsCard(
-            title = stringResource(R.string.settings_card_target_range),
-            categorySubtitle = "BOUNDARIES"
-        ) {
-            // Visual range bar preview
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                Text(
-                    text = "Range Preview: ${unit.format(currentLowSlider)} - ${unit.format(currentHighSlider)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                val clinicalColors = LocalClinicalColors.current
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(14.dp)
-                        .clip(RoundedCornerShape(7.dp))
-                ) {
-                    // Low / Hypo zone
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(clinicalColors.low)
-                    )
-                    // Target / In-range zone
-                    Box(
-                        modifier = Modifier
-                            .weight(2.5f)
-                            .background(clinicalColors.inRange)
-                    )
-                    // High / Hyper zone
-                    Box(
-                        modifier = Modifier
-                            .weight(1.5f)
-                            .background(clinicalColors.high)
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Low (< ${unit.format(currentLowSlider)})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                    Text("In Target Range", style = MaterialTheme.typography.labelSmall, color = clinicalColors.inRange, fontWeight = FontWeight.Bold)
-                    Text("High (> ${unit.format(currentHighSlider)})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
+        // TARGET THRESHOLDS
+        SettingsSection(title = "Target range") {
             // Target Low Slider
-            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.settings_target_low),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Standard guideline: 70 mg/dL (3.9 mmol/L)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+                Column {
                     Text(
-                        text = unit.format(currentLowSlider),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        text = "Low target",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Default: ${unit.format(70f)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Slider(
                     value = currentLowSlider,
                     onValueChange = { currentLowSlider = it },
                     onValueChangeFinished = { repository.setTargetRange(currentLowSlider, currentHighSlider) },
-                    valueRange = 55f..100f
+                    valueRange = 55f..100f,
+                    modifier = Modifier.fillMaxWidth(),
+                    thumb = {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            shadowElevation = 2.dp
+                        ) {
+                            Text(
+                                text = unit.format(currentLowSlider),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                 )
-                // Quick presets for low
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Quick presets
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -214,48 +228,67 @@ fun GlucoseTargetsSettingsScreen(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            )
 
             // Target High Slider
-            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.settings_target_high),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Standard guideline: 180 mg/dL (10.0 mmol/L)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+                Column {
                     Text(
-                        text = unit.format(currentHighSlider),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        text = "High target",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Default: ${unit.format(180f)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Slider(
                     value = currentHighSlider,
                     onValueChange = { currentHighSlider = it },
                     onValueChangeFinished = { repository.setTargetRange(currentLowSlider, currentHighSlider) },
-                    valueRange = 140f..250f
+                    valueRange = 140f..250f,
+                    modifier = Modifier.fillMaxWidth(),
+                    thumb = {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            shadowElevation = 2.dp
+                        ) {
+                            Text(
+                                text = unit.format(currentHighSlider),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                 )
-                // Quick presets for high
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Quick presets (without 140)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    listOf(140f, 160f, 180f, 200f, 220f).forEach { preset ->
+                    listOf(160f, 180f, 200f, 220f).forEach { preset ->
                         FilterChip(
                             selected = kotlin.math.abs(currentHighSlider - preset) < 0.5f,
                             onClick = {
@@ -269,9 +302,9 @@ fun GlucoseTargetsSettingsScreen(
             }
         }
 
-        // CLINICAL GUIDANCE CARD
+        // CLINICAL GUIDANCE
         SettingsInfoCard(
-            text = "Target range thresholds determine the Time in Range (TIR) percentages displayed on the Stats and Glucose graphs. The International Consensus on Time in Range recommends a target range of 70–180 mg/dL (3.9–10.0 mmol/L) with a goal of >70% time in range for most individuals.",
+            text = "Consensus target range is ${unit.format(70f)}–${unit.format(180f)} ${unit.label} with a goal of >70% time in range.",
             icon = Icons.Default.Info
         )
     }

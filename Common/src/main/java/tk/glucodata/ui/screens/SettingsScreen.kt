@@ -1,7 +1,6 @@
 package tk.glucodata.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,15 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,14 +41,19 @@ import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.screens.settings.AboutSettingsScreen
 import tk.glucodata.ui.screens.settings.AlarmsSettingsScreen
 import tk.glucodata.ui.screens.settings.BroadcastsSettingsScreen
+import tk.glucodata.ui.screens.settings.CalibrationSettingsScreen
 import tk.glucodata.ui.screens.settings.DataSettingsScreen
 import tk.glucodata.ui.screens.settings.DisplaySettingsScreen
+import tk.glucodata.ui.screens.settings.FloatingWidgetSettingsScreen
 import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
 import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
 import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
 import tk.glucodata.ui.screens.settings.SettingsDestination
+import tk.glucodata.ui.screens.settings.SettingsDivider
+import tk.glucodata.ui.screens.settings.SettingsNavRow
+import tk.glucodata.ui.screens.settings.SettingsSection
 import tk.glucodata.ui.screens.settings.TurnServerSettingsScreen
 import tk.glucodata.ui.screens.settings.VoiceSettingsScreen
 import tk.glucodata.ui.screens.settings.WebServerSettingsScreen
@@ -111,7 +110,17 @@ fun SettingsScreen(
                 repository = repository,
                 darkThemeOverride = darkThemeOverride,
                 onDarkThemeChanged = onDarkThemeChanged,
+                onOpenFloatingWidgetConfig = { handleNavigate(SettingsDestination.FLOATING_WIDGET) },
+                onOpenCalibrationConfig = { handleNavigate(SettingsDestination.CALIBRATION) },
                 onNavigateBack = { handleNavigate(null) }
+            )
+            SettingsDestination.FLOATING_WIDGET -> FloatingWidgetSettingsScreen(
+                repository = repository,
+                onNavigateBack = { handleNavigate(SettingsDestination.DISPLAY) }
+            )
+            SettingsDestination.CALIBRATION -> CalibrationSettingsScreen(
+                repository = repository,
+                onNavigateBack = { handleNavigate(SettingsDestination.DISPLAY) }
             )
             SettingsDestination.VOICE -> VoiceSettingsScreen(
                 repository = repository,
@@ -171,7 +180,6 @@ fun SettingsScreen(
     val targetLow by repository.targetLow.collectAsState()
     val targetHigh by repository.targetHigh.collectAsState()
     val alarms by repository.alarms.collectAsState()
-    val displayConfig by repository.displayConfig.collectAsState()
     val mirrorConnections by repository.mirrorConnections.collectAsState()
 
     val isReceiverActive = mirrorConnections.any { it.isReceiver }
@@ -181,27 +189,20 @@ fun SettingsScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .padding(bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Page subtitle (page title is already shown in the top app bar)
-        Text(
-            text = stringResource(R.string.settings_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
         // Quick Status Summary Bar
         Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -210,7 +211,7 @@ fun SettingsScreen(
                     Text(
                         text = "Unit",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = unit.label,
@@ -225,7 +226,7 @@ fun SettingsScreen(
                     Text(
                         text = "Target Range",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "${unit.format(targetLow)} - ${unit.format(targetHigh)}",
@@ -240,7 +241,7 @@ fun SettingsScreen(
                     Text(
                         text = "Alarms",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = if (alarms.lowAlarmEnabled || alarms.highAlarmEnabled) "Active" else "Off",
@@ -255,7 +256,7 @@ fun SettingsScreen(
                     Text(
                         text = "Role",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = when {
@@ -271,150 +272,78 @@ fun SettingsScreen(
             }
         }
 
-        // Group 1: Glucose Targets & Units
-        SettingsGroupNavButton(
-            title = stringResource(R.string.settings_group_glucose_title),
-            subtitle = stringResource(R.string.settings_group_glucose_desc),
-            icon = SettingsDestination.GLUCOSE_TARGETS.icon,
-            onClick = { handleNavigate(SettingsDestination.GLUCOSE_TARGETS) }
-        )
+        // Section: Glucose & alerts
+        SettingsSection(title = "Glucose & alerts") {
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_glucose_title),
+                subtitle = stringResource(R.string.settings_group_glucose_desc),
+                icon = SettingsDestination.GLUCOSE_TARGETS.icon,
+                onClick = { handleNavigate(SettingsDestination.GLUCOSE_TARGETS) }
+            )
+            SettingsDivider()
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_alarms_title),
+                subtitle = stringResource(R.string.settings_group_alarms_desc),
+                icon = SettingsDestination.ALARMS.icon,
+                onClick = { handleNavigate(SettingsDestination.ALARMS) }
+            )
+        }
 
-        // Group 2: Alarms & Audio
-        SettingsGroupNavButton(
-            title = stringResource(R.string.settings_group_alarms_title),
-            subtitle = stringResource(R.string.settings_group_alarms_desc),
-            icon = SettingsDestination.ALARMS.icon,
-            onClick = { handleNavigate(SettingsDestination.ALARMS) }
-        )
+        // Section: Display & speech
+        SettingsSection(title = "Display & speech") {
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_display_title),
+                subtitle = stringResource(R.string.settings_group_display_desc),
+                icon = SettingsDestination.DISPLAY.icon,
+                onClick = { handleNavigate(SettingsDestination.DISPLAY) }
+            )
+            SettingsDivider()
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_voice_title),
+                subtitle = stringResource(R.string.settings_group_voice_desc),
+                icon = SettingsDestination.VOICE.icon,
+                onClick = { handleNavigate(SettingsDestination.VOICE) }
+            )
+        }
 
-        // Group 3: Display & Appearance
-        SettingsGroupNavButton(
-            title = stringResource(R.string.settings_group_display_title),
-            subtitle = stringResource(R.string.settings_group_display_desc),
-            icon = SettingsDestination.DISPLAY.icon,
-            onClick = { handleNavigate(SettingsDestination.DISPLAY) }
-        )
+        // Section: Connectivity & sharing
+        SettingsSection(title = "Connectivity & sharing") {
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_broadcasts_title),
+                subtitle = stringResource(R.string.settings_group_broadcasts_desc),
+                icon = SettingsDestination.BROADCASTS.icon,
+                onClick = { handleNavigate(SettingsDestination.BROADCASTS) }
+            )
+            SettingsDivider()
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_mirror_title),
+                subtitle = stringResource(R.string.settings_group_mirror_desc),
+                icon = SettingsDestination.MIRROR.icon,
+                onClick = { handleNavigate(SettingsDestination.MIRROR) }
+            )
+            SettingsDivider()
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_hardware_title),
+                subtitle = stringResource(R.string.settings_group_hardware_desc),
+                icon = SettingsDestination.HARDWARE.icon,
+                onClick = { handleNavigate(SettingsDestination.HARDWARE) }
+            )
+        }
 
-        // Group 4: Voice & Speech
-        SettingsGroupNavButton(
-            title = stringResource(R.string.settings_group_voice_title),
-            subtitle = stringResource(R.string.settings_group_voice_desc),
-            icon = SettingsDestination.VOICE.icon,
-            onClick = { handleNavigate(SettingsDestination.VOICE) }
-        )
-
-        // Group 5: Broadcasts & Integrations
-        SettingsGroupNavButton(
-            title = stringResource(R.string.settings_group_broadcasts_title),
-            subtitle = stringResource(R.string.settings_group_broadcasts_desc),
-            icon = SettingsDestination.BROADCASTS.icon,
-            onClick = { handleNavigate(SettingsDestination.BROADCASTS) }
-        )
-
-        // Group 6: Mirror & Network Sharing
-        SettingsGroupNavButton(
-            title = stringResource(R.string.settings_group_mirror_title),
-            subtitle = stringResource(R.string.settings_group_mirror_desc),
-            icon = SettingsDestination.MIRROR.icon,
-            onClick = { handleNavigate(SettingsDestination.MIRROR) }
-        )
-
-        // Group 7: NFC & Hardware
-        SettingsGroupNavButton(
-            title = stringResource(R.string.settings_group_hardware_title),
-            subtitle = stringResource(R.string.settings_group_hardware_desc),
-            icon = SettingsDestination.HARDWARE.icon,
-            onClick = { handleNavigate(SettingsDestination.HARDWARE) }
-        )
-
-        // Group 8: Data Management
-        SettingsGroupNavButton(
-            title = stringResource(R.string.settings_group_data_title),
-            subtitle = stringResource(R.string.settings_group_data_desc),
-            icon = SettingsDestination.DATA.icon,
-            onClick = { handleNavigate(SettingsDestination.DATA) }
-        )
-
-        // Group 9: About Juggluco
-        SettingsGroupNavButton(
-            title = stringResource(R.string.settings_group_about_title),
-            subtitle = stringResource(R.string.settings_group_about_desc),
-            icon = SettingsDestination.ABOUT.icon,
-            onClick = { handleNavigate(SettingsDestination.ABOUT) }
-        )
-    }
-}
-
-@Composable
-private fun SettingsGroupNavButton(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Icon in colored circle container
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 16.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-                modifier = Modifier.size(20.dp)
+        // Section: System & data
+        SettingsSection(title = "System & data") {
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_data_title),
+                subtitle = stringResource(R.string.settings_group_data_desc),
+                icon = SettingsDestination.DATA.icon,
+                onClick = { handleNavigate(SettingsDestination.DATA) }
+            )
+            SettingsDivider()
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_about_title),
+                subtitle = stringResource(R.string.settings_group_about_desc),
+                icon = SettingsDestination.ABOUT.icon,
+                onClick = { handleNavigate(SettingsDestination.ABOUT) }
             )
         }
     }

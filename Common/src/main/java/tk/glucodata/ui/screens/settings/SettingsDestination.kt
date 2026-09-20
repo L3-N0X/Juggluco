@@ -5,12 +5,14 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.ui.graphics.vector.ImageVector
 import tk.glucodata.R
 
@@ -97,5 +99,17 @@ enum class SettingsDestination(
         descRes = R.string.settings_desc_turn_server,
         categoryRes = R.string.settings_cat_dev_testing,
         icon = Icons.Default.Sync
+    ),
+    FLOATING_WIDGET(
+        titleRes = R.string.settings_floating_widget,
+        descRes = R.string.settings_floating_widget_desc,
+        categoryRes = R.string.settings_cat_display,
+        icon = Icons.Default.Layers
+    ),
+    CALIBRATION(
+        titleRes = R.string.calibration_title,
+        descRes = R.string.calibration_enable_desc,
+        categoryRes = R.string.settings_calibration_section,
+        icon = Icons.Default.Tune
     )
 }
