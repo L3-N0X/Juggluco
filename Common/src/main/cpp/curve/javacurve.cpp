@@ -971,7 +971,10 @@ extern "C" JNIEXPORT void JNICALL fromjava(endstats) (JNIEnv *env, jclass clazz)
 #include "net/watchserver/Getopts.hpp"
 extern int getminutes(time_t tim);
 extern "C" JNIEXPORT jlong JNICALL fromjava(percentileEndtime) (JNIEnv *env, jclass clazz,jint days) {
- const uint32_t  endtime=appcurve.starttime+appcurve.duration;
+ uint32_t endtime=appcurve.starttime+appcurve.duration;
+ if(endtime < 1577829600u) {
+     endtime = time(nullptr);
+ }
  const uint32_t startday=endtime-getminutes(endtime)*60;
  const uint32_t endday=startday+daysecs-1;
  Getopts opts;
@@ -988,7 +991,13 @@ extern "C" JNIEXPORT void  JNICALL   fromjava(setInvertColors)(JNIEnv *env, jcla
 #if defined(JUGGLUCO_APP)&&!defined(WEAROS)
 extern bool  exportdata(uint32_t starttime, uint32_t duration,int type,int fd,float days) ;
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(exportdata)(JNIEnv *env, jclass cl,jint type,jint fd,jfloat days) {
- return  exportdata(appcurve.starttime, appcurve.duration,type,fd,days);
+ uint32_t starttime = appcurve.starttime;
+ uint32_t duration = appcurve.duration;
+ if (starttime + duration < 1577829600u) {
+     duration = 18000;
+     starttime = time(nullptr) - duration;
+ }
+ return exportdata(starttime, duration,type,fd,days);
  }
 #endif
 

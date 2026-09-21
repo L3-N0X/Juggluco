@@ -284,7 +284,7 @@ static void watchserverloop(int *sockptr,bool secure)  {
       const namehost name(addrptr);
       const char * namestr=name;
 const bool localhostonly=!settings->data()->remotelyxdripserver&&!secure;
-      if(localhostonly&&strcmp(namestr,"::ffff:127.0.0.1")&&strcmp(namestr,"127.0.0.1") )  {
+      if(localhostonly&&strcmp(namestr,"::ffff:127.0.0.1")&&strcmp(namestr,"127.0.0.1")&&strcmp(namestr,"::1") )  {
          struct sockaddr_in6 own_addr;
          bool sameaddress(const  struct sockaddr *addr, const struct sockaddr_in6  *known);
          bool getownip(struct sockaddr_in6 *outip);
@@ -1824,8 +1824,8 @@ Getopts::Getopts(const char *posptr,int size,int defaultduration): unit(settings
       }
    if(duration<=0)
       duration=defaultduration;
-   if (!end) {
-      if(start) {
+   if (!end || end < 1577829600u) {
+      if(start && start >= 1577829600u) {
          end=start+ duration;
          return;
          }
@@ -1834,8 +1834,8 @@ Getopts::Getopts(const char *posptr,int size,int defaultduration): unit(settings
             }
       }
 
-   if (!start)  {
-      start = end -duration; 
+   if (!start || start < 1577829600u)  {
+      start = (end > (uint32_t)duration) ? (end - duration) : 0; 
       }
    };
 
@@ -2060,16 +2060,35 @@ static bool givereport(Getopts &opts,std::string_view hostname,uint16_t langin,b
         }
 
     uint32_t endtime=opts.end-1; //otherwise the whole end day is shown when a startday is specified
+    if(endtime<1577829600u) {
+        endtime = time(nullptr) - 1;
+        }
     const bool darkmode=opts.darkmode;
     const int days=opts.days();
-    if(endtime<1577829600u) {
-        return false;
+    bool history=opts.historymode||opts.calibratedhistorymode;
+    uint32_t firsttime=history?sensors->firsthistorytime():sensors->firstpolltime();
+    if(history && !firsttime) {
+        uint32_t pollfirst = sensors->firstpolltime();
+        if(pollfirst) {
+            history = false;
+            opts.historymode = false;
+            opts.calibratedhistorymode = false;
+            opts.streammode = true;
+            firsttime = pollfirst;
         }
-    const bool history=opts.historymode||opts.calibratedhistorymode;
-   const uint32_t firsttime=history?sensors->firsthistorytime():sensors->firstpolltime();
-   if(endtime<firsttime)
+    } else if(!history && !firsttime) {
+        uint32_t histfirst = sensors->firsthistorytime();
+        if(histfirst) {
+            history = true;
+            opts.streammode = false;
+            opts.calibratedmode = false;
+            opts.historymode = true;
+            firsttime = histfirst;
+        }
+    }
+    if(firsttime && endtime<firsttime)
            return false;
-    if(opts.start<firsttime) { 
+    if(firsttime && opts.start<firsttime) { 
         endtime=firsttime+days*24*60*60;
         }
     LOGGER("mkreport(endtime=%u,days=%d,darkmode=%d,hostname=%s,secure=%d,origin=%d,..)\n",endtime,days,darkmode,hostname.data(),secure,origin.data());

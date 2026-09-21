@@ -56,7 +56,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,10 +101,42 @@ fun StatsScreen(
     val targetLow by repository.targetLow.collectAsState()
     val targetHigh by repository.targetHigh.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var showWebServerActivationDialog by remember { mutableStateOf(false) }
     var infoDialogTitle by remember { mutableStateOf<String?>(null) }
     var infoDialogText by remember { mutableStateOf<String?>(null) }
+
+    fun openWebReport() {
+        try {
+            if (Applic.Nativesloaded) {
+                try {
+                    Natives.analysedays(selectedPeriod.days, useHistory)
+                } catch (_: Throwable) {}
+            }
+            var endtime = try {
+                Natives.percentileEndtime(selectedPeriod.days)
+            } catch (_: Throwable) { 0L }
+            if (endtime < 1577829600L) {
+                endtime = System.currentTimeMillis() / 1000L
+            }
+            val key = try { Natives.getApiSecret() ?: "" } catch (_: Throwable) { "" }
+            val addkey = if (key.isNotEmpty()) "$key/" else ""
+            val effectiveHistory = if (Applic.Nativesloaded) {
+                try { Natives.getAnalysehistory() } catch (_: Throwable) { useHistory }
+            } else useHistory
+            val type = (if (Natives.getDoCalibrate()) (if (Natives.getCalibratePast()) "&pastvalues" else "") + "&calibrated" else "&") + if (effectiveHistory) "history" else "stream"
+            val rawPort = try { Natives.gethttpport() } catch (_: Throwable) { 17580 }
+            val port = if (rawPort > 0) rawPort else 17580
+            val url = "http://127.0.0.1:$port/$addkey" + "x/report?amounts&days=${selectedPeriod.days}&endtime=$endtime$type&hl=${Applic.curlang}"
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Throwable) {
+            Toast.makeText(context, "Report error: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     ScreenContent(modifier = modifier) {
         var showCustomPeriodDialog by remember { mutableStateOf(false) }
@@ -309,20 +346,6 @@ fun StatsScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            fun openWebReport() {
-                try {
-                    val endtime = Natives.percentileEndtime(selectedPeriod.days)
-                    val key = Natives.getApiSecret() ?: ""
-                    val addkey = if (key.isNotEmpty()) "$key/" else ""
-                    val type = (if (Natives.getDoCalibrate()) (if (Natives.getCalibratePast()) "&pastvalues" else "") + "&calibrated" else "&") + if (useHistory) "history" else "stream"
-                    val url = "http://127.0.0.1:${Natives.gethttpport()}/$addkey" + "x/report?amounts&days=${selectedPeriod.days}&endtime=$endtime$type&hl=${Applic.curlang}"
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    context.startActivity(intent)
-                } catch (e: Throwable) {
-                    Toast.makeText(context, "Report error: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -371,20 +394,6 @@ fun StatsScreen(
     }
 
     if (showWebServerActivationDialog) {
-        fun launchReportAfterServerEnable() {
-            try {
-                val endtime = Natives.percentileEndtime(selectedPeriod.days)
-                val key = Natives.getApiSecret() ?: ""
-                val addkey = if (key.isNotEmpty()) "$key/" else ""
-                val type = (if (Natives.getDoCalibrate()) (if (Natives.getCalibratePast()) "&pastvalues" else "") + "&calibrated" else "&") + if (useHistory) "history" else "stream"
-                val url = "http://127.0.0.1:${Natives.gethttpport()}/$addkey" + "x/report?amounts&days=${selectedPeriod.days}&endtime=$endtime$type&hl=${Applic.curlang}"
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                context.startActivity(intent)
-            } catch (e: Throwable) {
-                Toast.makeText(context, "Report error: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-
         AlertDialog(
             onDismissRequest = { showWebServerActivationDialog = false },
             icon = {
@@ -416,7 +425,22 @@ fun StatsScreen(
                         try {
                             Natives.setusexdripwebserver(true)
                         } catch (_: Throwable) {}
-                        launchReportAfterServerEnable()
+                        scope.launch {
+                            val rawPort = try { Natives.gethttpport() } catch (_: Throwable) { 17580 }
+                            val port = if (rawPort > 0) rawPort else 17580
+                            withContext(Dispatchers.IO) {
+                                var ready = false
+                                val start = System.currentTimeMillis()
+                                while (!ready && System.currentTimeMillis() - start < 2500) {
+                                    try {
+                                        java.net.Socket("127.0.0.1", port).use { ready = true }
+                                    } catch (_: Throwable) {
+                                        delay(100)
+                                    }
+                                }
+                            }
+                            openWebReport()
+                        }
                     }
                 ) {
                     Text(stringResource(R.string.web_report_activate_and_open))
