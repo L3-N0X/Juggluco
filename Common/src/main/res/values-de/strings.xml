@@ -573,6 +573,10 @@
     <string name="delta">Delta</string>
 
     <string name="help_and_explanations">Hilfe &amp; Klinische Erklärungen</string>
+    <string name="help_avg_title">Durchschnittsglukose</string>
+    <string name="help_avg_desc" formatted="false">Durchschnittlicher Glukosewert im ausgewählten Zeitraum. Der klinische Konsens empfiehlt einen Durchschnittswert von &lt; 154 mg/dl (8,5 mmol/l), was etwa einem geschätzten HbA1c von &lt; 7,0% entspricht.</string>
+    <string name="help_active_title">Aktive CGM-Zeit</string>
+    <string name="help_active_desc" formatted="false">Prozentsatz der Zeit, in der Sensordaten aktiv erfasst wurden. Der internationale Konsens fordert eine Tragezeit von mindestens 70% über 14 Tage für ein statistisch zuverlässiges und klinisch valides Ambulantes Glukoseprofil.</string>
     <string name="help_tir_title">Zeit im Zielbereich (TIR)</string>
     <string name="help_tir_desc" formatted="false">Der Prozentsatz der Zeit, in der Ihr Glukosewert im Zielbereich liegt (70–180 mg/dl bzw. 3,9–10,0 mmol/l). Klinische Leitlinien empfehlen &gt; 70% im Zielbereich, &lt; 4% zu niedrig und &lt; 1% sehr niedrig.</string>
     <string name="help_gmi_title">Glukose-Management-Indikator (GMI)</string>
@@ -663,6 +667,17 @@
     <string name="stat_max">Max</string>
     <string name="tir_guidelines">Internationale Konsensrichtlinien</string>
     <string name="tir_no_readings">Keine Messwerte für diesen Zeitraum verfügbar</string>
+    <string name="tir_range_greater_than">&gt; %s</string>
+    <string name="tir_range_between">%1$s – %2$s</string>
+    <string name="tir_range_less_than">&lt; %s</string>
+    <string name="tir_range_with_target">%1$s, Ziel: %2$s</string>
+    <string name="tir_duration_format">%1$d Std. %2$d Min.</string>
+    <string name="tir_percent">%d%%</string>
+    <string name="tir_target_very_high">&lt; 5%</string>
+    <string name="tir_target_high">&lt; 25%</string>
+    <string name="tir_target_in_range">&gt; 70%</string>
+    <string name="tir_target_low">&lt; 4%</string>
+    <string name="tir_target_very_low">&lt; 1%</string>
     <string name="agp_card_title">Ambulantes Glukoseprofil (AGP)</string>
     <string name="agp_card_subtitle">24-Stunden-Zusammensetzung über %s</string>
     <string name="reports_export_title">Berichte &amp; Export</string>

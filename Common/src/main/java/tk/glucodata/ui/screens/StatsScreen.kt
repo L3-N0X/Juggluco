@@ -71,7 +71,9 @@ import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HourlyPercentiles
 import tk.glucodata.ui.model.StatsPeriod
+import tk.glucodata.ui.theme.DarkClinicalColors
 import tk.glucodata.ui.theme.LocalClinicalColors
+import kotlin.math.roundToInt
 
 @Composable
 fun StatsScreen(
@@ -250,15 +252,17 @@ fun StatsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                val agpTitle = stringResource(R.string.help_agp_title)
+                val agpDesc = stringResource(R.string.help_agp_desc)
                 IconButton(
                     onClick = {
-                        infoDialogTitle = "Ambulatory Glucose Profile (AGP)"
-                        infoDialogText = "AGP collapses multiple days of continuous glucose data into a single 24-hour composite day. The dark blue median curve represents your typical trend, the 25–75% interquartile band shows frequent fluctuations, and the 10–90% band captures outer glycemic excursions."
+                        infoDialogTitle = agpTitle
+                        infoDialogText = agpDesc
                     }
                 ) {
                     Icon(
                         imageVector = Icons.Default.QueryStats,
-                        contentDescription = "AGP Info",
+                        contentDescription = agpTitle,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
@@ -468,6 +472,10 @@ private fun ClinicalKpiCards(
     val gmiDesc = stringResource(R.string.help_gmi_desc)
     val cvTitle = stringResource(R.string.help_cv_title)
     val cvDesc = stringResource(R.string.help_cv_desc)
+    val avgTitle = stringResource(R.string.help_avg_title)
+    val avgDesc = stringResource(R.string.help_avg_desc)
+    val activeTitle = stringResource(R.string.help_active_title)
+    val activeDesc = stringResource(R.string.help_active_desc)
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(
@@ -479,12 +487,7 @@ private fun ClinicalKpiCards(
                 value = if (hasData) unit.format(stats.averageMgDl) else "—",
                 subtitle = stringResource(R.string.target_average_sub, unit.format(154f)),
                 valueColor = avgColor,
-                onClick = {
-                    onShowInfo(
-                        "Average Glucose",
-                        "Average glucose over the selected period. Clinical consensus targets an average of < 154 mg/dL (8.5 mmol/L), which corresponds roughly to an estimated HbA1c of < 7.0%."
-                    )
-                },
+                onClick = { onShowInfo(avgTitle, avgDesc) },
                 modifier = Modifier.weight(1f)
             )
             KpiCard(
@@ -513,12 +516,7 @@ private fun ClinicalKpiCards(
                 value = if (hasData) "${String.format(java.util.Locale.US, "%.1f", stats.activeTimePercent)}%" else "—",
                 subtitle = stringResource(R.string.target_active_sub),
                 valueColor = activeColor,
-                onClick = {
-                    onShowInfo(
-                        "Active CGM Time",
-                        "Percentage of time sensor data was actively recorded. International consensus requires at least 70% wear time over 14 days for a statistically robust and clinically valid Ambulatory Glucose Profile."
-                    )
-                },
+                onClick = { onShowInfo(activeTitle, activeDesc) },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -597,7 +595,7 @@ private fun TimeInRangeBreakdownCard(
             IconButton(onClick = { onShowInfo(tirTitle, tirDesc) }) {
                 Icon(
                     imageVector = Icons.Default.Info,
-                    contentDescription = "TIR Info",
+                    contentDescription = tirTitle,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -652,44 +650,39 @@ private fun TimeInRangeBreakdownCard(
             // 5 Clinical Ranges Breakdown Rows
             TirRow(
                 label = stringResource(R.string.status_very_high),
-                rangeDesc = "> ${unit.format(250f)}",
+                rangeDesc = stringResource(R.string.tir_range_greater_than, unit.format(250f)),
                 percent = stats.timeVeryHighPercent,
-                target = "< 5%",
-                color = clinicalColors.veryHigh,
-                isTargetMet = stats.timeVeryHighPercent < 5
+                target = stringResource(R.string.tir_target_very_high),
+                color = clinicalColors.veryHigh
             )
             TirRow(
                 label = stringResource(R.string.status_high),
-                rangeDesc = "${unit.format(targetHigh + 1f)} – ${unit.format(250f)}",
+                rangeDesc = stringResource(R.string.tir_range_between, unit.format(targetHigh + 1f), unit.format(250f)),
                 percent = stats.timeAbovePercent,
-                target = "< 25%",
-                color = clinicalColors.high,
-                isTargetMet = stats.timeAbovePercent < 25
+                target = stringResource(R.string.tir_target_high),
+                color = clinicalColors.high
             )
             TirRow(
                 label = stringResource(R.string.status_in_range),
-                rangeDesc = "${unit.format(targetLow)} – ${unit.format(targetHigh)}",
+                rangeDesc = stringResource(R.string.tir_range_between, unit.format(targetLow), unit.format(targetHigh)),
                 percent = stats.timeInRangePercent,
-                target = "> 70%",
+                target = stringResource(R.string.tir_target_in_range),
                 color = clinicalColors.inRange,
-                isPrimary = true,
-                isTargetMet = stats.timeInRangePercent >= 70
+                isPrimary = true
             )
             TirRow(
                 label = stringResource(R.string.status_low),
-                rangeDesc = "${unit.format(54f)} – ${unit.format(targetLow - 1f)}",
+                rangeDesc = stringResource(R.string.tir_range_between, unit.format(54f), unit.format(targetLow - 1f)),
                 percent = stats.timeBelowPercent,
-                target = "< 4%",
-                color = clinicalColors.low,
-                isTargetMet = stats.timeBelowPercent < 4
+                target = stringResource(R.string.tir_target_low),
+                color = clinicalColors.low
             )
             TirRow(
                 label = stringResource(R.string.status_very_low),
-                rangeDesc = "< ${unit.format(54f)}",
+                rangeDesc = stringResource(R.string.tir_range_less_than, unit.format(54f)),
                 percent = stats.timeVeryLowPercent,
-                target = "< 1%",
-                color = clinicalColors.veryLow,
-                isTargetMet = stats.timeVeryLowPercent < 1
+                target = stringResource(R.string.tir_target_very_low),
+                color = clinicalColors.veryLow
             )
         }
     }
@@ -702,12 +695,11 @@ private fun TirRow(
     percent: Int,
     target: String,
     color: Color,
-    isPrimary: Boolean = false,
-    isTargetMet: Boolean = false
+    isPrimary: Boolean = false
 ) {
-    val hoursPerDay = (percent / 100f) * 24f
-    val hours = hoursPerDay.toInt()
-    val minutes = ((hoursPerDay - hours) * 60).toInt()
+    val totalMinutes = ((percent / 100f) * 24f * 60f).roundToInt()
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
 
     Row(
         modifier = Modifier
@@ -716,7 +708,10 @@ private fun TirRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Box(
                 modifier = Modifier
                     .size(10.dp)
@@ -731,33 +726,24 @@ private fun TirRow(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = rangeDesc,
+                    text = stringResource(R.string.tir_range_with_target, rangeDesc, target),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
             }
         }
 
+        Spacer(modifier = Modifier.width(8.dp))
+
         Column(horizontalAlignment = Alignment.End) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "$percent% (${hours}h ${minutes}m)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isPrimary) color else MaterialTheme.colorScheme.onSurface
-                )
-                if (isTargetMet) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "✓",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = LocalClinicalColors.current.inRange
-                    )
-                }
-            }
             Text(
-                text = "Target: $target",
+                text = stringResource(R.string.tir_percent, percent),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (isPrimary) color else MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(R.string.tir_duration_format, hours, minutes),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -767,13 +753,15 @@ private fun TirRow(
 
 @Composable
 private fun AgpLegend() {
+    val isDark = LocalClinicalColors.current == DarkClinicalColors
+    val outerRangeColor = if (isDark) Color(0xFF2563EB) else Color(0xFF60A5FA)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceAround
     ) {
         LegendItem(color = Color(0xFF1D4ED8), label = stringResource(R.string.agp_median))
         LegendItem(color = Color(0xFF3B82F6), label = stringResource(R.string.agp_iqr))
-        LegendItem(color = Color(0xFF60A5FA), label = stringResource(R.string.agp_outer_range))
+        LegendItem(color = outerRangeColor, label = stringResource(R.string.agp_outer_range))
     }
 }
 

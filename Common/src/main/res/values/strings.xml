@@ -598,6 +598,10 @@
     <string name="delta">Delta</string>
 
     <string name="help_and_explanations">Help &amp; Clinical Explanations</string>
+    <string name="help_avg_title">Average Glucose</string>
+    <string name="help_avg_desc" formatted="false">Average glucose over the selected period. Clinical consensus targets an average of &lt; 154 mg/dL (8.5 mmol/L), which corresponds roughly to an estimated HbA1c of &lt; 7.0%.</string>
+    <string name="help_active_title">Active CGM Time</string>
+    <string name="help_active_desc" formatted="false">Percentage of time sensor data was actively recorded. International consensus requires at least 70% wear time over 14 days for a statistically robust and clinically valid Ambulatory Glucose Profile.</string>
     <string name="help_tir_title">Time in Range (TIR)</string>
     <string name="help_tir_desc" formatted="false">The percentage of time your glucose stays within your target range (70–180 mg/dL or 3.9–10.0 mmol/L). Clinical consensus recommends aiming for &gt; 70% in range, &lt; 4% low, and &lt; 1% very low.</string>
     <string name="help_gmi_title">Glucose Management Indicator (GMI)</string>
@@ -693,6 +697,17 @@
     <string name="stat_max">Max</string>
     <string name="tir_guidelines">International Consensus Guidelines</string>
     <string name="tir_no_readings">No readings available for this period</string>
+    <string name="tir_range_greater_than">&gt; %s</string>
+    <string name="tir_range_between">%1$s – %2$s</string>
+    <string name="tir_range_less_than">&lt; %s</string>
+    <string name="tir_range_with_target">%1$s, Target: %2$s</string>
+    <string name="tir_duration_format">%1$dh %2$dm</string>
+    <string name="tir_percent">%d%%</string>
+    <string name="tir_target_very_high">&lt; 5%</string>
+    <string name="tir_target_high">&lt; 25%</string>
+    <string name="tir_target_in_range">&gt; 70%</string>
+    <string name="tir_target_low">&lt; 4%</string>
+    <string name="tir_target_very_low">&lt; 1%</string>
     <string name="agp_card_title">Ambulatory Glucose Profile (AGP)</string>
     <string name="agp_card_subtitle">24-hour composite curve across %s</string>
     <string name="reports_export_title">Reports &amp; Export</string>

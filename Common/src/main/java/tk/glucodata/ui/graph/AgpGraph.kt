@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,6 +57,7 @@ import tk.glucodata.R
 import tk.glucodata.ui.model.AgpProfile
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HourlyPercentiles
+import tk.glucodata.ui.theme.DarkClinicalColors
 import tk.glucodata.ui.theme.LocalClinicalColors
 
 @Composable
@@ -67,11 +69,20 @@ fun AgpGraph(
     onHourInspected: (HourlyPercentiles?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
     val clinicalColors = LocalClinicalColors.current
+    val isDark = clinicalColors == DarkClinicalColors
     val gridColor = clinicalColors.graphGrid
     val targetShade = clinicalColors.targetRangeShade
     val textSecondary = MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceColor = MaterialTheme.colorScheme.surface
+
+    val outerBandColor = if (isDark) Color(0xFF2563EB).copy(alpha = 0.38f) else Color(0xFF60A5FA).copy(alpha = 0.25f)
+    val innerBandColor = if (isDark) Color(0xFF3B82F6).copy(alpha = 0.25f) else Color(0xFF3B82F6).copy(alpha = 0.40f)
+    val medianColor = Color(0xFF1D4ED8)
+
+    val singleOuterLineColor = if (isDark) Color(0xFF2563EB).copy(alpha = 0.8f) else Color(0xFF60A5FA).copy(alpha = 0.6f)
+    val singleInnerLineColor = if (isDark) Color(0xFF3B82F6).copy(alpha = 0.65f) else Color(0xFF3B82F6).copy(alpha = 0.7f)
 
     var inspectedHour by remember { mutableStateOf<HourlyPercentiles?>(null) }
     var hideJob by remember { mutableStateOf<Job?>(null) }
@@ -88,17 +99,17 @@ fun AgpGraph(
             .fillMaxWidth()
             .height(260.dp)
             .background(surfaceColor, RoundedCornerShape(16.dp))
-            .padding(horizontal = 8.dp, vertical = 8.dp)
+            .padding(vertical = 8.dp)
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(hourlyData) {
+                .pointerInput(hourlyData, density) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         hideJob?.cancel()
-                        val paddingLeft = 20f
-                        val paddingRight = 85f
+                        val paddingLeft = with(density) { 8.dp.toPx() }
+                        val paddingRight = with(density) { 36.dp.toPx() }
                         val chartWidth = size.width - paddingLeft - paddingRight
 
                         fun updateInspection(x: Float) {
@@ -129,10 +140,10 @@ fun AgpGraph(
                     }
                 }
         ) {
-            val paddingLeft = 20f
-            val paddingRight = 85f
-            val paddingTop = 20f
-            val paddingBottom = 40f
+            val paddingLeft = with(density) { 8.dp.toPx() }
+            val paddingRight = with(density) { 36.dp.toPx() }
+            val paddingTop = with(density) { 10.dp.toPx() }
+            val paddingBottom = with(density) { 26.dp.toPx() }
 
             val chartWidth = size.width - paddingLeft - paddingRight
             val chartHeight = size.height - paddingTop - paddingBottom
@@ -181,6 +192,13 @@ fun AgpGraph(
                 textSize = 10.sp.toPx()
                 isAntiAlias = true
             }
+            val yLabelPaint = Paint().apply {
+                color = textSecondary.toArgb()
+                textSize = 10.sp.toPx()
+                textAlign = Paint.Align.RIGHT
+                isAntiAlias = true
+            }
+            val yLabelX = size.width - with(density) { 4.dp.toPx() }
 
             while (yVal <= maxY) {
                 val yPos = valueToY(yVal)
@@ -192,14 +210,15 @@ fun AgpGraph(
                 )
                 drawContext.canvas.nativeCanvas.drawText(
                     unit.format(yVal),
-                    paddingLeft + chartWidth + 10f,
+                    yLabelX,
                     yPos + 4.sp.toPx(),
-                    textPaint
+                    yLabelPaint
                 )
                 yVal += yStep
             }
 
             // 3. X-Axis Time Ticks (every 4 hours)
+            val xLabelY = paddingTop + chartHeight + with(density) { 18.dp.toPx() }
             for (h in 0..24 step 4) {
                 val xPos = hourToX(h.toFloat())
                 drawLine(
@@ -209,10 +228,15 @@ fun AgpGraph(
                     strokeWidth = 1f
                 )
                 val label = String.format(java.util.Locale.US, "%02d:00", if (h == 24) 0 else h)
+                textPaint.textAlign = when (h) {
+                    0 -> Paint.Align.LEFT
+                    24 -> Paint.Align.RIGHT
+                    else -> Paint.Align.CENTER
+                }
                 drawContext.canvas.nativeCanvas.drawText(
                     label,
-                    xPos - 16f,
-                    paddingTop + chartHeight + 20f,
+                    xPos,
+                    xLabelY,
                     textPaint
                 )
             }
@@ -237,6 +261,38 @@ fun AgpGraph(
                     dataSegments.add(currentSegment)
                 }
 
+                // If the last segment ends at hour 23, extend it to hour 24 so the plot reaches the right edge
+                val h0 = hourlyData.firstOrNull { it.hour == 0 && it.hasData }
+                val processedSegments = dataSegments.map { segment ->
+                    if (segment.isNotEmpty() && segment.last().hour == 23) {
+                        val endPoint = if (h0 != null) {
+                            HourlyPercentiles(
+                                hour = 24,
+                                p10 = h0.p10,
+                                p25 = h0.p25,
+                                p50 = h0.p50,
+                                p75 = h0.p75,
+                                p90 = h0.p90,
+                                count = h0.count
+                            )
+                        } else {
+                            val last = segment.last()
+                            HourlyPercentiles(
+                                hour = 24,
+                                p10 = last.p10,
+                                p25 = last.p25,
+                                p50 = last.p50,
+                                p75 = last.p75,
+                                p90 = last.p90,
+                                count = last.count
+                            )
+                        }
+                        segment + endPoint
+                    } else {
+                        segment
+                    }
+                }
+
                 // Highlight no-measurement sequences subtly
                 val noDataPaint = Paint().apply {
                     color = textSecondary.copy(alpha = 0.45f).toArgb()
@@ -247,7 +303,11 @@ fun AgpGraph(
 
                 var gapStart: Int? = null
                 for (h in 0..24) {
-                    val hasDataAtH = if (h < 24) hourlyData.getOrNull(h)?.hasData == true else true
+                    val hasDataAtH = if (h < 24) {
+                        hourlyData.getOrNull(h)?.hasData == true
+                    } else {
+                        hourlyData.getOrNull(23)?.hasData == true
+                    }
                     if (!hasDataAtH) {
                         if (gapStart == null) gapStart = h
                     } else {
@@ -278,15 +338,35 @@ fun AgpGraph(
                         }
                     }
                 }
+                if (gapStart != null) {
+                    val startX = hourToX(gapStart.toFloat())
+                    val endX = hourToX(24f)
+                    val gapWidth = endX - startX
+                    drawRect(
+                        color = Color.Gray.copy(alpha = 0.06f),
+                        topLeft = Offset(startX, paddingTop),
+                        size = Size(gapWidth, chartHeight)
+                    )
+                    if (24 - gapStart >= 3) {
+                        val centerX = (startX + endX) / 2f
+                        val centerY = paddingTop + chartHeight / 2f
+                        drawContext.canvas.nativeCanvas.drawText(
+                            noDataLabel,
+                            centerX,
+                            centerY,
+                            noDataPaint
+                        )
+                    }
+                }
 
                 // Draw percentile bands only for data segments
-                for (segment in dataSegments) {
+                for (segment in processedSegments) {
                     if (segment.size == 1) {
                         val single = segment[0]
                         val sx = hourToX(single.hour + 0.5f)
                         // 10-90 range line
                         drawLine(
-                            color = Color(0xFF60A5FA).copy(alpha = 0.6f),
+                            color = singleOuterLineColor,
                             start = Offset(sx, valueToY(single.p10)),
                             end = Offset(sx, valueToY(single.p90)),
                             strokeWidth = 3f,
@@ -294,7 +374,7 @@ fun AgpGraph(
                         )
                         // 25-75 IQR bar
                         drawLine(
-                            color = Color(0xFF3B82F6).copy(alpha = 0.7f),
+                            color = singleInnerLineColor,
                             start = Offset(sx, valueToY(single.p25)),
                             end = Offset(sx, valueToY(single.p75)),
                             strokeWidth = 6f,
@@ -302,12 +382,12 @@ fun AgpGraph(
                         )
                         // Median dot
                         drawCircle(
-                            color = Color(0xFF1D4ED8),
+                            color = medianColor,
                             radius = 4.dp.toPx(),
                             center = Offset(sx, valueToY(single.p50))
                         )
                     } else {
-                        // Outer band (10th - 90th percentile, light blue)
+                        // Outer band (10th - 90th percentile)
                         val outerBandPath = Path()
                         val p0X = hourToX(segment[0].hour.toFloat())
                         val p0Y = valueToY(segment[0].p90)
@@ -339,10 +419,10 @@ fun AgpGraph(
 
                         drawPath(
                             path = outerBandPath,
-                            color = Color(0xFF60A5FA).copy(alpha = 0.25f)
+                            color = outerBandColor
                         )
 
-                        // Inner band (25th - 75th percentile, medium blue)
+                        // Inner band (25th - 75th percentile)
                         val innerBandPath = Path()
                         innerBandPath.moveTo(p0X, valueToY(segment[0].p75))
                         for (i in 1 until segment.size) {
@@ -368,10 +448,10 @@ fun AgpGraph(
 
                         drawPath(
                             path = innerBandPath,
-                            color = Color(0xFF3B82F6).copy(alpha = 0.40f)
+                            color = innerBandColor
                         )
 
-                        // Median Curve (50th percentile, deep blue)
+                        // Median Curve (50th percentile)
                         val medianPath = Path()
                         medianPath.moveTo(p0X, valueToY(segment[0].p50))
                         for (i in 1 until segment.size) {
@@ -386,7 +466,7 @@ fun AgpGraph(
 
                         drawPath(
                             path = medianPath,
-                            color = Color(0xFF1D4ED8),
+                            color = medianColor,
                             style = Stroke(width = 3.5f, cap = StrokeCap.Round)
                         )
                     }
