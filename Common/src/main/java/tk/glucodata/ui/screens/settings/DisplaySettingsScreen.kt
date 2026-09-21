@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShortText
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.model.DeltaCalculation
 
 @Composable
 fun DisplaySettingsScreen(
@@ -204,6 +206,42 @@ fun DisplaySettingsScreen(
                 checked = displayConfig.minimalistUnits,
                 onCheckedChange = { repository.setMinimalistUnits(it) }
             )
+
+            SettingsSegmentedRow(
+                title = stringResource(R.string.settings_delta_calculation),
+                subtitle = stringResource(R.string.settings_delta_calculation_desc),
+                icon = Icons.AutoMirrored.Filled.TrendingUp
+            ) {
+                @OptIn(ExperimentalMaterial3Api::class)
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    SegmentedButton(
+                        selected = displayConfig.deltaCalculation == DeltaCalculation.ONE_MINUTE,
+                        onClick = { repository.setDeltaCalculation(DeltaCalculation.ONE_MINUTE) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        label = {
+                            Text(
+                                text = stringResource(R.string.settings_delta_1min),
+                                maxLines = 1
+                            )
+                        }
+                    )
+                    SegmentedButton(
+                        selected = displayConfig.deltaCalculation == DeltaCalculation.FIVE_MINUTES,
+                        onClick = { repository.setDeltaCalculation(DeltaCalculation.FIVE_MINUTES) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        label = {
+                            Text(
+                                text = stringResource(R.string.settings_delta_5min),
+                                maxLines = 1
+                            )
+                        }
+                    )
+                }
+            }
         }
 
         // ADVANCED TOOLS

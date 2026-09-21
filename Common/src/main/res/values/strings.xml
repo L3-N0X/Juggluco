@@ -852,6 +852,10 @@
     <string name="settings_status_bar_desc">Keep live glucose and trend continuously in Android status bar</string>
     <string name="settings_fullscreen">Fullscreen System UI</string>
     <string name="settings_fullscreen_desc">Hide Android status and navigation bars for immersive curve</string>
+    <string name="settings_delta_calculation">Delta Calculation</string>
+    <string name="settings_delta_calculation_desc">Calculate glucose rate of change over 1 or 5 minutes on the home screen</string>
+    <string name="settings_delta_1min">1 min</string>
+    <string name="settings_delta_5min">5 min</string>
 
     <string name="settings_cat_hardware">NFC &amp; hardware</string>
     <string name="settings_card_hardware">Scanning &amp; Sound Options</string>

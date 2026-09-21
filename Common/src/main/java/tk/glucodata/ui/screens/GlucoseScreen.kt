@@ -87,6 +87,7 @@ import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FilterChip
 import androidx.compose.ui.graphics.Color
+import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
@@ -121,7 +122,9 @@ fun GlucoseScreen(
     val context = LocalContext.current
 
     val sensorName = sensorDetails.firstOrNull()?.name
-    val previousReading = if (readings.size >= 2) readings[readings.size - 2] else null
+    val previousReading = remember(currentReading, readings, displayConfig.deltaCalculation) {
+        DeltaCalculation.findDeltaReading(currentReading, readings, displayConfig.deltaCalculation)
+    }
 
     // 1. Unified Graph Viewport State
     val viewportState = rememberGraphViewportState(initialDurationMillis = selectedRange?.durationMillis ?: tk.glucodata.ui.model.TimeRange.SIX_HOURS.durationMillis)
@@ -351,7 +354,8 @@ fun GlucoseScreen(
                         sensorName = sensorName,
                         targetLow = targetLow,
                         targetHigh = targetHigh,
-                        minimalistUnits = displayConfig.minimalistUnits
+                        minimalistUnits = displayConfig.minimalistUnits,
+                        deltaCalculation = displayConfig.deltaCalculation
                     )
                     GlucoseStatsCard(
                         stats = visibleStats,
@@ -463,7 +467,8 @@ fun GlucoseScreen(
                     sensorName = sensorName,
                     targetLow = targetLow,
                     targetHigh = targetHigh,
-                    minimalistUnits = displayConfig.minimalistUnits
+                    minimalistUnits = displayConfig.minimalistUnits,
+                    deltaCalculation = displayConfig.deltaCalculation
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))

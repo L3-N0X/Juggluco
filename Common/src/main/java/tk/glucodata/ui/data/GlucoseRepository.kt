@@ -25,6 +25,7 @@ import tk.glucodata.nums.numio
 import tk.glucodata.ui.model.AgpProfile
 import tk.glucodata.ui.model.AlarmConfig
 import tk.glucodata.ui.model.AlarmSoundStream
+import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.DisplayConfig
 import tk.glucodata.ui.model.ExchangesConfig
 import tk.glucodata.ui.model.GlucosePoint
@@ -193,6 +194,16 @@ class GlucoseRepository(
                     xdripWebServer = Natives.getusexdripwebserver()
                 )
 
+                val savedMinimalistUnits = try {
+                    Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                        .getBoolean(KEY_MINIMALIST_UNITS, true)
+                } catch (_: Throwable) { true }
+                val savedDeltaMinutes = try {
+                    Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                        .getInt(KEY_DELTA_CALCULATION, 1)
+                } catch (_: Throwable) { 1 }
+                val deltaCalculation = DeltaCalculation.fromMinutes(savedDeltaMinutes)
+
                 // Read Display
                 _displayConfig.value = DisplayConfig(
                     floatingGlucose = Natives.getfloatglucose(),
@@ -207,6 +218,8 @@ class GlucoseRepository(
                     showCalibratedHistory = Natives.getshowcalibratedhistories(),
                     showAmounts = Natives.getshownumbers(),
                     showMeals = Natives.getshowmeals(),
+                    minimalistUnits = savedMinimalistUnits,
+                    deltaCalculation = deltaCalculation,
                     calibrationEnabled = try { Natives.getDoCalibrate() } catch (_: Throwable) { false },
                     calibratePastReadings = try { Natives.getCalibratePast() } catch (_: Throwable) { false },
                     calibrateAllValues = try { Natives.getAllValues() } catch (_: Throwable) { false }
@@ -1163,6 +1176,26 @@ class GlucoseRepository(
 
     fun setMinimalistUnits(enabled: Boolean) {
         _displayConfig.value = _displayConfig.value.copy(minimalistUnits = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_MINIMALIST_UNITS, enabled)
+                    .apply()
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setDeltaCalculation(calculation: DeltaCalculation) {
+        _displayConfig.value = _displayConfig.value.copy(deltaCalculation = calculation)
+        scope.launch(Dispatchers.IO) {
+            try {
+                Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt(KEY_DELTA_CALCULATION, calculation.minutes)
+                    .apply()
+            } catch (_: Throwable) {}
+        }
     }
 
     // --- GRAPH NAVIGATION ACTIONS ---
@@ -1359,5 +1392,8 @@ class GlucoseRepository(
     private companion object {
         const val CALIBRATION_PREFS = "calibration_prefs"
         const val KEY_CALIBRATION_PROMPT_SHOWN = "calibration_prompt_shown"
+        const val UI_PREFS = "ui_prefs"
+        const val KEY_DELTA_CALCULATION = "delta_calculation_minutes"
+        const val KEY_MINIMALIST_UNITS = "minimalist_units"
     }
 }

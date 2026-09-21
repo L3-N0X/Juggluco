@@ -822,6 +822,10 @@
     <string name="settings_status_bar_desc">Aktuellen Glukosewert und Trend dauerhaft in der Statusleiste anzeigen</string>
     <string name="settings_fullscreen">Vollbildmodus</string>
     <string name="settings_fullscreen_desc">Status- und Navigationsleiste für maximale Kurvendarstellung ausblenden</string>
+    <string name="settings_delta_calculation">Delta-Berechnung</string>
+    <string name="settings_delta_calculation_desc">Glukose-Änderungsrate über 1 oder 5 Minuten auf dem Startbildschirm berechnen</string>
+    <string name="settings_delta_1min">1 Min.</string>
+    <string name="settings_delta_5min">5 Min.</string>
 
     <string name="settings_cat_hardware">NFC &amp; HARDWARE</string>
     <string name="settings_card_hardware">Scan- &amp; Tonoptionen</string>

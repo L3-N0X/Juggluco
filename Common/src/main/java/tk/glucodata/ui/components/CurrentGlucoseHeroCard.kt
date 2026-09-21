@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import tk.glucodata.R
+import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
@@ -49,6 +50,7 @@ fun CurrentGlucoseHeroCard(
     targetLow: Float = 70f,
     targetHigh: Float = 180f,
     minimalistUnits: Boolean = true,
+    deltaCalculation: DeltaCalculation = DeltaCalculation.ONE_MINUTE,
     modifier: Modifier = Modifier
 ) {
     val clinicalColors = LocalClinicalColors.current
@@ -89,7 +91,8 @@ fun CurrentGlucoseHeroCard(
             GlucoseUnit.MG_DL -> "$sign${deltaMgDl.toInt()}"
             GlucoseUnit.MMOL_L -> "$sign${String.format(java.util.Locale.US, "%.1f", deltaMgDl * unit.factor)}"
         }
-        if (!minimalistUnits) "$numStr ${unit.label}" else numStr
+        val intervalSuffix = if (deltaCalculation == DeltaCalculation.FIVE_MINUTES) " (5m)" else ""
+        if (!minimalistUnits) "$numStr ${unit.label}$intervalSuffix" else "$numStr$intervalSuffix"
     } else null
 
     Column(
