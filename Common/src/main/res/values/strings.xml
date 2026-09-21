@@ -821,6 +821,12 @@
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_system">System</string>
+    <string name="settings_language_desc">Select app display language</string>
+    <string name="settings_language_system_default">System default</string>
+    <string name="settings_language_dialog_title">Select Language</string>
+    <string name="settings_language_search_hint">Search language…</string>
+    <string name="settings_language_no_results">No matching languages found</string>
+    <string name="settings_language_follow_system">Follow device language</string>
     <string name="settings_floating_widget">Floating Glucose Widget</string>
     <string name="settings_floating_widget_desc">Show movable floating glucose overlay above other apps</string>
     <string name="settings_btn_configure_appearance">Configure Appearance</string>

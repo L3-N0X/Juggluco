@@ -32,10 +32,9 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -94,7 +93,7 @@ fun StatsScreen(
     var infoDialogTitle by remember { mutableStateOf<String?>(null) }
     var infoDialogText by remember { mutableStateOf<String?>(null) }
 
-    ScreenContent(modifier = modifier, spacing = 12.dp) {
+    ScreenContent(modifier = modifier) {
         var showCustomPeriodDialog by remember { mutableStateOf(false) }
 
         // 1. Period Selector Pills (Horizontally scrollable to prevent wrapping on small screens)
@@ -215,7 +214,9 @@ fun StatsScreen(
             }
         )
 
-        // 3. Time in Range Breakdown Card
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+        // 3. Time in Range Breakdown
         TimeInRangeBreakdownCard(
             stats = stats,
             unit = unit,
@@ -227,143 +228,133 @@ fun StatsScreen(
             }
         )
 
-        // 4. Ambulatory Glucose Profile (AGP) Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(modifier = Modifier.padding(ScreenLayout.CardPadding)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.agp_card_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = stringResource(R.string.agp_card_subtitle, if (selectedPeriod.labelRes != null) stringResource(selectedPeriod.labelRes!!) else selectedPeriod.label),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            infoDialogTitle = "Ambulatory Glucose Profile (AGP)"
-                            infoDialogText = "AGP collapses multiple days of continuous glucose data into a single 24-hour composite day. The dark blue median curve represents your typical trend, the 25–75% interquartile band shows frequent fluctuations, and the 10–90% band captures outer glycemic excursions."
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.QueryStats,
-                            contentDescription = "AGP Info",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+        // 4. Ambulatory Glucose Profile (AGP)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.agp_card_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.agp_card_subtitle, if (selectedPeriod.labelRes != null) stringResource(selectedPeriod.labelRes!!) else selectedPeriod.label),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                AgpGraph(
-                    profile = agpProfile,
-                    unit = unit,
-                    targetLow = targetLow,
-                    targetHigh = targetHigh
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Legend
-                AgpLegend()
+                IconButton(
+                    onClick = {
+                        infoDialogTitle = "Ambulatory Glucose Profile (AGP)"
+                        infoDialogText = "AGP collapses multiple days of continuous glucose data into a single 24-hour composite day. The dark blue median curve represents your typical trend, the 25–75% interquartile band shows frequent fluctuations, and the 10–90% band captures outer glycemic excursions."
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QueryStats,
+                        contentDescription = "AGP Info",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            AgpGraph(
+                profile = agpProfile,
+                unit = unit,
+                targetLow = targetLow,
+                targetHigh = targetHigh
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Legend
+            AgpLegend()
         }
 
-        // 5. Actions Card: Web Report & Export
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(modifier = Modifier.padding(ScreenLayout.CardPadding)) {
-                Text(
-                    text = stringResource(R.string.reports_export_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.reports_export_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-                Spacer(modifier = Modifier.height(14.dp))
+        // 5. Actions: Web Report & Export
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.reports_export_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.reports_export_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-                fun openWebReport() {
-                    try {
-                        val endtime = Natives.percentileEndtime(selectedPeriod.days)
-                        val key = Natives.getApiSecret() ?: ""
-                        val addkey = if (key.isNotEmpty()) "$key/" else ""
-                        val type = (if (Natives.getDoCalibrate()) (if (Natives.getCalibratePast()) "&pastvalues" else "") + "&calibrated" else "&") + if (useHistory) "history" else "stream"
-                        val url = "http://127.0.0.1:${Natives.gethttpport()}/$addkey" + "x/report?amounts&days=${selectedPeriod.days}&endtime=$endtime$type&hl=${Applic.curlang}"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                        context.startActivity(intent)
-                    } catch (e: Throwable) {
-                        Toast.makeText(context, "Report error: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
+            Spacer(modifier = Modifier.height(14.dp))
+
+            fun openWebReport() {
+                try {
+                    val endtime = Natives.percentileEndtime(selectedPeriod.days)
+                    val key = Natives.getApiSecret() ?: ""
+                    val addkey = if (key.isNotEmpty()) "$key/" else ""
+                    val type = (if (Natives.getDoCalibrate()) (if (Natives.getCalibratePast()) "&pastvalues" else "") + "&calibrated" else "&") + if (useHistory) "history" else "stream"
+                    val url = "http://127.0.0.1:${Natives.gethttpport()}/$addkey" + "x/report?amounts&days=${selectedPeriod.days}&endtime=$endtime$type&hl=${Applic.curlang}"
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    context.startActivity(intent)
+                } catch (e: Throwable) {
+                    Toast.makeText(context, "Report error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (Applic.Nativesloaded && Natives.getusexdripwebserver()) {
+                            openWebReport()
+                        } else {
+                            showWebServerActivationDialog = true
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(R.string.btn_web_report),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                OutlinedButton(
+                    onClick = onExportData,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Button(
-                        onClick = {
-                            if (Applic.Nativesloaded && Natives.getusexdripwebserver()) {
-                                openWebReport()
-                            } else {
-                                showWebServerActivationDialog = true
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = stringResource(R.string.btn_web_report),
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    OutlinedButton(
-                        onClick = onExportData,
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Assessment, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = stringResource(R.string.btn_export_data),
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Icon(imageVector = Icons.Default.Assessment, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(R.string.btn_export_data),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
@@ -462,51 +453,32 @@ private fun ClinicalKpiCards(
     val clinicalColors = LocalClinicalColors.current
     val hasData = stats.readingsCount > 0 && stats.averageMgDl > 0f
 
-    val avgBadge = when {
-        !hasData -> ""
-        stats.averageMgDl in 70f..154f -> stringResource(R.string.clinical_target_reached)
-        stats.averageMgDl > 154f -> stringResource(R.string.status_high)
-        else -> stringResource(R.string.status_low)
+    // Values that miss their clinical target are tinted instead of carrying a badge
+    val onTarget = MaterialTheme.colorScheme.onSurface
+    val avgColor = when {
+        !hasData || stats.averageMgDl in 70f..154f -> onTarget
+        stats.averageMgDl > 154f -> clinicalColors.high
+        else -> clinicalColors.low
     }
-    val avgBadgeColor = if (stats.averageMgDl in 70f..154f) clinicalColors.inRange else clinicalColors.high
-
-    val gmiBadge = when {
-        !hasData || stats.estimatedA1c <= 0f -> ""
-        stats.estimatedA1c in 4.0f..7.0f -> stringResource(R.string.clinical_target_reached)
-        else -> stringResource(R.string.status_high)
-    }
-    val gmiBadgeColor = if (stats.estimatedA1c in 4.0f..7.0f) clinicalColors.inRange else clinicalColors.high
-
-    val cvBadge = when {
-        !hasData || stats.cvPercent <= 0f -> ""
-        stats.cvPercent < 36f -> stringResource(R.string.clinical_stable_cv)
-        else -> stringResource(R.string.clinical_high_cv)
-    }
-    val cvBadgeColor = if (stats.cvPercent < 36f) clinicalColors.inRange else clinicalColors.veryHigh
-
-    val activeBadge = when {
-        !hasData -> ""
-        stats.activeTimePercent >= 70f -> stringResource(R.string.clinical_target_reached)
-        else -> stringResource(R.string.clinical_target_unmet)
-    }
-    val activeBadgeColor = if (stats.activeTimePercent >= 70f) clinicalColors.inRange else clinicalColors.high
+    val gmiColor = if (!hasData || stats.estimatedA1c <= 0f || stats.estimatedA1c in 4.0f..7.0f) onTarget else clinicalColors.high
+    val cvColor = if (!hasData || stats.cvPercent <= 0f || stats.cvPercent < 36f) onTarget else clinicalColors.veryHigh
+    val activeColor = if (!hasData || stats.activeTimePercent >= 70f) onTarget else clinicalColors.high
 
     val gmiTitle = stringResource(R.string.help_gmi_title)
     val gmiDesc = stringResource(R.string.help_gmi_desc)
     val cvTitle = stringResource(R.string.help_cv_title)
     val cvDesc = stringResource(R.string.help_cv_desc)
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             KpiCard(
                 title = stringResource(R.string.kpi_average_glucose),
                 value = if (hasData) unit.format(stats.averageMgDl) else "—",
                 subtitle = stringResource(R.string.target_average_sub, unit.format(154f)),
-                badge = avgBadge,
-                badgeColor = avgBadgeColor,
+                valueColor = avgColor,
                 onClick = {
                     onShowInfo(
                         "Average Glucose",
@@ -519,22 +491,20 @@ private fun ClinicalKpiCards(
                 title = stringResource(R.string.kpi_gmi),
                 value = if (hasData && stats.estimatedA1c > 0) "${String.format(java.util.Locale.US, "%.1f", stats.estimatedA1c)}%" else "—",
                 subtitle = stringResource(R.string.target_gmi_sub),
-                badge = gmiBadge,
-                badgeColor = gmiBadgeColor,
+                valueColor = gmiColor,
                 onClick = { onShowInfo(gmiTitle, gmiDesc) },
                 modifier = Modifier.weight(1f)
             )
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             KpiCard(
                 title = stringResource(R.string.kpi_cv),
                 value = if (hasData && stats.cvPercent > 0) "${String.format(java.util.Locale.US, "%.1f", stats.cvPercent)}%" else "—",
                 subtitle = stringResource(R.string.target_cv_sub),
-                badge = cvBadge,
-                badgeColor = cvBadgeColor,
+                valueColor = cvColor,
                 onClick = { onShowInfo(cvTitle, cvDesc) },
                 modifier = Modifier.weight(1f)
             )
@@ -542,8 +512,7 @@ private fun ClinicalKpiCards(
                 title = stringResource(R.string.kpi_active_time),
                 value = if (hasData) "${String.format(java.util.Locale.US, "%.1f", stats.activeTimePercent)}%" else "—",
                 subtitle = stringResource(R.string.target_active_sub),
-                badge = activeBadge,
-                badgeColor = activeBadgeColor,
+                valueColor = activeColor,
                 onClick = {
                     onShowInfo(
                         "Active CGM Time",
@@ -561,65 +530,36 @@ private fun KpiCard(
     title: String,
     value: String,
     subtitle: String,
-    badge: String,
-    badgeColor: Color,
+    valueColor: Color,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    Column(
         modifier = modifier.then(
             if (onClick != null) Modifier.clickable { onClick() } else Modifier
-        ),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        )
     ) {
-        Column(modifier = Modifier.padding(ScreenLayout.CardPadding)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                if (badge.isNotEmpty()) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = badgeColor.copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = badge,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = badgeColor,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
-                maxLines = 1
-            )
-        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = valueColor,
+            maxLines = 1
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+            maxLines = 1
+        )
     }
 }
 
@@ -635,129 +575,122 @@ private fun TimeInRangeBreakdownCard(
     val tirTitle = stringResource(R.string.help_tir_title)
     val tirDesc = stringResource(R.string.help_tir_desc)
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(ScreenLayout.CardPadding)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.tir_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.tir_guidelines),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = { onShowInfo(tirTitle, tirDesc) }) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "TIR Info",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        val hasData = stats.readingsCount > 0 && stats.averageMgDl > 0f
+
+        if (!hasData) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.tir_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.tir_guidelines),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Text(
+                    text = stringResource(R.string.tir_no_readings),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            // Multi-segment horizontal stacked bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                if (stats.timeVeryLowPercent > 0) {
+                    Box(modifier = Modifier.weight(stats.timeVeryLowPercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.veryLow))
                 }
-                IconButton(onClick = { onShowInfo(tirTitle, tirDesc) }) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "TIR Info",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                if (stats.timeBelowPercent > 0) {
+                    Box(modifier = Modifier.weight(stats.timeBelowPercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.low))
+                }
+                if (stats.timeInRangePercent > 0) {
+                    Box(modifier = Modifier.weight(stats.timeInRangePercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.inRange))
+                }
+                if (stats.timeAbovePercent > 0) {
+                    Box(modifier = Modifier.weight(stats.timeAbovePercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.high))
+                }
+                if (stats.timeVeryHighPercent > 0) {
+                    Box(modifier = Modifier.weight(stats.timeVeryHighPercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.veryHigh))
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            val hasData = stats.readingsCount > 0 && stats.averageMgDl > 0f
-
-            if (!hasData) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(R.string.tir_no_readings),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Multi-segment horizontal stacked bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(16.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    if (stats.timeVeryLowPercent > 0) {
-                        Box(modifier = Modifier.weight(stats.timeVeryLowPercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.veryLow))
-                    }
-                    if (stats.timeBelowPercent > 0) {
-                        Box(modifier = Modifier.weight(stats.timeBelowPercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.low))
-                    }
-                    if (stats.timeInRangePercent > 0) {
-                        Box(modifier = Modifier.weight(stats.timeInRangePercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.inRange))
-                    }
-                    if (stats.timeAbovePercent > 0) {
-                        Box(modifier = Modifier.weight(stats.timeAbovePercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.high))
-                    }
-                    if (stats.timeVeryHighPercent > 0) {
-                        Box(modifier = Modifier.weight(stats.timeVeryHighPercent.coerceAtLeast(1).toFloat()).fillMaxSize().background(clinicalColors.veryHigh))
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 5 Clinical Ranges Breakdown Rows
-                TirRow(
-                    label = stringResource(R.string.status_very_high),
-                    rangeDesc = "> ${unit.format(250f)}",
-                    percent = stats.timeVeryHighPercent,
-                    target = "< 5%",
-                    color = clinicalColors.veryHigh,
-                    isTargetMet = stats.timeVeryHighPercent < 5
-                )
-                TirRow(
-                    label = stringResource(R.string.status_high),
-                    rangeDesc = "${unit.format(targetHigh + 1f)} – ${unit.format(250f)}",
-                    percent = stats.timeAbovePercent,
-                    target = "< 25%",
-                    color = clinicalColors.high,
-                    isTargetMet = stats.timeAbovePercent < 25
-                )
-                TirRow(
-                    label = stringResource(R.string.status_in_range),
-                    rangeDesc = "${unit.format(targetLow)} – ${unit.format(targetHigh)}",
-                    percent = stats.timeInRangePercent,
-                    target = "> 70%",
-                    color = clinicalColors.inRange,
-                    isPrimary = true,
-                    isTargetMet = stats.timeInRangePercent >= 70
-                )
-                TirRow(
-                    label = stringResource(R.string.status_low),
-                    rangeDesc = "${unit.format(54f)} – ${unit.format(targetLow - 1f)}",
-                    percent = stats.timeBelowPercent,
-                    target = "< 4%",
-                    color = clinicalColors.low,
-                    isTargetMet = stats.timeBelowPercent < 4
-                )
-                TirRow(
-                    label = stringResource(R.string.status_very_low),
-                    rangeDesc = "< ${unit.format(54f)}",
-                    percent = stats.timeVeryLowPercent,
-                    target = "< 1%",
-                    color = clinicalColors.veryLow,
-                    isTargetMet = stats.timeVeryLowPercent < 1
-                )
-            }
+            // 5 Clinical Ranges Breakdown Rows
+            TirRow(
+                label = stringResource(R.string.status_very_high),
+                rangeDesc = "> ${unit.format(250f)}",
+                percent = stats.timeVeryHighPercent,
+                target = "< 5%",
+                color = clinicalColors.veryHigh,
+                isTargetMet = stats.timeVeryHighPercent < 5
+            )
+            TirRow(
+                label = stringResource(R.string.status_high),
+                rangeDesc = "${unit.format(targetHigh + 1f)} – ${unit.format(250f)}",
+                percent = stats.timeAbovePercent,
+                target = "< 25%",
+                color = clinicalColors.high,
+                isTargetMet = stats.timeAbovePercent < 25
+            )
+            TirRow(
+                label = stringResource(R.string.status_in_range),
+                rangeDesc = "${unit.format(targetLow)} – ${unit.format(targetHigh)}",
+                percent = stats.timeInRangePercent,
+                target = "> 70%",
+                color = clinicalColors.inRange,
+                isPrimary = true,
+                isTargetMet = stats.timeInRangePercent >= 70
+            )
+            TirRow(
+                label = stringResource(R.string.status_low),
+                rangeDesc = "${unit.format(54f)} – ${unit.format(targetLow - 1f)}",
+                percent = stats.timeBelowPercent,
+                target = "< 4%",
+                color = clinicalColors.low,
+                isTargetMet = stats.timeBelowPercent < 4
+            )
+            TirRow(
+                label = stringResource(R.string.status_very_low),
+                rangeDesc = "< ${unit.format(54f)}",
+                percent = stats.timeVeryLowPercent,
+                target = "< 1%",
+                color = clinicalColors.veryLow,
+                isTargetMet = stats.timeVeryLowPercent < 1
+            )
         }
     }
 }

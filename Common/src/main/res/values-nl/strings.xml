@@ -502,5 +502,11 @@
 
 <string name="transport_needs_password">Watchwoord noodzakelijk bij directe Bluetooth</string>
 
+    <string name="settings_language_desc">Selecteer de app-taal</string>
+    <string name="settings_language_system_default">Systeemstandaard</string>
+    <string name="settings_language_dialog_title">Taal selecteren</string>
+    <string name="settings_language_search_hint">Zoek taal…</string>
+    <string name="settings_language_no_results">Geen overeenkomende talen gevonden</string>
+    <string name="settings_language_follow_system">Apparaattaal volgen</string>
 </resources>
 

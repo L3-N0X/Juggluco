@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -38,6 +39,15 @@ object ScreenLayout {
 
     /** Bottom gap so the last item clears the bottom navigation bar and any FAB. */
     val BottomPadding = 96.dp
+
+    /**
+     * Fill for the few surfaces that remain: repeated list items (e.g. previous
+     * sensors) and settings groups. Screen sections themselves sit directly on the
+     * background with no card. Never use plain `surface` here, it matches the
+     * background in dark mode and the padding then reads as a stray indent.
+     */
+    val cardContainerColor: Color
+        @Composable get() = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
 }
 
 /**

@@ -1,14 +1,19 @@
 package tk.glucodata.ui.screens.settings
 
 import android.app.Activity
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShortText
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
@@ -16,16 +21,23 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
@@ -41,12 +53,16 @@ fun DisplaySettingsScreen(
 ) {
     val displayConfig by repository.displayConfig.collectAsState()
     val context = LocalContext.current
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var currentLanguageCode by remember {
+        mutableStateOf(AppLanguageManager.getCurrentLanguageCode())
+    }
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_group_display_title),
         onNavigateBack = onNavigateBack
     ) {
-        // THEME PREFERENCE
+        // THEME PREFERENCE & LANGUAGE
         SettingsSection(title = "Appearance") {
             SettingsSegmentedRow(
                 title = stringResource(R.string.settings_theme_pref),
@@ -115,6 +131,52 @@ fun DisplaySettingsScreen(
                     )
                 }
             }
+
+            SettingsDivider()
+
+            SettingsActionRow(
+                title = stringResource(R.string.languagename),
+                subtitle = AppLanguageManager.getLanguageDisplayName(currentLanguageCode, context),
+                icon = Icons.Default.Language,
+                onClick = { showLanguageDialog = true },
+                trailingContent = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        ) {
+                            Text(
+                                text = AppLanguageManager.getLanguageBadge(currentLanguageCode),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = stringResource(R.string.settings_language_dialog_title),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            )
+        }
+
+        if (showLanguageDialog) {
+            LanguageSelectionDialog(
+                currentLanguageCode = currentLanguageCode,
+                onLanguageSelected = { selectedCode ->
+                    currentLanguageCode = selectedCode
+                    AppLanguageManager.setLanguage(selectedCode)
+                    showLanguageDialog = false
+                },
+                onDismissRequest = { showLanguageDialog = false }
+            )
         }
 
         // SYSTEM UI & LAYOUT

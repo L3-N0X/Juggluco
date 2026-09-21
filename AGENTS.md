@@ -29,6 +29,8 @@
 - **Shared layout module:** `Common/src/main/java/tk/glucodata/ui/screens/ScreenLayout.kt` owns the spacing scale (`Gutter` / `CardPadding` 16.dp, `SectionSpacing`, `TopPadding`, `BottomPadding` 96.dp) plus `ScreenContent { }` (standard scrolling tab body) and `SectionTitle(...)`. Use these instead of ad-hoc dp values.
 - **One title per screen:** the persistent app bar supplies it — `JugglucoApp`'s `TopAppBar` for every tab, `SettingsDetailScaffold` for detail screens. Never repeat the page title in the content, and leave descriptions out unless they earn their space.
 - **Two padding levels, never three:** screen gutter → card padding. Group content inside a card with spacing or `HorizontalDivider`, not another padded/tinted container — nesting a third level is the "double indent" bug.
+- **No cards for screen sections:** sections (stats blocks, the current sensor, calls to action) sit directly on the screen background, separated by spacing, `SectionTitle`s or `HorizontalDivider`s. Cards are only for repeated list items, filled with `ScreenLayout.cardContainerColor`.
+- **No badges:** don't put status pills/chips next to titles or values. Show status as plain text or by tinting the value.
 - **Gutters belong to the parent:** screen-level Columns apply the gutter; cards and sections (hero card, stats card, time range pills, graph, logbook) fill the width and carry no horizontal padding of their own.
 
 ---

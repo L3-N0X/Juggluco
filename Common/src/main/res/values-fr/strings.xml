@@ -318,4 +318,10 @@
     <string name="webdeletefailed">Impossible de supprimer %1$s</string>
     <string name="webdirectoryempty">Ce répertoire est vide</string>
     <string name="webdirectoryentry">[répertoire] %1$s</string>
+    <string name="settings_language_desc">Sélectionner la langue de l’application</string>
+    <string name="settings_language_system_default">Par défaut du système</string>
+    <string name="settings_language_dialog_title">Sélectionner la langue</string>
+    <string name="settings_language_search_hint">Rechercher une langue…</string>
+    <string name="settings_language_no_results">Aucune langue correspondante</string>
+    <string name="settings_language_follow_system">Suivre la langue de l’appareil</string>
 </resources>

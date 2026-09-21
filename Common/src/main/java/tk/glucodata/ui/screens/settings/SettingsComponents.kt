@@ -133,7 +133,7 @@ fun SettingsSection(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            color = ScreenLayout.cardContainerColor
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 content()

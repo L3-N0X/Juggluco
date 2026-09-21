@@ -364,4 +364,10 @@
     <string name="webdeletefailed">无法删除 %1$s</string>
     <string name="webdirectoryempty">此目录为空</string>
     <string name="webdirectoryentry">[目录] %1$s</string>
+    <string name="settings_language_desc">选择应用显示语言</string>
+    <string name="settings_language_system_default">系统默认</string>
+    <string name="settings_language_dialog_title">选择语言</string>
+    <string name="settings_language_search_hint">搜索语言…</string>
+    <string name="settings_language_no_results">未找到匹配的语言</string>
+    <string name="settings_language_follow_system">跟随系统语言</string>
 </resources>

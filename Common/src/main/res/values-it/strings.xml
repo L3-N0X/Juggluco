@@ -513,4 +513,10 @@
     <string name="webdeletefailed">Impossibile eliminare %1$s</string>
     <string name="webdirectoryempty">Questa directory è vuota</string>
     <string name="webdirectoryentry">[directory] %1$s</string>
+    <string name="settings_language_desc">Seleziona la lingua dell’app</string>
+    <string name="settings_language_system_default">Predefinito di sistema</string>
+    <string name="settings_language_dialog_title">Seleziona lingua</string>
+    <string name="settings_language_search_hint">Cerca lingua…</string>
+    <string name="settings_language_no_results">Nessuna lingua trovata</string>
+    <string name="settings_language_follow_system">Segui la lingua del dispositivo</string>
 </resources>
