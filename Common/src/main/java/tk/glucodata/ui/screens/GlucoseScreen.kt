@@ -341,7 +341,7 @@ fun GlucoseScreen(
                         .fillMaxHeight()
                         .verticalScroll(rememberScrollState())
                         .padding(end = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Always show current real-time sensor reading
                     CurrentGlucoseHeroCard(
@@ -455,7 +455,7 @@ fun GlucoseScreen(
                         bottom = ScreenLayout.BottomPadding
                     )
             ) {
-                // 1. Hero Card at top (ALWAYS real-time reading)
+                // 1. Current Glucose Reading at top (ALWAYS real-time reading)
                 CurrentGlucoseHeroCard(
                     currentReading = currentReading,
                     previousReading = previousReading,
@@ -466,7 +466,7 @@ fun GlucoseScreen(
                     minimalistUnits = displayConfig.minimalistUnits
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // 2. Time Range Selector pills
                 TimeRangeSelector(
@@ -538,9 +538,9 @@ fun GlucoseScreen(
                     onOpenHelp = { showHelpSheet = true }
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // 5. Glucose Stats & Time in Range Card
+                // 5. Glucose Stats & Time in Range
                 GlucoseStatsCard(
                     stats = visibleStats,
                     unit = unit,
@@ -548,7 +548,7 @@ fun GlucoseScreen(
                     minimalistUnits = displayConfig.minimalistUnits
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // 6. Recent Logbook Entries Section
                 LogbookSection(

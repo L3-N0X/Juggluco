@@ -12,12 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -36,7 +33,6 @@ import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.TrendArrow
-import tk.glucodata.ui.screens.ScreenLayout
 import tk.glucodata.ui.theme.LocalClinicalColors
 
 @Composable
@@ -54,19 +50,16 @@ fun CurrentGlucoseHeroCard(
 
     val isConnected = currentReading != null
     val statusLabel = if (currentReading != null) stringResource(currentReading.status.labelRes) else stringResource(R.string.no_reading)
-    val (statusColor, containerColor) = if (currentReading != null) {
+    val statusColor = if (currentReading != null) {
         when (currentReading.status) {
-            GlucoseStatus.VERY_LOW -> Pair(clinicalColors.veryLow, clinicalColors.veryLowContainer)
-            GlucoseStatus.LOW -> Pair(clinicalColors.low, clinicalColors.lowContainer)
-            GlucoseStatus.IN_RANGE -> Pair(clinicalColors.inRange, clinicalColors.inRangeContainer)
-            GlucoseStatus.HIGH -> Pair(clinicalColors.high, clinicalColors.highContainer)
-            GlucoseStatus.VERY_HIGH -> Pair(clinicalColors.veryHigh, clinicalColors.veryHighContainer)
+            GlucoseStatus.VERY_LOW -> clinicalColors.veryLow
+            GlucoseStatus.LOW -> clinicalColors.low
+            GlucoseStatus.IN_RANGE -> clinicalColors.inRange
+            GlucoseStatus.HIGH -> clinicalColors.high
+            GlucoseStatus.VERY_HIGH -> clinicalColors.veryHigh
         }
     } else {
-        Pair(
-            MaterialTheme.colorScheme.onSurfaceVariant,
-            MaterialTheme.colorScheme.surfaceVariant
-        )
+        MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     val trendArrow = if (currentReading != null) TrendArrow.fromRate(currentReading.rate) else TrendArrow.UNKNOWN
@@ -94,141 +87,126 @@ fun CurrentGlucoseHeroCard(
         if (!minimalistUnits) "$numStr ${unit.label}" else numStr
     } else null
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    Column(
+        modifier = modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier.padding(ScreenLayout.CardPadding)
+        // Top Row: Sensor Name & Status
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Top Row: Sensor Name & Status Chip
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(
+                            if (isConnected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .background(
-                                if (isConnected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Sensors,
-                            contentDescription = "Sensor",
-                            tint = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = sensorName ?: (if (isConnected) stringResource(R.string.cgm_sensor) else stringResource(R.string.no_sensor_connected)),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Icon(
+                        imageVector = Icons.Default.Sensors,
+                        contentDescription = "Sensor",
+                        tint = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
                     )
                 }
-
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = containerColor
-                ) {
-                    Text(
-                        text = statusLabel,
-                        color = statusColor,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Middle Row: Big Glucose Value + Unit + Trend Arrow
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    val formattedValue = currentReading?.formatted(unit) ?: "—"
-                    Text(
-                        text = formattedValue,
-                        fontSize = 50.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        letterSpacing = (-1).sp
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = unit.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = if (minimalistUnits) 11.sp else 14.sp,
-                        fontWeight = if (minimalistUnits) FontWeight.Normal else FontWeight.Medium,
-                        color = if (minimalistUnits) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = if (minimalistUnits) 8.dp else 10.dp)
-                    )
-                }
-
-                // Trend Arrow Box
-                Surface(
-                    shape = CircleShape,
-                    color = if (isConnected) statusColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (isConnected && trendArrow != TrendArrow.UNKNOWN) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowForward,
-                                contentDescription = trendArrow.label,
-                                tint = statusColor,
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .rotate(trendArrow.angleDegrees)
-                            )
-                        } else {
-                            Text(
-                                text = "—",
-                                color = MaterialTheme.colorScheme.outline,
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Bottom Row: Time ago, Delta
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = timeAgoText,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = sensorName ?: (if (isConnected) stringResource(R.string.cgm_sensor) else stringResource(R.string.no_sensor_connected)),
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (deltaText != null) {
-                    Text(
-                        text = "  •  $deltaText",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = statusColor,
-                        fontWeight = FontWeight.SemiBold
-                    )
+            }
+
+            Text(
+                text = statusLabel,
+                color = statusColor,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Middle Row: Big Glucose Value + Unit + Trend Arrow
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.Bottom
+            ) {
+                val formattedValue = currentReading?.formatted(unit) ?: "—"
+                Text(
+                    text = formattedValue,
+                    fontSize = 50.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    letterSpacing = (-1).sp
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = unit.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = if (minimalistUnits) 11.sp else 14.sp,
+                    fontWeight = if (minimalistUnits) FontWeight.Normal else FontWeight.Medium,
+                    color = if (minimalistUnits) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = if (minimalistUnits) 8.dp else 10.dp)
+                )
+            }
+
+            // Trend Arrow Box
+            Surface(
+                shape = CircleShape,
+                color = if (isConnected) statusColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.size(52.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (isConnected && trendArrow != TrendArrow.UNKNOWN) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = trendArrow.label,
+                            tint = statusColor,
+                            modifier = Modifier
+                                .size(30.dp)
+                                .rotate(trendArrow.angleDegrees)
+                        )
+                    } else {
+                        Text(
+                            text = "—",
+                            color = MaterialTheme.colorScheme.outline,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Bottom Row: Time ago, Delta
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = timeAgoText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (deltaText != null) {
+                Text(
+                    text = "  •  $deltaText",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = statusColor,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,8 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +30,6 @@ import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
-import tk.glucodata.ui.screens.ScreenLayout
 import tk.glucodata.ui.theme.LocalClinicalColors
 
 @Composable
@@ -48,124 +44,115 @@ fun GlucoseStatsCard(
     val hasData = stats.readingsCount > 0 && stats.averageMgDl > 0f
     val glucoseUnitLabel = if (!minimalistUnits) unit.label else ""
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    Column(
+        modifier = modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier.padding(ScreenLayout.CardPadding)
+        // Header: Title & Time in target
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Header: Title & Time in target
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Text(
+                text = stringResource(R.string.tir_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (hasData) {
+                Text(
+                    text = "${stats.timeInRangePercent}%",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = clinicalColors.inRange
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (!hasData) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = stringResource(R.string.tir_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = stringResource(R.string.tir_no_readings),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (hasData) {
-                    Text(
-                        text = "${stats.timeInRangePercent}%",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = clinicalColors.inRange
-                    )
-                }
             }
+        } else {
+            // Multi-segment Time in Range Bar
+            TimeInRangeBar(stats = stats)
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            if (!hasData) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(R.string.tir_no_readings),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Multi-segment Time in Range Bar
-                TimeInRangeBar(stats = stats)
+            // Concise Legend / Breakdown Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TirLegendItem(
+                    label = stringResource(R.string.status_very_low),
+                    percent = stats.timeVeryLowPercent,
+                    color = clinicalColors.veryLow
+                )
+                TirLegendItem(
+                    label = stringResource(R.string.status_low),
+                    percent = (stats.timeBelowPercent - stats.timeVeryLowPercent).coerceAtLeast(0),
+                    color = clinicalColors.low
+                )
+                TirLegendItem(
+                    label = stringResource(R.string.status_in_range),
+                    percent = stats.timeInRangePercent,
+                    color = clinicalColors.inRange
+                )
+                TirLegendItem(
+                    label = stringResource(R.string.status_high),
+                    percent = (stats.timeAbovePercent - stats.timeVeryHighPercent).coerceAtLeast(0),
+                    color = clinicalColors.high
+                )
+                TirLegendItem(
+                    label = stringResource(R.string.status_very_high),
+                    percent = stats.timeVeryHighPercent,
+                    color = clinicalColors.veryHigh
+                )
+            }
 
-                Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-                // Concise Legend / Breakdown Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    TirLegendItem(
-                        label = stringResource(R.string.status_very_low),
-                        percent = stats.timeVeryLowPercent,
-                        color = clinicalColors.veryLow
-                    )
-                    TirLegendItem(
-                        label = stringResource(R.string.status_low),
-                        percent = (stats.timeBelowPercent - stats.timeVeryLowPercent).coerceAtLeast(0),
-                        color = clinicalColors.low
-                    )
-                    TirLegendItem(
-                        label = stringResource(R.string.status_in_range),
-                        percent = stats.timeInRangePercent,
-                        color = clinicalColors.inRange
-                    )
-                    TirLegendItem(
-                        label = stringResource(R.string.status_high),
-                        percent = (stats.timeAbovePercent - stats.timeVeryHighPercent).coerceAtLeast(0),
-                        color = clinicalColors.high
-                    )
-                    TirLegendItem(
-                        label = stringResource(R.string.status_very_high),
-                        percent = stats.timeVeryHighPercent,
-                        color = clinicalColors.veryHigh
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // 4 Equal-Height Stat Tiles Grid: Average, GMI, Min, Max
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    StatTile(
-                        title = stringResource(R.string.stat_average),
-                        value = unit.format(stats.averageMgDl),
-                        unit = glucoseUnitLabel,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatTile(
-                        title = stringResource(R.string.stat_gmi),
-                        value = if (stats.estimatedA1c > 0) String.format(java.util.Locale.US, "%.1f", stats.estimatedA1c) else "—",
-                        unit = if (stats.estimatedA1c > 0) "%" else "",
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatTile(
-                        title = stringResource(R.string.stat_min),
-                        value = unit.format(stats.minMgDl),
-                        unit = glucoseUnitLabel,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatTile(
-                        title = stringResource(R.string.stat_max),
-                        value = unit.format(stats.maxMgDl),
-                        unit = glucoseUnitLabel,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+            // 4 Equal-Height Stat Tiles Grid: Average, GMI, Min, Max
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                StatTile(
+                    title = stringResource(R.string.stat_average),
+                    value = unit.format(stats.averageMgDl),
+                    unit = glucoseUnitLabel,
+                    modifier = Modifier.weight(1f)
+                )
+                StatTile(
+                    title = stringResource(R.string.stat_gmi),
+                    value = if (stats.estimatedA1c > 0) String.format(java.util.Locale.US, "%.1f", stats.estimatedA1c) else "—",
+                    unit = if (stats.estimatedA1c > 0) "%" else "",
+                    modifier = Modifier.weight(1f)
+                )
+                StatTile(
+                    title = stringResource(R.string.stat_min),
+                    value = unit.format(stats.minMgDl),
+                    unit = glucoseUnitLabel,
+                    modifier = Modifier.weight(1f)
+                )
+                StatTile(
+                    title = stringResource(R.string.stat_max),
+                    value = unit.format(stats.maxMgDl),
+                    unit = glucoseUnitLabel,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
@@ -272,59 +259,49 @@ private fun StatTile(
     unit: String,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.height(68.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-        )
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(vertical = 8.dp, horizontal = 2.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.Center
         ) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 10.5.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
+                textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.Center
-            ) {
+            if (unit.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(2.dp))
                 Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = unit,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.outline,
                     maxLines = 1,
-                    textAlign = TextAlign.Center
+                    softWrap = false,
+                    modifier = Modifier.padding(bottom = 1.dp)
                 )
-                if (unit.isNotEmpty()) {
-                    Spacer(modifier = Modifier.width(1.dp))
-                    Text(
-                        text = unit,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier.padding(bottom = 1.dp)
-                    )
-                }
             }
         }
     }
