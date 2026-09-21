@@ -35,6 +35,9 @@ static void initScreen(Object obj) {}
 static void settext(String str) {}
 static void      rmlayout() {}
 
+public static void setupWearUi(MainActivity act) {}
+public static void refreshRepository() {}
+
 static void   blockedNum(MainActivity  act) {
 			var width=GlucoseCurve.getwidth();
 		help.basehelp(Applic.app.getString(R.string.staticnum),act,xzy->{ }, (l,w,h)-> {

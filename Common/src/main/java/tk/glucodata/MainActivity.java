@@ -264,7 +264,7 @@ private void startdisplay() {
     if(!isWearable) {
         tk.glucodata.ui.ComposeUiBridge.setupComposeUi(this);
     } else {
-        setContentView(curve);
+        Specific.setupWearUi(this);
     }
 
 if(!isWearable) {
@@ -1365,8 +1365,12 @@ public void onConfigurationChanged(Configuration newConfig) {
 public void requestRender() {
     if(curve!=null)
         curve.requestRender();
-    if(tk.glucodata.ui.ComposeUiBridge.isComposeUiActive && tk.glucodata.ui.ComposeUiBridge.repository != null) {
-        tk.glucodata.ui.ComposeUiBridge.repository.refreshAll();
+    if(!isWearable) {
+        if(tk.glucodata.ui.ComposeUiBridge.isComposeUiActive && tk.glucodata.ui.ComposeUiBridge.repository != null) {
+            tk.glucodata.ui.ComposeUiBridge.repository.refreshAll();
+        }
+    } else {
+        Specific.refreshRepository();
     }
     }
 

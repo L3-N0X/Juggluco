@@ -62,55 +62,76 @@ Targets:
              APK: Common/build/outputs/apk/mobileLibre3SiDexGoogle/debug/...
   release    Mobile Libre3 + Sibionics + Dexcom (No Google, ReleaseLog)
              APK: Common/build/outputs/apk/mobileLibre3SiDexNogoogle/releaselog/...
-  wear       Wear OS Libre3 + Sibionics + Dexcom (Google, Debug)
+  wear|watch Wear OS Libre3 + Sibionics + Dexcom (Google, Debug)
+             APK: Common/build/outputs/apk/wearLibre3SiDexGoogle/debug/...
   clean      Runs Gradle clean
   <custom>   Any valid Gradle task name (e.g. assembleWearLibre3Release)
 
 Options:
-  -i, --install    Install the generated APK to a connected device via adb
-  -h, --help       Show this help message
+  -i, --install           Install the generated APK to a connected device via adb
+  -s, --device <serial>   Specify adb device serial or IP (e.g. 192.168.1.50:5555)
+  -h, --help              Show this help message
+
+Examples:
+  ./build.sh watch --install
+  ./build.sh watch -s 192.168.1.100:5555
+  ./install-watch.sh [serial]
 
 EOF
 }
 
 TARGET=""
 INSTALL=false
+DEVICE=""
 
-for arg in "$@"; do
-    case "$arg" in
+while [[ $# -gt 0 ]]; do
+    case "$1" in
         -h|--help)
             show_help
             exit 0
             ;;
         -i|--install)
             INSTALL=true
+            shift
+            ;;
+        -s|--device|--serial)
+            DEVICE="$2"
+            INSTALL=true
+            shift 2
             ;;
         clean)
             TARGET="clean"
+            shift
             ;;
         debugdub)
             TARGET="debugdub"
+            shift
             ;;
         debug)
             TARGET="debug"
+            shift
             ;;
         google|google-debug)
             TARGET="google"
+            shift
             ;;
         release|releaselog)
             TARGET="release"
+            shift
             ;;
-        wear)
+        wear|watch)
             TARGET="wear"
+            shift
             ;;
         *)
             if [ -z "$TARGET" ]; then
-                TARGET="$arg"
+                TARGET="$1"
             else
-                echo "Unknown option: $arg" >&2
+                echo "Unknown option: $1" >&2
                 show_help
                 exit 1
             fi
+            shift
             ;;
     esac
 done
@@ -203,7 +224,37 @@ if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
             echo "Error: adb not found in PATH." >&2
             exit 1
         fi
-        adb install -r "$APK_PATH"
+
+        ADB_FLAGS=()
+        if [ -n "$DEVICE" ]; then
+            ADB_FLAGS+=("-s" "$DEVICE")
+        else
+            # If targeting wear and multiple devices connected, attempt to auto-select watch
+            CONNECTED_DEVICES=($(adb devices | grep -w "device" | awk '{print $1}'))
+            if [ ${#CONNECTED_DEVICES[@]} -gt 1 ]; then
+                WATCH_FOUND=""
+                for d in "${CONNECTED_DEVICES[@]}"; do
+                    CHARS=$(adb -s "$d" shell getprop ro.build.characteristics 2>/dev/null || true)
+                    if [[ "$CHARS" == *"watch"* ]]; then
+                        WATCH_FOUND="$d"
+                        break
+                    fi
+                done
+                if [ -n "$WATCH_FOUND" ] && [ "$TARGET" = "wear" ]; then
+                    echo "==> Auto-detected Wear OS watch: $WATCH_FOUND"
+                    ADB_FLAGS+=("-s" "$WATCH_FOUND")
+                else
+                    echo "Multiple devices connected. Please specify one with -s <serial>:"
+                    for d in "${CONNECTED_DEVICES[@]}"; do
+                        MODEL=$(adb -s "$d" shell getprop ro.product.model 2>/dev/null || echo "Unknown")
+                        echo "  - $d ($MODEL)"
+                    done
+                    exit 1
+                fi
+            fi
+        fi
+
+        adb "${ADB_FLAGS[@]}" install -r "$APK_PATH"
         echo "==> Installed successfully!"
     else
         echo ""
@@ -211,6 +262,8 @@ if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
         echo "  adb install -r \"$APK_PATH\""
         echo "Or run this script with --install:"
         echo "  ./build.sh --install"
+        echo "For Wear OS watch:"
+        echo "  ./build.sh watch --install [-s <serial>]"
     fi
 else
     echo " Build finished, but output APK could not be automatically located."

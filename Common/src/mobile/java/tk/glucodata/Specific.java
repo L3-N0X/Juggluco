@@ -39,6 +39,12 @@ public class Specific {
 	static void rmlayout() {
 	}
 
+	public static void setupWearUi(MainActivity act) {
+	}
+
+	public static void refreshRepository() {
+	}
+
 	static void initScreen(Object act) {
 	}
 
