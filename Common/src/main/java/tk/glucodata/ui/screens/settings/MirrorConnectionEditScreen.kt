@@ -213,6 +213,27 @@ fun MirrorConnectionEditScreen(
             )
         }
 
+        // DIAGNOSTICS
+        if (existingConn != null && existingConn.status.isNotBlank()) {
+            SettingsSection(title = "Connection status & diagnostics") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    val annotated = remember(existingConn.status) {
+                        htmlToAnnotatedString(existingConn.status)
+                    }
+                    Text(
+                        text = annotated,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        }
+
         // ACTIONS
         SettingsSection(title = "Actions") {
             Column(

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -47,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.Applic
@@ -56,6 +58,7 @@ import tk.glucodata.R
 import tk.glucodata.SensorBridge
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.MirrorConnection
+import tk.glucodata.ui.screens.settings.getMirrorConnectionStatusSummary
 
 @Composable
 fun MirrorConfigDialog(
@@ -317,9 +320,10 @@ fun MirrorConfigDialog(
                                         color = MaterialTheme.colorScheme.primary
                                     )
 
-                                    if (conn.status.isNotBlank()) {
+                                    val statusSummary = getMirrorConnectionStatusSummary(conn)
+                                    if (statusSummary.isNotBlank()) {
                                         Text(
-                                            text = "Status: ${conn.status}",
+                                            text = "Status: $statusSummary",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.outline
                                         )
@@ -383,19 +387,18 @@ fun MirrorConfigDialog(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(stringResource(R.string.dialog_tcp_port), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
-                                OutlinedTextField(
-                                    value = editListenPort,
-                                    onValueChange = { editListenPort = it },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth().padding(end = 8.dp)
-                                )
-                            }
-                            OutlinedButton(
+                            OutlinedTextField(
+                                value = editListenPort,
+                                onValueChange = { editListenPort = it },
+                                label = { Text("Listen Port") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
                                 onClick = {
                                     val ok = repository.setMirrorReceivePort(editListenPort)
                                     if (ok) {
@@ -404,6 +407,7 @@ fun MirrorConfigDialog(
                                         Toast.makeText(context, portInvalidMsg, Toast.LENGTH_SHORT).show()
                                     }
                                 },
+                                modifier = Modifier.height(56.dp),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(stringResource(R.string.dialog_mirror_save_port))

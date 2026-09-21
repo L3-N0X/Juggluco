@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -51,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.Applic
@@ -59,6 +61,44 @@ import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.SensorBridge
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.model.MirrorConnection
+
+fun getMirrorConnectionStatusSummary(conn: MirrorConnection): String {
+    if (conn.isDeactivated) return "Disabled"
+    val raw = conn.status
+    if (raw.isBlank()) return if (conn.isActive) "Active" else ""
+
+    val errorMatch = Regex("""\w{3}\s+\w{3}\s+\d+\s+[\d:]+\s+\d{4}:\s*(.+)""").find(raw)
+    if (errorMatch != null) {
+        val err = errorMatch.groupValues[1].trim().removeSuffix(":")
+        if (err.isNotBlank()) return "Error: $err"
+    }
+
+    val isTcpLive = raw.contains("live socket: true", ignoreCase = true) ||
+            raw.contains("TCP/IP live socket</b>: true", ignoreCase = true)
+    val isBleLive = raw.contains("Direct Bluetooth (BLE GATT)=true", ignoreCase = true)
+    val isWearLive = raw.contains("Messages (Wear OS MessageClient)=true", ignoreCase = true)
+
+    if (isTcpLive || isBleLive || isWearLive) {
+        return "Connected"
+    }
+
+    if (raw.contains("running=true", ignoreCase = true) ||
+        raw.contains("wait for commands: true", ignoreCase = true) ||
+        raw.contains("wait for commands:true", ignoreCase = true)
+    ) {
+        return if (conn.isReceiver) "Listening" else "Connecting"
+    }
+
+    if (raw.contains("running=false", ignoreCase = true) ||
+        raw.contains("live socket: false", ignoreCase = true) ||
+        raw.contains("No active carrier", ignoreCase = true)
+    ) {
+        return "Disconnected"
+    }
+
+    return if (conn.isActive) "Active" else ""
+}
 
 @Composable
 fun MirrorSettingsScreen(
@@ -174,7 +214,7 @@ fun MirrorSettingsScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
@@ -182,6 +222,7 @@ fun MirrorSettingsScreen(
                         onValueChange = { editListenPort = it },
                         label = { Text("Listen Port") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
                     )
                     Button(
@@ -193,6 +234,7 @@ fun MirrorSettingsScreen(
                                 Toast.makeText(context, portInvalidMsg, Toast.LENGTH_SHORT).show()
                             }
                         },
+                        modifier = Modifier.height(56.dp),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Text(stringResource(R.string.dialog_mirror_save_port))
@@ -221,10 +263,12 @@ fun MirrorSettingsScreen(
                 connections.forEach { conn ->
                     val ipText = if (conn.ips.isNotEmpty()) conn.ips.joinToString(", ") else "127.0.0.1"
                     val roleLabel = if (conn.isReceiver) "Receiver" else "Sender"
+                    val statusSummary = getMirrorConnectionStatusSummary(conn)
+                    val statusSuffix = if (statusSummary.isNotBlank()) " • $statusSummary" else ""
 
                     SettingsNavRow(
                         title = conn.label.ifBlank { "Connection #${conn.index + 1}" },
-                        subtitle = "$ipText:${conn.port} • $roleLabel ${if (conn.status.isNotBlank()) "(${conn.status})" else ""}",
+                        subtitle = "$ipText:${conn.port} • $roleLabel$statusSuffix",
                         icon = Icons.Default.Devices,
                         onClick = { onOpenConnectionEdit(conn.index) }
                     )
@@ -406,11 +450,11 @@ fun MirrorSettingsScreen(
 
                 AnimatedVisibility(visible = showGuideExpanded) {
                     val guideHtml = stringResource(R.string.settings_dev_guide_body)
-                    val spanned = remember(guideHtml) {
-                        androidx.core.text.HtmlCompat.fromHtml(guideHtml, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT)
+                    val annotated = remember(guideHtml) {
+                        htmlToAnnotatedString(guideHtml)
                     }
                     Text(
-                        text = spanned.toString(),
+                        text = annotated,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 18.sp,

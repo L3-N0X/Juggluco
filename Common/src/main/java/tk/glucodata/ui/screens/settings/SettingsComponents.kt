@@ -1,5 +1,10 @@
 package tk.glucodata.ui.screens.settings
 
+import android.graphics.Typeface
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
+import android.text.style.UnderlineSpan
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,10 +56,15 @@ import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.text.HtmlCompat
 import tk.glucodata.ui.screens.ScreenLayout
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -679,4 +689,52 @@ fun SettingsCard(
         title = categorySubtitle ?: title.takeIf { it.isNotEmpty() },
         content = content
     )
+}
+
+/**
+ * Converts an Android [Spanned] instance to a Compose [AnnotatedString],
+ * preserving bold, italic, underline, and foreground color styling.
+ */
+fun Spanned.toAnnotatedString(): AnnotatedString {
+    val text = this.toString()
+    val builder = AnnotatedString.Builder(text)
+    val spans = getSpans(0, length, Any::class.java)
+    for (span in spans) {
+        val start = getSpanStart(span).coerceIn(0, text.length)
+        val end = getSpanEnd(span).coerceIn(0, text.length)
+        if (start >= end) continue
+        when (span) {
+            is StyleSpan -> {
+                when (span.style) {
+                    Typeface.BOLD -> builder.addStyle(SpanStyle(fontWeight = FontWeight.Bold), start, end)
+                    Typeface.ITALIC -> builder.addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
+                    Typeface.BOLD_ITALIC -> builder.addStyle(SpanStyle(fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic), start, end)
+                }
+            }
+            is UnderlineSpan -> {
+                builder.addStyle(SpanStyle(textDecoration = TextDecoration.Underline), start, end)
+            }
+            is ForegroundColorSpan -> {
+                builder.addStyle(SpanStyle(color = Color(span.foregroundColor)), start, end)
+            }
+        }
+    }
+    return builder.toAnnotatedString()
+}
+
+/**
+ * Parses an HTML string cleanly using [HtmlCompat], stripping tags and returning
+ * a styled [AnnotatedString] suitable for Jetpack Compose [Text] components.
+ */
+fun htmlToAnnotatedString(html: String): AnnotatedString {
+    if (html.isBlank()) return AnnotatedString("")
+    return try {
+        val spanned = HtmlCompat.fromHtml(
+            html,
+            HtmlCompat.FROM_HTML_MODE_COMPACT
+        )
+        spanned.toAnnotatedString()
+    } catch (_: Throwable) {
+        AnnotatedString(html.replace(Regex("<[^>]+>"), " ").trim())
+    }
 }
