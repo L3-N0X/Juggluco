@@ -132,8 +132,6 @@ fun LibreViewSettingsScreen(
                 )
             }
 
-            SettingsDivider()
-
             SettingsSwitchRow(
                 title = stringResource(R.string.sendamounts),
                 subtitle = "Upload logged carbs and insulin doses along with glucose stream",

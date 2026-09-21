@@ -59,7 +59,6 @@ import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.screens.settings.SettingsDetailScaffold
-import tk.glucodata.ui.screens.settings.SettingsDivider
 import tk.glucodata.ui.screens.settings.SettingsIcon
 import tk.glucodata.ui.screens.settings.SettingsInfoCard
 import tk.glucodata.ui.screens.settings.SettingsSection
@@ -272,7 +271,6 @@ fun ExportScreen(
         SettingsSection(title = stringResource(R.string.export_select_stream)) {
             streamOptions.forEachIndexed { index, option ->
                 if (index > 0) {
-                    SettingsDivider()
                 }
                 val isSelected = selectedTypeIndex == option.typeIndex
                 Row(

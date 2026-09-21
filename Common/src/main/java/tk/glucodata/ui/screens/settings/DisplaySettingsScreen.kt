@@ -132,8 +132,6 @@ fun DisplaySettingsScreen(
                 }
             }
 
-            SettingsDivider()
-
             SettingsActionRow(
                 title = stringResource(R.string.languagename),
                 subtitle = AppLanguageManager.getLanguageDisplayName(currentLanguageCode, context),
@@ -189,8 +187,6 @@ fun DisplaySettingsScreen(
                 onCheckedChange = { repository.setStatusBarNotification(it) }
             )
 
-            SettingsDivider()
-
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_fullscreen),
                 subtitle = stringResource(R.string.settings_fullscreen_desc),
@@ -200,8 +196,6 @@ fun DisplaySettingsScreen(
                     repository.setSystemUiFullscreen(it, context as? Activity)
                 }
             )
-
-            SettingsDivider()
 
             SettingsSwitchRow(
                 title = stringResource(R.string.minimalist_units),
@@ -226,8 +220,6 @@ fun DisplaySettingsScreen(
                 },
                 onClick = onOpenFloatingWidgetConfig
             )
-
-            SettingsDivider()
 
             SettingsNavRow(
                 title = stringResource(R.string.calibration_title),

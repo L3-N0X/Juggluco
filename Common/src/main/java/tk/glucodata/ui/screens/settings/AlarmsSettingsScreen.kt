@@ -61,7 +61,6 @@ fun AlarmsSettingsScreen(
             )
 
             if (alarms.lowAlarmEnabled) {
-                SettingsDivider()
 
                 // Low Threshold Slider
                 Column(
@@ -96,8 +95,6 @@ fun AlarmsSettingsScreen(
                         modifier = Modifier.padding(start = 52.dp, top = 2.dp)
                     )
                 }
-
-                SettingsDivider()
 
                 // Snooze selection
                 Column(
@@ -134,8 +131,6 @@ fun AlarmsSettingsScreen(
                 }
             }
 
-            SettingsDivider()
-
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_alarm_high),
                 subtitle = stringResource(R.string.settings_alarm_high_desc, unit.format(alarms.highThreshold)),
@@ -145,7 +140,6 @@ fun AlarmsSettingsScreen(
             )
 
             if (alarms.highAlarmEnabled) {
-                SettingsDivider()
 
                 // High Threshold Slider
                 Column(
@@ -180,8 +174,6 @@ fun AlarmsSettingsScreen(
                         modifier = Modifier.padding(start = 52.dp, top = 2.dp)
                     )
                 }
-
-                SettingsDivider()
 
                 // Snooze selection
                 Column(
@@ -230,7 +222,6 @@ fun AlarmsSettingsScreen(
             )
 
             if (alarms.lossAlarmEnabled) {
-                SettingsDivider()
 
                 Column(
                     modifier = Modifier
@@ -265,8 +256,6 @@ fun AlarmsSettingsScreen(
                     }
                 }
             }
-
-            SettingsDivider()
 
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_alarm_value_available),

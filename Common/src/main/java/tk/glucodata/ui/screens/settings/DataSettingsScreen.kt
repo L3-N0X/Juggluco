@@ -133,7 +133,6 @@ fun DataSettingsScreen(
                         traceBytes = logSize { Natives.getLogfilesize() }
                     }
                 )
-                SettingsDivider()
                 SettingsActionRow(
                     title = "trace.log",
                     subtitle = formatLogSize(traceBytes),
@@ -150,7 +149,6 @@ fun DataSettingsScreen(
                         }
                     }
                 )
-                SettingsDivider()
                 SettingsSwitchRow(
                     title = "Capture system log",
                     subtitle = "Runs logcat in the background and rotates it at ${formatLogSize(8L * 1024L * 1024L)}",
@@ -162,7 +160,6 @@ fun DataSettingsScreen(
                         logcatBytes = logSize { Natives.getLogcatfilesize() }
                     }
                 )
-                SettingsDivider()
                 SettingsActionRow(
                     title = "logcat.txt",
                     subtitle = formatLogSize(logcatBytes),

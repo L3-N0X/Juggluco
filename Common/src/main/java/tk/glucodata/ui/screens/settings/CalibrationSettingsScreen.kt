@@ -43,8 +43,6 @@ fun CalibrationSettingsScreen(
                     onCheckedChange = { repository.setCalibratePastReadings(it) }
                 )
 
-                SettingsDivider()
-
                 SettingsSwitchRow(
                     title = stringResource(R.string.calibration_all_values),
                     subtitle = stringResource(R.string.calibration_all_values_desc),

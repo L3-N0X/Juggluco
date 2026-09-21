@@ -48,7 +48,6 @@ import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
 import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
 import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
 import tk.glucodata.ui.screens.settings.SettingsDestination
-import tk.glucodata.ui.screens.settings.SettingsDivider
 import tk.glucodata.ui.screens.settings.SettingsNavRow
 import tk.glucodata.ui.screens.settings.SettingsSection
 import tk.glucodata.ui.screens.settings.TurnServerSettingsScreen
@@ -270,7 +269,6 @@ fun SettingsScreen(
                 icon = SettingsDestination.GLUCOSE_TARGETS.icon,
                 onClick = { handleNavigate(SettingsDestination.GLUCOSE_TARGETS) }
             )
-            SettingsDivider()
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_alarms_title),
                 subtitle = stringResource(R.string.settings_group_alarms_desc),
@@ -287,7 +285,6 @@ fun SettingsScreen(
                 icon = SettingsDestination.DISPLAY.icon,
                 onClick = { handleNavigate(SettingsDestination.DISPLAY) }
             )
-            SettingsDivider()
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_voice_title),
                 subtitle = stringResource(R.string.settings_group_voice_desc),
@@ -304,14 +301,12 @@ fun SettingsScreen(
                 icon = SettingsDestination.BROADCASTS.icon,
                 onClick = { handleNavigate(SettingsDestination.BROADCASTS) }
             )
-            SettingsDivider()
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_mirror_title),
                 subtitle = stringResource(R.string.settings_group_mirror_desc),
                 icon = SettingsDestination.MIRROR.icon,
                 onClick = { handleNavigate(SettingsDestination.MIRROR) }
             )
-            SettingsDivider()
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_hardware_title),
                 subtitle = stringResource(R.string.settings_group_hardware_desc),
@@ -328,7 +323,6 @@ fun SettingsScreen(
                 icon = SettingsDestination.DATA.icon,
                 onClick = { handleNavigate(SettingsDestination.DATA) }
             )
-            SettingsDivider()
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_about_title),
                 subtitle = stringResource(R.string.settings_group_about_desc),

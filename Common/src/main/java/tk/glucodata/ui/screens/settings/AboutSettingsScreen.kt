@@ -36,15 +36,11 @@ fun AboutSettingsScreen(
                 icon = Icons.Default.Sensors
             )
 
-            SettingsDivider()
-
             SettingsActionRow(
                 title = "Dexcom CGM",
                 subtitle = "Dexcom G7 and Dexcom ONE+ direct Bluetooth Low Energy connectivity",
                 icon = Icons.Default.Sensors
             )
-
-            SettingsDivider()
 
             SettingsActionRow(
                 title = "Sibionics CGM",
@@ -60,8 +56,6 @@ fun AboutSettingsScreen(
                 subtitle = "100% offline-capable. Medical records never leave your phone without explicit third-party service setup.",
                 icon = Icons.Default.Security
             )
-
-            SettingsDivider()
 
             SettingsActionRow(
                 title = "Free software (GPLv3)",

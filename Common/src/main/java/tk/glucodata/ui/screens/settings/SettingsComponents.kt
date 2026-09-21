@@ -27,7 +27,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,12 +38,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.ui.screens.ScreenLayout
@@ -112,11 +120,91 @@ fun SettingsDetailScaffold(
     }
 }
 
+private val SettingsGroupOuterRadius = 20.dp
+private val SettingsGroupInnerRadius = 4.dp
+private val SettingsGroupItemGap = 3.dp
+
+private data class SettingsGroupItemBounds(val offset: Offset, val size: Size)
+
+private fun settingsGroupItemShape(index: Int, count: Int): RoundedCornerShape = when {
+    count <= 1 -> RoundedCornerShape(SettingsGroupOuterRadius)
+    index == 0 -> RoundedCornerShape(
+        topStart = SettingsGroupOuterRadius,
+        topEnd = SettingsGroupOuterRadius,
+        bottomStart = SettingsGroupInnerRadius,
+        bottomEnd = SettingsGroupInnerRadius
+    )
+    index == count - 1 -> RoundedCornerShape(
+        topStart = SettingsGroupInnerRadius,
+        topEnd = SettingsGroupInnerRadius,
+        bottomStart = SettingsGroupOuterRadius,
+        bottomEnd = SettingsGroupOuterRadius
+    )
+    else -> RoundedCornerShape(SettingsGroupInnerRadius)
+}
+
+/**
+ * Lays out its children as a Material 3 grouped list: every direct child becomes
+ * its own filled item with a tiny gap to its neighbors, square corners where two
+ * items touch, and the full radius only at the very top and bottom of the group.
+ */
+@Composable
+private fun SettingsGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val itemColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+    val itemBounds = remember { mutableStateOf(emptyList<SettingsGroupItemBounds>()) }
+
+    Layout(
+        content = content,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(SettingsGroupOuterRadius))
+            .drawBehind {
+                val bounds = itemBounds.value
+                val count = bounds.size
+                bounds.forEachIndexed { index, item ->
+                    val shape = settingsGroupItemShape(index, count)
+                    val outline = shape.createOutline(item.size, layoutDirection, this)
+                    translate(left = item.offset.x, top = item.offset.y) {
+                        drawOutline(outline, color = itemColor)
+                    }
+                }
+            }
+    ) { measurables, constraints ->
+        val gapPx = SettingsGroupItemGap.roundToPx()
+        val childConstraints = Constraints.fixedWidth(constraints.maxWidth)
+        val placeables = measurables.map { it.measure(childConstraints) }
+        val totalHeight = if (placeables.isEmpty()) {
+            0
+        } else {
+            placeables.sumOf { it.height } + gapPx * (placeables.size - 1)
+        }
+
+        val bounds = ArrayList<SettingsGroupItemBounds>(placeables.size)
+        var y = 0
+        for (placeable in placeables) {
+            bounds.add(SettingsGroupItemBounds(Offset(0f, y.toFloat()), Size(placeable.width.toFloat(), placeable.height.toFloat())))
+            y += placeable.height + gapPx
+        }
+        itemBounds.value = bounds
+
+        layout(constraints.maxWidth, totalHeight) {
+            var placeY = 0
+            placeables.forEach { placeable ->
+                placeable.placeRelative(0, placeY)
+                placeY += placeable.height + gapPx
+            }
+        }
+    }
+}
+
 @Composable
 fun SettingsSection(
     modifier: Modifier = Modifier,
     title: String? = null,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable () -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxWidth()
@@ -130,24 +218,8 @@ fun SettingsSection(
                 modifier = Modifier.padding(start = ScreenLayout.CardPadding, bottom = 6.dp)
             )
         }
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            color = ScreenLayout.cardContainerColor
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                content()
-            }
-        }
+        SettingsGroup(content = content)
     }
-}
-
-@Composable
-fun SettingsDivider(modifier: Modifier = Modifier) {
-    HorizontalDivider(
-        modifier = modifier.padding(start = 68.dp, end = 16.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-    )
 }
 
 @Composable
@@ -175,8 +247,10 @@ fun SettingsIcon(
 
 /**
  * A setting row that opens a dedicated screen or section.
- * Renders an icon on the left, text in the middle, and on the right:
- * a caret, vertical line, and optionally a toggle switch.
+ * Renders an icon on the left and text in the middle. A row that only
+ * navigates has no trailing indicator; a caret + vertical line + switch only
+ * appears when the row combines navigation with a boolean value, since tapping
+ * the switch and tapping the rest of the row do different things.
  */
 @Composable
 fun SettingsNavRow(
@@ -254,21 +328,6 @@ fun SettingsNavRow(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 enabled = enabled
-            )
-        } else {
-            Spacer(modifier = Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .height(28.dp)
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -613,7 +672,7 @@ fun SettingsCard(
     icon: ImageVector? = null,
     categorySubtitle: String? = null,
     modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable () -> Unit
 ) {
     SettingsSection(
         modifier = modifier,

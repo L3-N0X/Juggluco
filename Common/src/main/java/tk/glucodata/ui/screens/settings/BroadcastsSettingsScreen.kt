@@ -38,8 +38,6 @@ fun BroadcastsSettingsScreen(
                 onCheckedChange = { repository.setGlucodataBroadcast(it) }
             )
 
-            SettingsDivider()
-
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_xdrip_broadcast),
                 subtitle = stringResource(R.string.settings_xdrip_broadcast_desc),
@@ -47,8 +45,6 @@ fun BroadcastsSettingsScreen(
                 checked = exchanges.xdripBroadcast,
                 onCheckedChange = { repository.setXdripBroadcast(it) }
             )
-
-            SettingsDivider()
 
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_librelink_broadcast),
@@ -69,8 +65,6 @@ fun BroadcastsSettingsScreen(
                 onCheckedChange = { repository.setHealthConnect(it, context as? Activity) }
             )
 
-            SettingsDivider()
-
             SettingsNavRow(
                 title = stringResource(R.string.settings_libreview),
                 subtitle = stringResource(R.string.settings_libreview_desc),
@@ -79,8 +73,6 @@ fun BroadcastsSettingsScreen(
                 onCheckedChange = { repository.setLibreViewEnabled(it) },
                 onClick = onOpenLibreViewConfig
             )
-
-            SettingsDivider()
 
             SettingsNavRow(
                 title = stringResource(R.string.settings_xdrip_server),

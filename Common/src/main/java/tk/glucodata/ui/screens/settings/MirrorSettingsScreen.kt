@@ -137,15 +137,11 @@ fun MirrorSettingsScreen(
                 icon = Icons.Default.Devices
             )
 
-            SettingsDivider()
-
             SettingsActionRow(
                 title = stringResource(R.string.dialog_wlan_ip),
                 subtitle = wlanIp,
                 icon = Icons.Default.Wifi
             )
-
-            SettingsDivider()
 
             SettingsSwitchRow(
                 title = stringResource(R.string.dialog_lock_amounts),
@@ -215,7 +211,6 @@ fun MirrorSettingsScreen(
             )
 
             if (connections.isEmpty()) {
-                SettingsDivider()
                 Text(
                     text = stringResource(R.string.dialog_mirror_no_conns),
                     style = MaterialTheme.typography.bodySmall,
@@ -224,7 +219,6 @@ fun MirrorSettingsScreen(
                 )
             } else {
                 connections.forEach { conn ->
-                    SettingsDivider()
                     val ipText = if (conn.ips.isNotEmpty()) conn.ips.joinToString(", ") else "127.0.0.1"
                     val roleLabel = if (conn.isReceiver) "Receiver" else "Sender"
 

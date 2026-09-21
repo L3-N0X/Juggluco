@@ -64,8 +64,6 @@ fun FloatingWidgetSettingsScreen(
                     }
                 )
 
-                SettingsDivider()
-
                 SettingsSliderRow(
                     title = stringResource(R.string.dialog_bg_opacity),
                     valueText = "${(opacity * 100).toInt()}%",

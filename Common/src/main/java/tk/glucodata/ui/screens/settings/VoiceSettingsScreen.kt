@@ -65,8 +65,6 @@ fun VoiceSettingsScreen(
                 }
             )
 
-            SettingsDivider()
-
             SettingsSwitchRow(
                 title = stringResource(R.string.dialog_speak_alarms),
                 subtitle = stringResource(R.string.dialog_speak_alarms_desc),
@@ -92,8 +90,6 @@ fun VoiceSettingsScreen(
                 },
                 valueRange = 0.5f..2.0f
             )
-
-            SettingsDivider()
 
             SettingsSliderRow(
                 title = stringResource(R.string.dialog_voice_pitch),
@@ -129,8 +125,6 @@ fun VoiceSettingsScreen(
                     }
                 }
             )
-
-            SettingsDivider()
 
             SettingsActionRow(
                 title = "Reset default voice settings",

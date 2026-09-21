@@ -188,8 +188,6 @@ fun MirrorConnectionEditScreen(
                 )
             }
 
-            SettingsDivider()
-
             SettingsSwitchRow(
                 title = "Continuous glucose stream",
                 subtitle = "Sync minute-by-minute sensor curve points",
@@ -198,8 +196,6 @@ fun MirrorConnectionEditScreen(
                 onCheckedChange = { sendStream = it }
             )
 
-            SettingsDivider()
-
             SettingsSwitchRow(
                 title = "Manual NFC scans",
                 subtitle = "Sync NFC scan events and fingerstick tests",
@@ -207,8 +203,6 @@ fun MirrorConnectionEditScreen(
                 checked = sendScans,
                 onCheckedChange = { sendScans = it }
             )
-
-            SettingsDivider()
 
             SettingsSwitchRow(
                 title = "Insulin & carb amounts",

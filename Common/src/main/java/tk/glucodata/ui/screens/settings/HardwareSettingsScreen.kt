@@ -41,8 +41,6 @@ fun HardwareSettingsScreen(
                 }
             )
 
-            SettingsDivider()
-
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_nfc_launch),
                 subtitle = stringResource(R.string.settings_nfc_launch_desc),
