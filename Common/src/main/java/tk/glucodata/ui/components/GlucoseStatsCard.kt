@@ -14,6 +14,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -96,26 +104,31 @@ fun GlucoseStatsCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 TirLegendItem(
+                    icon = Icons.Default.KeyboardDoubleArrowDown,
                     label = stringResource(R.string.status_very_low),
                     percent = stats.timeVeryLowPercent,
                     color = clinicalColors.veryLow
                 )
                 TirLegendItem(
+                    icon = Icons.Default.ArrowDownward,
                     label = stringResource(R.string.status_low),
-                    percent = (stats.timeBelowPercent - stats.timeVeryLowPercent).coerceAtLeast(0),
+                    percent = stats.timeBelowPercent,
                     color = clinicalColors.low
                 )
                 TirLegendItem(
+                    icon = Icons.Default.Check,
                     label = stringResource(R.string.status_in_range),
                     percent = stats.timeInRangePercent,
                     color = clinicalColors.inRange
                 )
                 TirLegendItem(
+                    icon = Icons.Default.ArrowUpward,
                     label = stringResource(R.string.status_high),
-                    percent = (stats.timeAbovePercent - stats.timeVeryHighPercent).coerceAtLeast(0),
+                    percent = stats.timeAbovePercent,
                     color = clinicalColors.high
                 )
                 TirLegendItem(
+                    icon = Icons.Default.KeyboardDoubleArrowUp,
                     label = stringResource(R.string.status_very_high),
                     percent = stats.timeVeryHighPercent,
                     color = clinicalColors.veryHigh
@@ -163,9 +176,9 @@ private fun TimeInRangeBar(stats: GlucoseStats) {
     val clinicalColors = LocalClinicalColors.current
 
     val vLow = stats.timeVeryLowPercent.coerceAtLeast(0)
-    val low = (stats.timeBelowPercent - stats.timeVeryLowPercent).coerceAtLeast(0)
+    val low = stats.timeBelowPercent.coerceAtLeast(0)
     val inRange = stats.timeInRangePercent.coerceAtLeast(0)
-    val high = (stats.timeAbovePercent - stats.timeVeryHighPercent).coerceAtLeast(0)
+    val high = stats.timeAbovePercent.coerceAtLeast(0)
     val vHigh = stats.timeVeryHighPercent.coerceAtLeast(0)
 
     val total = (vLow + low + inRange + high + vHigh).coerceAtLeast(1)
@@ -222,18 +235,20 @@ private fun TimeInRangeBar(stats: GlucoseStats) {
 
 @Composable
 private fun TirLegendItem(
+    icon: ImageVector,
     label: String,
     percent: Int,
     color: Color
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(color, CircleShape)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(12.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(3.dp))
             Text(
                 text = "${percent.coerceAtLeast(0)}%",
                 style = MaterialTheme.typography.labelSmall,
@@ -241,6 +256,7 @@ private fun TirLegendItem(
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,

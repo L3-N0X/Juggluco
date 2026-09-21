@@ -80,18 +80,20 @@ val LightClinicalColors = ClinicalColors(
     inRange = Color(0xFF2E6B4F), // Muted sage / forest green
     inRangeContainer = Color(0xFFE2EFE7),
     onInRangeContainer = Color(0xFF133825),
-    low = Color(0xFFB45309), // Muted warm amber
+    // Warning tier (Level 1 deviation: Low & High share unified accessible amber token)
+    low = Color(0xFFB45309), // Warm amber
     lowContainer = Color(0xFFFEF3C7),
     onLowContainer = Color(0xFF78350F),
-    veryLow = Color(0xFFB91C1C), // Deep crimson
-    veryLowContainer = Color(0xFFFEE2E2),
-    onVeryLowContainer = Color(0xFF7F1D1D),
-    high = Color(0xFFC2410C), // Muted burnt orange
-    highContainer = Color(0xFFFFEDD5),
-    onHighContainer = Color(0xFF7C2D12),
-    veryHigh = Color(0xFF9F1239), // Muted wine / rose
-    veryHighContainer = Color(0xFFFFE4E6),
-    onVeryHighContainer = Color(0xFF701A31),
+    high = Color(0xFFB45309), // Warm amber (matching opposite warning area)
+    highContainer = Color(0xFFFEF3C7),
+    onHighContainer = Color(0xFF78350F),
+    // Critical tier (Level 2 deviation: Very Low & Very High share unified accessible crimson token)
+    veryLow = Color(0xFFBA1A1A), // Deep vibrant crimson
+    veryLowContainer = Color(0xFFFFDAD6),
+    onVeryLowContainer = Color(0xFF410002),
+    veryHigh = Color(0xFFBA1A1A), // Deep vibrant crimson (matching opposite critical area)
+    veryHighContainer = Color(0xFFFFDAD6),
+    onVeryHighContainer = Color(0xFF410002),
     targetRangeShade = Color(0x142E6B4F),
     graphGrid = Color(0x1870787D)
 )
@@ -100,18 +102,20 @@ val DarkClinicalColors = ClinicalColors(
     inRange = Color(0xFF7CB69D), // Soft muted sage, never neon
     inRangeContainer = Color(0xFF1B382B),
     onInRangeContainer = Color(0xFFD1E8DC),
-    low = Color(0xFFE0A34E), // Muted gold/amber
-    lowContainer = Color(0xFF4A3315),
+    // Warning tier (Level 1 deviation: Low & High share unified radiant amber token)
+    low = Color(0xFFF59E0B), // Warm radiant amber
+    lowContainer = Color(0xFF452C06),
     onLowContainer = Color(0xFFFDE68A),
-    veryLow = Color(0xFFE57373), // Soft muted coral
-    veryLowContainer = Color(0xFF4C1D1D),
+    high = Color(0xFFF59E0B), // Warm radiant amber (matching opposite warning area)
+    highContainer = Color(0xFF452C06),
+    onHighContainer = Color(0xFFFDE68A),
+    // Critical tier (Level 2 deviation: Very Low & Very High share unified crisp coral red token)
+    veryLow = Color(0xFFF87171), // Crisp coral red
+    veryLowContainer = Color(0xFF4C1818),
     onVeryLowContainer = Color(0xFFFECACA),
-    high = Color(0xFFE08E55), // Muted soft orange
-    highContainer = Color(0xFF4A2612),
-    onHighContainer = Color(0xFFFED7AA),
-    veryHigh = Color(0xFFE57388), // Soft muted rose
-    veryHighContainer = Color(0xFF4C1625),
-    onVeryHighContainer = Color(0xFFFECDD3),
+    veryHigh = Color(0xFFF87171), // Crisp coral red (matching opposite critical area)
+    veryHighContainer = Color(0xFF4C1818),
+    onVeryHighContainer = Color(0xFFFECACA),
     targetRangeShade = Color(0x1A7CB69D),
     graphGrid = Color(0x208A9297)
 )

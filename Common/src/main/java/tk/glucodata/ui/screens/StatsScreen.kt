@@ -22,13 +22,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowUp
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -647,8 +653,9 @@ private fun TimeInRangeBreakdownCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 5 Clinical Ranges Breakdown Rows
+            // 5 Clinical Ranges Breakdown Rows (Vertical descending hierarchy: Top/Very High -> Bottom/Very Low)
             TirRow(
+                icon = Icons.Default.KeyboardDoubleArrowUp,
                 label = stringResource(R.string.status_very_high),
                 rangeDesc = stringResource(R.string.tir_range_greater_than, unit.format(250f)),
                 percent = stats.timeVeryHighPercent,
@@ -656,6 +663,7 @@ private fun TimeInRangeBreakdownCard(
                 color = clinicalColors.veryHigh
             )
             TirRow(
+                icon = Icons.Default.ArrowUpward,
                 label = stringResource(R.string.status_high),
                 rangeDesc = stringResource(R.string.tir_range_between, unit.format(targetHigh + 1f), unit.format(250f)),
                 percent = stats.timeAbovePercent,
@@ -663,6 +671,7 @@ private fun TimeInRangeBreakdownCard(
                 color = clinicalColors.high
             )
             TirRow(
+                icon = Icons.Default.Check,
                 label = stringResource(R.string.status_in_range),
                 rangeDesc = stringResource(R.string.tir_range_between, unit.format(targetLow), unit.format(targetHigh)),
                 percent = stats.timeInRangePercent,
@@ -671,6 +680,7 @@ private fun TimeInRangeBreakdownCard(
                 isPrimary = true
             )
             TirRow(
+                icon = Icons.Default.ArrowDownward,
                 label = stringResource(R.string.status_low),
                 rangeDesc = stringResource(R.string.tir_range_between, unit.format(54f), unit.format(targetLow - 1f)),
                 percent = stats.timeBelowPercent,
@@ -678,6 +688,7 @@ private fun TimeInRangeBreakdownCard(
                 color = clinicalColors.low
             )
             TirRow(
+                icon = Icons.Default.KeyboardDoubleArrowDown,
                 label = stringResource(R.string.status_very_low),
                 rangeDesc = stringResource(R.string.tir_range_less_than, unit.format(54f)),
                 percent = stats.timeVeryLowPercent,
@@ -690,6 +701,7 @@ private fun TimeInRangeBreakdownCard(
 
 @Composable
 private fun TirRow(
+    icon: ImageVector,
     label: String,
     rangeDesc: String,
     percent: Int,
@@ -704,7 +716,7 @@ private fun TirRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 5.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -714,9 +726,17 @@ private fun TirRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(10.dp)
-                    .background(color, CircleShape)
-            )
+                    .size(24.dp)
+                    .background(color.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(10.dp))
             Column {
                 Text(

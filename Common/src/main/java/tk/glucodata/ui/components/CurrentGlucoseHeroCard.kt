@@ -13,7 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowUp
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -123,12 +128,30 @@ fun CurrentGlucoseHeroCard(
                 )
             }
 
-            Text(
-                text = statusLabel,
-                color = statusColor,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (currentReading != null) {
+                    val statusIcon = when (currentReading.status) {
+                        GlucoseStatus.VERY_LOW -> Icons.Default.KeyboardDoubleArrowDown
+                        GlucoseStatus.LOW -> Icons.Default.ArrowDownward
+                        GlucoseStatus.IN_RANGE -> Icons.Default.Check
+                        GlucoseStatus.HIGH -> Icons.Default.ArrowUpward
+                        GlucoseStatus.VERY_HIGH -> Icons.Default.KeyboardDoubleArrowUp
+                    }
+                    Icon(
+                        imageVector = statusIcon,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                }
+                Text(
+                    text = statusLabel,
+                    color = statusColor,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
