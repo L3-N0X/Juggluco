@@ -268,6 +268,7 @@ static RemoteGlucose arrowNotify;
     private static final String GLUCOSEALARM = "glucoseAlarm";
     //  private static final String LOSSALARM = "LossofSensorAlarm";
     private static final String GLUCOSENOTIFICATION = "glucoseNotification";
+    private static final String FOREGROUNDNOTIFICATION = "foregroundNotification";
 
 
     private void createNotificationChannel(Context context) {
@@ -292,6 +293,13 @@ static RemoteGlucose arrowNotify;
             importance = NotificationManager.IMPORTANCE_HIGH;
             channel = new NotificationChannel(GLUCOSENOTIFICATION, GLUCOSENOTIFICATION, importance);
             //allowbubbel(channel);
+            channel.setSound(null, null);
+            channel.setDescription(description);
+            notificationManager.createNotificationChannel(channel);
+
+            description = context.getString(R.string.ongoing_description);
+            importance = NotificationManager.IMPORTANCE_LOW;
+            channel = new NotificationChannel(FOREGROUNDNOTIFICATION, FOREGROUNDNOTIFICATION, importance);
             channel.setSound(null, null);
             channel.setDescription(description);
             notificationManager.createNotificationChannel(channel);
@@ -1035,7 +1043,7 @@ private Notification  makenotification(int draw,String message,String type,boole
 
 Notification getforgroundnotification() {
     final String mess= app.getString(SensorBluetooth.blueone!=null?R.string.connectwithsensor:R.string.exchangedata);
-    Notification not=makenotification(R.drawable.novalue,mess,GLUCOSENOTIFICATION,true);
+    Notification not=makenotification(R.drawable.novalue,mess,FOREGROUNDNOTIFICATION,true);
     not.flags|= FLAG_ONGOING_EVENT;
     return not;
     }
