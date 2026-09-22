@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -38,8 +37,6 @@ import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -344,7 +341,7 @@ fun GlucoseScreen(
                         .fillMaxHeight()
                         .verticalScroll(rememberScrollState())
                         .padding(end = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(28.dp)
                 ) {
                     // Always show current real-time sensor reading
                     CurrentGlucoseHeroCard(
@@ -410,7 +407,7 @@ fun GlucoseScreen(
                                 repository.stopSearch()
                             }
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
 
                     GlucoseGraph(
@@ -427,7 +424,7 @@ fun GlucoseScreen(
                             .weight(1f)
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     GraphNavigationToolbar(
                         isFullscreen = false,
@@ -471,7 +468,7 @@ fun GlucoseScreen(
                     deltaCalculation = displayConfig.deltaCalculation
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
                 // 2. Time Range Selector pills
                 TimeRangeSelector(
@@ -482,7 +479,7 @@ fun GlucoseScreen(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Search Active Banner
                 if (isSearchActive && searchMatches.isNotEmpty()) {
@@ -506,7 +503,7 @@ fun GlucoseScreen(
                             repository.stopSearch()
                         }
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // 3. Modern Interactive Compose Glucose Graph
@@ -524,7 +521,7 @@ fun GlucoseScreen(
                         .height(310.dp)
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // 4. Quick Graph Navigation Controls
                 GraphNavigationToolbar(
@@ -543,7 +540,7 @@ fun GlucoseScreen(
                     onOpenHelp = { showHelpSheet = true }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
                 // 5. Glucose Stats & Time in Range
                 GlucoseStatsCard(
@@ -553,7 +550,7 @@ fun GlucoseScreen(
                     minimalistUnits = displayConfig.minimalistUnits
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
                 // 6. Recent Logbook Entries Section
                 LogbookSection(
@@ -886,62 +883,56 @@ private fun SearchActiveBar(
     onNext: () -> Unit,
     onClose: () -> Unit
 ) {
-    Card(
+    // Flat indicator placed directly on the page (M3): no Card container, the
+    // primary accent carries the active state instead of a tonal surface.
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f, fill = false)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f, fill = false)
-            ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = summaryText.ifEmpty { stringResource(R.string.search) },
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onPrev, modifier = Modifier.size(32.dp)) {
                 Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = summaryText.ifEmpty { stringResource(R.string.search) },
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    maxLines = 1
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Prev Match",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPrev, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Prev Match",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-                IconButton(onClick = onNext, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Next Match",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-                IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close Search",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
+            IconButton(onClick = onNext, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "Next Match",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close Search",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -959,74 +950,67 @@ private fun GraphNavigationToolbar(
     onOpenDatePicker: () -> Unit,
     onOpenHelp: () -> Unit
 ) {
-    Card(
+    // Flat toolbar placed directly on the page (M3): icon buttons with no Card
+    // container, background or elevation, edge to edge with the screen gutter.
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        // Day Back
+        IconButton(onClick = { onNavigateDay(-1) }, modifier = Modifier.size(36.dp)) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(R.string.day_back),
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Center Actions: Date, Search, Last Scan, Layers, Fullscreen, Help
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onOpenDatePicker, modifier = Modifier.size(36.dp)) {
+                Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.date), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+
+            IconButton(onClick = onOpenSearch, modifier = Modifier.size(36.dp)) {
+                Icon(imageVector = Icons.Default.Search, contentDescription = stringResource(R.string.search), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+
+            IconButton(onClick = onShowLastScan, modifier = Modifier.size(36.dp)) {
+                Icon(imageVector = Icons.Default.Nfc, contentDescription = stringResource(R.string.last_scan), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+
+            IconButton(onClick = onOpenLayers, modifier = Modifier.size(36.dp)) {
+                Icon(imageVector = Icons.Default.Layers, contentDescription = stringResource(R.string.graph_layers), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+
+            IconButton(onClick = onToggleFullscreen, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                    contentDescription = stringResource(if (isFullscreen) R.string.exit_fullscreen else R.string.fullscreen_graph),
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            IconButton(onClick = onOpenHelp, modifier = Modifier.size(36.dp)) {
+                Icon(imageVector = Icons.Default.HelpOutline, contentDescription = stringResource(R.string.helpname), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        // Day Forward
+        IconButton(
+            onClick = { onNavigateDay(1) },
+            enabled = canNavigateForward,
+            modifier = Modifier.size(36.dp)
         ) {
-            // Day Back
-            IconButton(onClick = { onNavigateDay(-1) }, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.day_back),
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Center Actions: Date, Search, Last Scan, Layers, Fullscreen, Help
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onOpenDatePicker, modifier = Modifier.size(36.dp)) {
-                    Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.date), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-
-                IconButton(onClick = onOpenSearch, modifier = Modifier.size(36.dp)) {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = stringResource(R.string.search), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-
-                IconButton(onClick = onShowLastScan, modifier = Modifier.size(36.dp)) {
-                    Icon(imageVector = Icons.Default.Nfc, contentDescription = stringResource(R.string.last_scan), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-
-                IconButton(onClick = onOpenLayers, modifier = Modifier.size(36.dp)) {
-                    Icon(imageVector = Icons.Default.Layers, contentDescription = stringResource(R.string.graph_layers), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-
-                IconButton(onClick = onToggleFullscreen, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                        contentDescription = stringResource(if (isFullscreen) R.string.exit_fullscreen else R.string.fullscreen_graph),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                IconButton(onClick = onOpenHelp, modifier = Modifier.size(36.dp)) {
-                    Icon(imageVector = Icons.Default.HelpOutline, contentDescription = stringResource(R.string.helpname), modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-            }
-
-            // Day Forward
-            IconButton(
-                onClick = { onNavigateDay(1) },
-                enabled = canNavigateForward,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = stringResource(R.string.day_later),
-                    modifier = Modifier.size(18.dp),
-                    tint = if (canNavigateForward) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
-                )
-            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = stringResource(R.string.day_later),
+                modifier = Modifier.size(18.dp),
+                tint = if (canNavigateForward) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+            )
         }
     }
 }
@@ -1238,8 +1222,13 @@ fun LogbookSection(
                 )
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                displayLogs.forEach { logItem ->
+            // Flat M3 list (M3): rows sit directly on the page, separated by
+            // dividers instead of Card containers.
+            Column {
+                displayLogs.forEachIndexed { index, logItem ->
+                    if (index > 0) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    }
                     LogItemCard(
                         record = logItem,
                         unit = unit,

@@ -29,8 +29,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Update
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -166,7 +164,7 @@ fun GlucoseGraph(
     val currentOnLogEntryClicked by rememberUpdatedState(onLogEntryClicked)
     val decaySpec = remember(density) { androidx.compose.animation.core.exponentialDecay<Float>(frictionMultiplier = 1.4f) }
 
-    val cardModifier = if (modifier == Modifier) {
+    val graphModifier = if (modifier == Modifier) {
         Modifier
             .fillMaxWidth()
             .height(310.dp)
@@ -174,15 +172,9 @@ fun GlucoseGraph(
         modifier
     }
 
-    Card(
-        modifier = cardModifier,
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    // Flat section placed directly on the page (M3): no Card container, no
+    // elevation. The plot, grid and target band carry the visual structure.
+    Column(modifier = graphModifier) {
             // Fixed-height header: it is always present, so navigating in time never shifts the
             // graph (or anything below it) by a single pixel.
             GraphHeader(
@@ -348,7 +340,6 @@ fun GlucoseGraph(
                 }
             }
         }
-    }
 }
 
 // ---------------------------------------------------------------------------------------------

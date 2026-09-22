@@ -36,6 +36,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -305,9 +306,12 @@ fun LogbookScreen(
                         top = 6.dp,
                         bottom = ScreenLayout.BottomPadding
                     ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    itemsIndexed(finalFilteredLogs, key = { index, item -> "${item.id}_${item.timestamp}_$index" }) { _, item ->
+                    itemsIndexed(finalFilteredLogs, key = { index, item -> "${item.id}_${item.timestamp}_$index" }) { index, item ->
+                        if (index > 0) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        }
                         LogItemCard(
                             record = item,
                             unit = unit,
@@ -384,87 +388,83 @@ fun LogItemCard(
         LogType.NOTE -> if (record.value > 0) "${record.value}" else ""
     }
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    // Flat M3 list row placed directly on the page: no Card container, no
+    // elevation. Parents separate rows with HorizontalDivider.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .size(44.dp)
+                .background(itemColors.container, CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(itemColors.container, CircleShape),
-                contentAlignment = Alignment.Center
+            Icon(
+                imageVector = icon,
+                contentDescription = record.type.label,
+                tint = itemColors.onContainer,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = record.type.label,
-                    tint = itemColors.onContainer,
-                    modifier = Modifier.size(24.dp)
+                Text(
+                    text = record.type.label,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = valueDisplay,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = itemColors.primary
                 )
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = record.type.label,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = valueDisplay,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = itemColors.primary
-                    )
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${dateFormat.format(Date(record.timestamp))} at ${timeFormat.format(Date(record.timestamp))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                if (!record.note.isNullOrEmpty()) {
                     Text(
-                        text = "${dateFormat.format(Date(record.timestamp))} at ${timeFormat.format(Date(record.timestamp))}",
+                        text = record.note,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1
                     )
-
-                    if (!record.note.isNullOrEmpty()) {
-                        Text(
-                            text = record.note,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1
-                        )
-                    }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(6.dp))
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Delete",
+                tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
