@@ -47,7 +47,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -206,47 +205,6 @@ fun StatsScreen(
                     repository.setStatsPeriod(StatsPeriod.fromDays(days))
                 }
             )
-        }
-
-        // Stream vs History Toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(R.string.data_source),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (!useHistory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.clickable { repository.setStatsUseHistory(false) }
-                ) {
-                    Text(
-                        text = stringResource(R.string.realtime_stream),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (!useHistory) FontWeight.Bold else FontWeight.Normal,
-                        color = if (!useHistory) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (useHistory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.clickable { repository.setStatsUseHistory(true) }
-                ) {
-                    Text(
-                        text = stringResource(R.string.sensor_history),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (useHistory) FontWeight.Bold else FontWeight.Normal,
-                        color = if (useHistory) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
-            }
         }
 
         // 2. Clinical KPI Metrics Grid
