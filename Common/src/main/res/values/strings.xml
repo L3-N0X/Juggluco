@@ -353,12 +353,17 @@
 <string name="complications">Complications</string>
     <string name="colors_style_setting_description">Watchface color</string>
 
-   <string name="glucosenumbercomplicationlabel">Glucose value</string>
-   <string name="glucosearrowcomplicationlabel">Glucose arrow</string>
-   <string name="glucosearrowvaluecomplicationlabel">Value + arrow</string>
- <string name="glucosevalueiconcomplicationlabel">Glucose Value small</string>
- <string name="glucosearrowiconcomplicationlabel">Glucose Arrow small</string>
- <string name="glucoseshortcomplicationlabel">Value + arrow small</string>
+   <string name="glucosenumbercomplicationlabel">Glucose (Signal • Value)</string>
+   <string name="glucosearrowcomplicationlabel">Glucose (Signal • Trend Arrow)</string>
+   <string name="glucosearrowvaluecomplicationlabel">Glucose (Signal • Arrow Beside)</string>
+   <string name="glucose_signal_arrow_top">Glucose (Signal • Arrow on Top)</string>
+   <string name="glucose_signal_arrow_bottom">Glucose (Signal • Arrow Below)</string>
+   <string name="glucosevalueiconcomplicationlabel">Glucose (Mono • Value)</string>
+   <string name="glucosearrowiconcomplicationlabel">Glucose (Mono • Trend Arrow)</string>
+   <string name="glucose_mono_arrow_beside">Glucose (Mono • Arrow Beside)</string>
+   <string name="glucose_mono_arrow_top">Glucose (Mono • Arrow on Top)</string>
+   <string name="glucose_mono_arrow_bottom">Glucose (Mono • Arrow Below)</string>
+   <string name="glucoseshortcomplicationlabel">Glucose (Short Text)</string>
 
    <string name="text">Text</string>
    <string name="arrow">Arrow</string>
@@ -896,6 +901,8 @@
     <string name="settings_group_data_desc">Export glucose data records and switch to legacy OpenGL view</string>
     <string name="settings_group_about_title">About Juggluco</string>
     <string name="settings_group_about_desc">App version, license, sensor support and development guide</string>
+    <string name="settings_group_watch_title">Smartwatch &amp; Wear OS</string>
+    <string name="settings_group_watch_desc">Connect Wear OS, Garmin, Watchdrip and manage watch sensor streaming</string>
     <string name="settings_title_web_server">Local REST Web Server</string>
     <string name="settings_desc_web_server">Configure local HTTP/SSL ports and API secret</string>
     <string name="settings_title_libre_view">Abbott LibreView Upload</string>
@@ -947,4 +954,29 @@
     <string name="dialog_mirror_conn_added">Mirror connection added successfully</string>
     <string name="dialog_mirror_legacy_btn">Advanced Mirror Manager (Legacy UI / QR)</string>
     <string name="dialog_mirror_port_hint">Note: If running two apps on one device, each must use a different listen port (e.g. 17580 for Prod, 17581 for Dev).</string>
+
+    <!-- Smartwatch & Wear OS Settings -->
+    <string name="settings_wearos_service">Wear OS Service</string>
+    <string name="settings_wearos_service_desc">Enable background messaging and auto-discovery with Wear OS watches</string>
+    <string name="settings_search_watches">Search for Watches</string>
+    <string name="settings_connected_watches">Connected Watches</string>
+    <string name="settings_no_watches_found">No Wear OS watches detected</string>
+    <string name="settings_direct_sensor_title">Direct sensor connection</string>
+    <string name="settings_direct_sensor_desc">Sensor connects directly to watch via Bluetooth instead of phone</string>
+    <string name="settings_enter_nums_title">Enter insulin &amp; carbs</string>
+    <string name="settings_enter_nums_desc">Enter insulin doses and carbs on watch</string>
+    <string name="settings_sync_reinit">Sync &amp; Reconnect</string>
+    <string name="settings_init_watch">Init Watch App</string>
+    <string name="settings_reset_defaults">Reset to Defaults</string>
+    <string name="settings_other_watches">Other Smartwatches</string>
+    <string name="settings_garmin_title">Garmin (Kerfstok)</string>
+    <string name="settings_garmin_desc">Send glucose readings to Garmin watch running Kerfstok</string>
+    <string name="settings_watchdrip_title">Watchdrip+</string>
+    <string name="settings_watchdrip_desc">Send watchfaces with glucose values to MiBand and Amazfit</string>
+    <string name="settings_gadgetbridge_title">Gadgetbridge</string>
+    <string name="settings_gadgetbridge_desc">Send glucose values as weather updates to Gadgetbridge</string>
+    <string name="settings_watch_separate_alarm">Separate alarm sound</string>
+    <string name="settings_watch_separate_alarm_desc">Use separate alarm tone on watch</string>
+    <string name="settings_watch_forward_alarm">Forward alarms to watch</string>
+    <string name="settings_watch_forward_alarm_desc">Vibrate or alert watch when glucose alarms trigger</string>
 </resources>

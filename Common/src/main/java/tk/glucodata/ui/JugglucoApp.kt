@@ -55,6 +55,7 @@ import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
 import tk.glucodata.ui.screens.settings.SettingsDestination
 import tk.glucodata.ui.screens.settings.TurnServerSettingsScreen
 import tk.glucodata.ui.screens.settings.VoiceSettingsScreen
+import tk.glucodata.ui.screens.settings.WatchSettingsScreen
 import tk.glucodata.ui.screens.settings.WebServerSettingsScreen
 import tk.glucodata.ui.theme.JugglucoTheme
 
@@ -126,6 +127,11 @@ fun JugglucoApp(
                 SettingsDestination.VOICE -> VoiceSettingsScreen(
                     repository = repository,
                     onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.WATCH -> WatchSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = null },
+                    onOpenMirrorConfig = { activeSettingsDestination = SettingsDestination.MIRROR }
                 )
                 SettingsDestination.BROADCASTS -> BroadcastsSettingsScreen(
                     repository = repository,

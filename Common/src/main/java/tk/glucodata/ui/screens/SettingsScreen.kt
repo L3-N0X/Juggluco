@@ -52,6 +52,7 @@ import tk.glucodata.ui.screens.settings.SettingsNavRow
 import tk.glucodata.ui.screens.settings.SettingsSection
 import tk.glucodata.ui.screens.settings.TurnServerSettingsScreen
 import tk.glucodata.ui.screens.settings.VoiceSettingsScreen
+import tk.glucodata.ui.screens.settings.WatchSettingsScreen
 import tk.glucodata.ui.screens.settings.WebServerSettingsScreen
 
 @Composable
@@ -121,6 +122,11 @@ fun SettingsScreen(
             SettingsDestination.VOICE -> VoiceSettingsScreen(
                 repository = repository,
                 onNavigateBack = { handleNavigate(null) }
+            )
+            SettingsDestination.WATCH -> WatchSettingsScreen(
+                repository = repository,
+                onNavigateBack = { handleNavigate(null) },
+                onOpenMirrorConfig = { handleNavigate(SettingsDestination.MIRROR) }
             )
             SettingsDestination.BROADCASTS -> BroadcastsSettingsScreen(
                 repository = repository,
@@ -295,6 +301,12 @@ fun SettingsScreen(
 
         // Section: Connectivity & sharing
         SettingsSection(title = "Connectivity & sharing") {
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_watch_title),
+                subtitle = stringResource(R.string.settings_group_watch_desc),
+                icon = SettingsDestination.WATCH.icon,
+                onClick = { handleNavigate(SettingsDestination.WATCH) }
+            )
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_broadcasts_title),
                 subtitle = stringResource(R.string.settings_group_broadcasts_desc),

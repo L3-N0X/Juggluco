@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.ui.graphics.vector.ImageVector
 import tk.glucodata.R
 
@@ -45,6 +46,12 @@ enum class SettingsDestination(
         descRes = R.string.settings_group_voice_desc,
         categoryRes = R.string.settings_voice_speech,
         icon = Icons.Default.RecordVoiceOver
+    ),
+    WATCH(
+        titleRes = R.string.settings_group_watch_title,
+        descRes = R.string.settings_group_watch_desc,
+        categoryRes = R.string.settings_cat_integrations,
+        icon = Icons.Default.Watch
     ),
     BROADCASTS(
         titleRes = R.string.settings_group_broadcasts_title,

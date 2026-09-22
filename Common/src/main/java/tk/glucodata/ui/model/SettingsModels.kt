@@ -71,7 +71,28 @@ data class WatchConfig(
     val garminEnabled: Boolean = false,
     val watchdripEnabled: Boolean = false,
     val gadgetbridgeEnabled: Boolean = false,
-    val separateAlerts: Boolean = false
+    val separateAlerts: Boolean = false,
+    val notifyWatch: Boolean = false
+)
+
+data class WearWatchDevice(
+    val id: String,
+    val displayName: String,
+    val isDirectSensor: Boolean,
+    val isEnterNumsOnWatch: Boolean,
+    val isGalaxy: Boolean,
+    val mirrorIndex: Int = -1,
+    val mirrorStatus: String = "",
+    val mirrorIps: List<String> = emptyList(),
+    val isConnected: Boolean = false
+)
+
+data class WearDiagnosticInfo(
+    val phoneAppId: String = "",
+    val phoneVersion: String = "",
+    val mirrorPort: String = "",
+    val isReceiverServiceEnabled: Boolean = false,
+    val reachableWearNodesCount: Int = 0
 )
 
 data class MirrorConnection(

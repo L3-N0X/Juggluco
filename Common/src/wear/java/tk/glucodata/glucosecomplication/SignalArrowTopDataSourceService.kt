@@ -8,17 +8,17 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
 import tk.glucodata.Applic
 
 /**
- * Signal complication: Centered glucose value only.
+ * Signal complication: Number with small trend arrow on top.
  */
-class NumberDataSourceService : BaseGlucoseComplicationService(
-    ComplicationLayout.VALUE_ONLY,
+class SignalArrowTopDataSourceService : BaseGlucoseComplicationService(
+    ComplicationLayout.ARROW_TOP,
     ComplicationColorStyle.SIGNAL
 ) {
     companion object {
         private val updateRequester by lazy {
             ComplicationDataSourceUpdateRequester.create(
                 Applic.app,
-                ComponentName(Applic.app, NumberDataSourceService::class.java)
+                ComponentName(Applic.app, SignalArrowTopDataSourceService::class.java)
             )
         }
 

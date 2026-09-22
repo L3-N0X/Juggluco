@@ -1,233 +1,68 @@
 /*      This file is part of Juggluco, an Android app to receive and display         */
 /*      glucose values from Freestyle Libre 2 and 3 sensors.                         */
 /*                                                                                   */
-/*      Copyright (C) 2021 Jaap Korthals Altes <jaapkorthalsaltes@gmail.com>         */
-/*                                                                                   */
-/*      Juggluco is free software: you can redistribute it and/or modify             */
-/*      it under the terms of the GNU General Public License as published            */
-/*      by the Free Software Foundation, either version 3 of the License, or         */
-/*      (at your option) any later version.                                          */
-/*                                                                                   */
-/*      Juggluco is distributed in the hope that it will be useful, but              */
-/*      WITHOUT ANY WARRANTY; without even the implied warranty of                   */
-/*      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                         */
-/*      See the GNU General Public License for more details.                         */
-/*                                                                                   */
-/*      You should have received a copy of the GNU General Public License            */
-/*      along with Juggluco. If not, see <https://www.gnu.org/licenses/>.            */
-/*                                                                                   */
-/*      Fri Oct 11 12:22:15 CEST 2024                                                 */
+/*      Legacy GlucoseValue drawing code was replaced by the Material 3              */
+/*      ComplicationRenderer. This class remains as a thin compatibility shim        */
+/*      for the color-config preview UI and update triggers.                         */
 
 
 package tk.glucodata.glucosecomplication;
 
-import static android.graphics.Color.BLACK;
-import static android.graphics.Color.BLUE;
-import static android.graphics.Color.GREEN;
-import static android.graphics.Color.YELLOW;
-import static android.graphics.Color.LTGRAY;
-import static android.graphics.Color.DKGRAY;
-import static android.graphics.Color.CYAN;
-import static android.graphics.Color.MAGENTA;
-import static android.graphics.Typeface.BOLD;
-import static android.graphics.Typeface.NORMAL;
-
-import static java.lang.Float.isNaN;
-import static java.lang.String.format;
-
-import static tk.glucodata.CommonCanvas.drawarrow;
-import static tk.glucodata.CommonCanvas.drawarrowcircle;
-import static tk.glucodata.Log.doLog;
-import static tk.glucodata.Notify.unitlabel;
 import static tk.glucodata.glucosecomplication.ColorConfig.defcol;
 
-import android.annotation.SuppressLint;
-import android.content.Context;
-import android.content.res.TypedArray;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.PorterDuff;
-import android.graphics.Rect;
-import android.graphics.Typeface;
-import android.os.Build;
-import tk.glucodata.Log;
-
-import tk.glucodata.Applic;
 import tk.glucodata.Natives;
-import tk.glucodata.Notify;
-import tk.glucodata.R;
 
 public class GlucoseValue {
 final private static String LOG_ID="GlucoseValue";
-//64 good
-//final static float mapwidth=512,mapheight=512;
-//final static float mapwidth=100,mapheight=100;
-final  float mapwidth;
-final float mapheight;
-final  float half;
-final  private float density;
-    final private float timeoffy;
-    final private float numoffy;
-    final private float timesize;
-    float fontsize;
-//    static   float upperboundfontsize=1000.0f;
     static   float fontFraction=1.0f;
 
-    final private Bitmap glucoseBitmap;
-    final private Canvas canvas;
-    final private Paint glucosePaint=new Paint();
-   final private Typeface normaltype, boldtype;
-//    final private Paint agePaint=new Paint();
-void clear() {
-   glucoseBitmap.eraseColor(Color.TRANSPARENT);
-   }
+    final  float mapwidth;
+    final float mapheight;
+
 GlucoseValue(int w,int h) {
-	mapwidth=w;
-	mapheight=h;
-    half=0.5f*mapwidth;
-    density= mapheight/70.0f;
-     fontsize=mapwidth*0.63f;
-     final float usefontsize=fontFraction*fontsize;
-   glucosePaint.setTextAlign(Paint.Align.CENTER);
-  glucosePaint.setTextSize(usefontsize);
-  //agePaint.setARGB(0xFF,0xFF,0,0xFF);
-  timesize=mapwidth*0.15f;
-  numoffy=mapheight*0.20f;
-     if(Applic.hour24) {
-        timeoffy=mapwidth*0.036f;
-      }
-      else {
-    //    timesize=mapwidth*0.11f;
-        timeoffy=mapwidth*0.066f;
-   //     numoffy=mapwidth*0.1f;
-      }
-
-   {if(doLog) {Log.i(LOG_ID,"fontsize="+fontsize+" timesize="+timesize);};};
-
-
-	glucosePaint.setAntiAlias(true);
-
-	glucoseBitmap = Bitmap.createBitmap((int)mapwidth, (int)mapheight, Bitmap.Config.ARGB_8888);
-	canvas = new Canvas(glucoseBitmap);
-
-	{if(doLog) {Log.i(LOG_ID," mapwidth="+mapwidth+" mapheight="+mapheight+"color="+ format("%x",glucosePaint.getColor()));};};
-//   glucosePaint.setColor(WHITE);
-   final var basistype=Typeface.SANS_SERIF;
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        boldtype= Typeface.create(basistype,750, false);
-        normaltype= Typeface.create(basistype,350, false);
-//        boldtype= Typeface.create(basistype,1000, false);
- //       normaltype= Typeface.create(basistype,200, false);
+ 	mapwidth=w;
+ 	mapheight=h;
     }
-    else {
-        boldtype= Typeface.create(basistype,Typeface.BOLD);
-        normaltype= Typeface.create(basistype,Typeface.NORMAL);
-       }
 
-//   glucosePaint.setTypeface(normaltype);
-   }
-//int wasbackground=0;
-static int newbackground=1;
-private void setcolor() {
-    final int background=Natives.getComplicationBackgroundColor( );
-   if((background&0xff000000)!=0)
-	   canvas.drawColor(background);
-    else
-      canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-   // wasbackground=newbackground;
-     }
+void clear() {
+    }
 
-void  setbackground() {
-/*	if(wasbackground!=newbackground) {
-		setcolor();
-		} */
-        setcolor();
-	}
-float  drawcenter(String value) {
-       var bounds=new Rect();
-       glucosePaint.setTextSize(fontsize);
-       glucosePaint.getTextBounds(value, 0, value.length(),  bounds);
-       float fsize=fontsize*mapwidth/bounds.right*.87f;
-//       final float usefontsize=fsize>upperboundfontsize?upperboundfontsize:fsize;
-       final float usefontsize=fsize*fontFraction;
-       glucosePaint.setTextSize(usefontsize);
-       var des=glucosePaint.descent();
-       var as=glucosePaint.ascent();
-       {if(doLog) {Log.i(LOG_ID,"descent()="+des+" ascent()="+as+" fontsize="+fontsize);};};
-       var y = half - (des + as)*.5f;
-       canvas.drawText(value,0,value.length(),half,y,glucosePaint);
-       return fsize;
-   }
-void mknovalue() {
-   Context cont=Applic.getContext();
-   var novalue=cont.getString(R.string.novalue);
-   drawcenter(novalue);
-   }
 Bitmap getnovalue() {
-    setbackground();
-    glucosePaint.setColor(getTextColor());
-   mknovalue();
-    return glucoseBitmap;
-    }
-
-    void setNumberBitmap(String value,long time,int index,boolean showtime) {
-      {if(doLog) {Log.i(LOG_ID,"setNumberBitmap "+value);};};
-      if(index>=0) {
-              glucosePaint.setTextSize(timesize);
-             if(index!=0) {
-               String instr=index+""; 
-               canvas.drawText(instr,0,instr.length(),half,numoffy,glucosePaint);
-               }
-           if(showtime) {
-                var timestr=tk.glucodata.NumberView.minhourstr(time);
-                canvas.drawText(timestr,0,timestr.length(),half,mapheight-timeoffy,glucosePaint);
-                }
-            }
-   fontsize=drawcenter(value);
-	}
-
+    return ComplicationRenderer.INSTANCE.renderComplication(
+        ComplicationLayout.VALUE_ONLY,
+        ComplicationColorStyle.SIGNAL,
+        ComplicationRenderer.INSTANCE.getLatestGlucose(),
+        false
+    );
+}
 
 Bitmap getNumberBitmap(String value,long time,int index,long now,boolean showtime) {
-    setbackground();
-    glucosePaint.setColor(getTextColor());
-    if((now-time)<tk.glucodata.Notify.glucosetimeout) {
-        setNumberBitmap(value, time, index,showtime);
-       }
-   else {
-        mknovalue();
-      }
-    return glucoseBitmap;
-	}
+    return ComplicationRenderer.INSTANCE.renderComplication(
+        ComplicationLayout.VALUE_ONLY,
+        ComplicationColorStyle.SIGNAL,
+        ComplicationRenderer.INSTANCE.getLatestGlucose(),
+        showtime
+    );
+}
 
 Bitmap getArrowBitmap(Float rate) {
-   setbackground();
-	{if(doLog) {Log.i(LOG_ID,"getBitmap");};};
-	if(isNaN(rate)) {
-		{if(doLog) {Log.i(LOG_ID,"rate=nan");};};
-      		mknovalue();
-	} else {
-      glucosePaint.setColor(getArrowColor());
-      drawarrowcircle(canvas,glucosePaint,density,rate);
- //tk.glucodata.CommonCanvas.testcircle(canvas,glucosePaint,density);
-	}
-	 return glucoseBitmap;
-	}
-	
-Bitmap getArrowBitmap() {
-   var glucose = Natives.lastglucose();
-   if(glucose==null) {
-     {if(doLog) {Log.d(LOG_ID,"lastglucose()==null");};};
-      return getnovalue();
-      }
+    return ComplicationRenderer.INSTANCE.renderComplication(
+        ComplicationLayout.ARROW_ONLY,
+        ComplicationColorStyle.SIGNAL,
+        ComplicationRenderer.INSTANCE.getLatestGlucose(),
+        false
+    );
+}
 
-    if((System.currentTimeMillis()-(glucose.time*1000L))>=tk.glucodata.Notify.glucosetimeout) {
-         {if(doLog) {Log.d(LOG_ID,"oldvalue "+glucose.time);};};
-         return getnovalue();
-         }
-    return getArrowBitmap(glucose.rate);
-   }
+Bitmap getArrowBitmap() {
+    return ComplicationRenderer.INSTANCE.renderComplication(
+        ComplicationLayout.ARROW_ONLY,
+        ComplicationColorStyle.SIGNAL,
+        ComplicationRenderer.INSTANCE.getLatestGlucose(),
+        false
+    );
+}
 static int getTextColor( ) {
    int col=Natives.getComplicationTextColor( );
    return col==0?defcol[1]:col;
@@ -241,91 +76,47 @@ static int getBackgroundColor( ) {
    int col=Natives.getComplicationBackgroundColor( );
    return col==0?defcol[2]:col;
    }
-   /*
-static int getTextBorderColor( ) {
-   int col=Natives.getComplicationTextBorderColor( );
-   return col==0?getBackgroundColor():col;
-   } */
 Bitmap getArrowValueBitmap(String value,long time,int index,float rate,boolean showtime) {
-   final var now = System.currentTimeMillis();
-   if((now-time)>=tk.glucodata.Notify.glucosetimeout) {
-       return getnovalue();
-      }
-   getArrowBitmap(rate);
-//   glucosePaint.setTypeface(Typeface.defaultFromStyle(BOLD));
-   glucosePaint.setTypeface(boldtype);
-   glucosePaint.setColor(getBackgroundColor( ));
-   setNumberBitmap(value,time, -1,showtime);
-   glucosePaint.setColor(getTextColor());
- //  glucosePaint.setTypeface(Typeface.defaultFromStyle(NORMAL));
-   glucosePaint.setTypeface(normaltype);
-   setNumberBitmap(value,time, index,showtime);
-   return glucoseBitmap;
-   }
+    return ComplicationRenderer.INSTANCE.renderComplication(
+        ComplicationLayout.ARROW_BESIDE,
+        ComplicationColorStyle.SIGNAL,
+        ComplicationRenderer.INSTANCE.getLatestGlucose(),
+        showtime
+    );
+}
 Bitmap getArrowTimeBitmap(long time,float rate) {
-   final var now = System.currentTimeMillis();
-   if((now-time)>=tk.glucodata.Notify.glucosetimeout) {
-       return getnovalue();
-      }
-   setbackground();
-    if(doLog) 
-            Log.i(LOG_ID,"getArrowTimeBitmap($time,$rate)");
-    if(isNaN(rate)) {
-         if(doLog) {Log.i(LOG_ID,"rate=nan");}
-        mknovalue();
-       } 
-   else {
-      glucosePaint.setColor(getArrowColor());
-      drawarrowcircle(canvas,glucosePaint,density,rate);
-      if(Natives.gettimeOnComplication()) {
-              final var timestr=tk.glucodata.NumberView.minhourstr(time);
-              final var len= timestr.length();
-              final var h=mapheight-timeoffy;
-              glucosePaint.setTextSize(timesize*1.8f);
-
-              glucosePaint.setTypeface(boldtype);
-              glucosePaint.setColor(getBackgroundColor( ));
-              canvas.drawText(timestr,0,len,half,h,glucosePaint);
-
-              glucosePaint.setColor(getTextColor());
-              glucosePaint.setTypeface(normaltype);
-              canvas.drawText(timestr,0,len,half,h,glucosePaint);
-              }
-
-      }
- return glucoseBitmap;
-   }
+    return ComplicationRenderer.INSTANCE.renderComplication(
+        ComplicationLayout.ARROW_ONLY,
+        ComplicationColorStyle.SIGNAL,
+        ComplicationRenderer.INSTANCE.getLatestGlucose(),
+        Natives.gettimeOnComplication()
+    );
+}
 
 
 Bitmap previewbitmap(boolean showtime) {
-        String value;
-        float rate;
-        int index;
-        final var glucose = Natives.lastglucose();
-         var now = System.currentTimeMillis();
-        long  time;
-        if(glucose != null&&((time = glucose.time * 1000L)!=0L&&(now-time)<tk.glucodata.Notify.glucosetimeout)) {
-            value = glucose.value;
-            index = glucose.index;
-            rate = glucose.rate;
-        } else {
-            value = (Applic.unit == 1)?"5.6": "101";
-            time = now;
-            rate = 1.0f;
-            index = 0;
-        }
-	return getArrowValueBitmap( value, time, index, rate,showtime);
-	}
+    return ComplicationRenderer.INSTANCE.renderComplication(
+        ComplicationLayout.ARROW_BESIDE,
+        ComplicationColorStyle.SIGNAL,
+        ComplicationRenderer.INSTANCE.getPreviewGlucose(),
+        showtime
+    );
+}
 
 
 static public void updateall() {
-	ArrowValueDataSourceService.Companion.update();
-	NumberDataSourceService.Companion.update();
-	ArrowDataSourceService.Companion.update();
+    SignalArrowTopDataSourceService.Companion.update();
+    SignalArrowBottomDataSourceService.Companion.update();
+    ArrowValueDataSourceService.Companion.update();
+    NumberDataSourceService.Companion.update();
+    ArrowDataSourceService.Companion.update();
+    MonoArrowTopDataSourceService.Companion.update();
+    MonoArrowBottomDataSourceService.Companion.update();
+    MonoArrowBesideDataSourceService.Companion.update();
     IconValueDataSourceService.Companion.update();
     IconArrowDataSourceService.Companion.update();
     ShortArrowValueDataSourceService.Companion.update();
-	TimeStampComplicationService.Companion.update();
-    }
+    TimeStampComplicationService.Companion.update();
+}
 
 }

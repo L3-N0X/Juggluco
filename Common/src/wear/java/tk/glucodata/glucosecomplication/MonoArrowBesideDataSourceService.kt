@@ -8,17 +8,17 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
 import tk.glucodata.Applic
 
 /**
- * Signal complication: Centered glucose value only.
+ * Monochrome complication: Glucose value and trend arrow side-by-side.
  */
-class NumberDataSourceService : BaseGlucoseComplicationService(
-    ComplicationLayout.VALUE_ONLY,
-    ComplicationColorStyle.SIGNAL
+class MonoArrowBesideDataSourceService : BaseGlucoseComplicationService(
+    ComplicationLayout.ARROW_BESIDE,
+    ComplicationColorStyle.MONOCHROME
 ) {
     companion object {
         private val updateRequester by lazy {
             ComplicationDataSourceUpdateRequester.create(
                 Applic.app,
-                ComponentName(Applic.app, NumberDataSourceService::class.java)
+                ComponentName(Applic.app, MonoArrowBesideDataSourceService::class.java)
             )
         }
 

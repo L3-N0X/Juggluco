@@ -146,11 +146,8 @@ static public   void show(MainActivity context, View view) {
 	defaultbox.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
 		if(isChecked) {
          final int curcol=radiosel;
-			setcolor(curcol,0);
-          if(curcol==2) {
-             GlucoseValue.newbackground=0;
-             }
-			}
+ 			setcolor(curcol,0);
+ 			}
 		});
       setradio(allradio,defaultbox);
       var select=getbutton(context,R.string.modify);
@@ -191,13 +188,10 @@ static public void showcolors(MainActivity act,CheckDirectionBox def) {
       final var preview=new ImageView(act);
       AmbilWarnaDialog dialog = new AmbilWarnaDialog(act, initialColor, c-> {
          {if(doLog) {Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));};};
-         setcolor(coltype,c);
-         def.setChecked(false);
-	  if(coltype==2) {
-	     GlucoseValue.newbackground=c;
-	     }
+          setcolor(coltype,c);
+          def.setChecked(false);
 
-	 preview.setImageBitmap(glview.previewbitmap(showtime));
+ 	 preview.setImageBitmap(glview.previewbitmap(showtime));
        }, v-> {
             int h=v.getMeasuredHeight();
                 int w=v.getMeasuredWidth();

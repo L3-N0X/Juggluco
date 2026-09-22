@@ -14,12 +14,16 @@ import kotlinx.coroutines.launch
 import tk.glucodata.Applic
 import tk.glucodata.Backup
 import tk.glucodata.BleMirror
+import tk.glucodata.BuildConfig
+import tk.glucodata.Log
 import tk.glucodata.MainActivity
 import tk.glucodata.MessageSender
 import tk.glucodata.Natives
 import tk.glucodata.Nightscout
 import tk.glucodata.Notify
 import tk.glucodata.SensorBridge
+import tk.glucodata.SuperGattCallback
+import tk.glucodata.WatchBridge
 import tk.glucodata.XInfuus
 import tk.glucodata.nums.numio
 import tk.glucodata.ui.model.AgpProfile
@@ -44,6 +48,8 @@ import tk.glucodata.ui.model.SignalQuality
 import tk.glucodata.ui.model.StatsPeriod
 import tk.glucodata.ui.model.TimeRange
 import tk.glucodata.ui.model.WatchConfig
+import tk.glucodata.ui.model.WearDiagnosticInfo
+import tk.glucodata.ui.model.WearWatchDevice
 
 class GlucoseRepository(
     private val scope: CoroutineScope
@@ -111,9 +117,16 @@ class GlucoseRepository(
     private val _watchConfig = MutableStateFlow(WatchConfig())
     val watchConfig: StateFlow<WatchConfig> = _watchConfig.asStateFlow()
 
+    private val _wearDevices = MutableStateFlow<List<WearWatchDevice>>(emptyList())
+    val wearDevices: StateFlow<List<WearWatchDevice>> = _wearDevices.asStateFlow()
+
+    private val _wearDiagnosticInfo = MutableStateFlow(WearDiagnosticInfo())
+    val wearDiagnosticInfo: StateFlow<WearDiagnosticInfo> = _wearDiagnosticInfo.asStateFlow()
+
     init {
         refreshSettings()
         refreshAll()
+        refreshWearDevices()
         startPolling()
     }
 
@@ -230,6 +243,16 @@ class GlucoseRepository(
                     nfcSound = Natives.nfcsound(),
                     googleScan = try { Natives.getGoogleScan() } catch (_: Throwable) { false },
                     hasNfc = MainActivity.hasnfc
+                )
+
+                // Read Watch & Wear OS
+                _watchConfig.value = WatchConfig(
+                    wearOsEnabled = WatchBridge.isWearOsEnabled(),
+                    garminEnabled = try { Natives.getusegarmin() } catch (_: Throwable) { false },
+                    watchdripEnabled = try { Natives.getwatchdrip() } catch (_: Throwable) { false },
+                    gadgetbridgeEnabled = try { SuperGattCallback.doGadgetbridge } catch (_: Throwable) { false },
+                    separateAlerts = try { Notify.alertseparate } catch (_: Throwable) { false },
+                    notifyWatch = WatchBridge.getNotifyWatch()
                 )
             }
         } catch (_: Throwable) {}
@@ -1046,6 +1069,191 @@ class GlucoseRepository(
         }
     }
 
+    // --- SMARTWATCH & WEAR OS ACTIONS ---
+
+    fun refreshWearDevices() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val list = mutableListOf<WearWatchDevice>()
+                val targets = LinkedHashMap<String, Pair<String, Boolean>>()
+
+                val nodes = WatchBridge.getWearNodes()
+                for (node in nodes) {
+                    targets[node.id] = Pair(node.displayName, MessageSender.isGalaxy(node))
+                }
+                for (label in WatchBridge.getBleWatchLabels()) {
+                    targets.putIfAbsent(label, Pair(label, WatchBridge.isGalaxyDefault()))
+                }
+
+                val mirrorCount = try { Natives.backuphostNr() } catch (_: Throwable) { 0 }
+                val mirrorMap = mutableMapOf<String, Int>()
+                for (i in 0 until mirrorCount) {
+                    val isWearOS = try { Natives.isWearOS(i) } catch (_: Throwable) { false }
+                    val label = try { Natives.getbackuplabel(i) ?: "" } catch (_: Throwable) { "" }
+                    if (isWearOS && label.isNotBlank()) {
+                        mirrorMap[label] = i
+                        targets.putIfAbsent(label, Pair(label, WatchBridge.isGalaxyDefault()))
+                    }
+                }
+
+                for ((id, pair) in targets) {
+                    val displayName = pair.first
+                    val isGalaxy = pair.second
+                    val dirVal = try { Natives.directsensorwatch(id) } catch (_: Throwable) { 0 }
+                    val isDirectSensor = dirVal > 0
+                    val numsVal = try { Natives.hasWatchNums(id) } catch (_: Throwable) { 0 }
+                    val isEnterNums = numsVal > 0
+
+                    val mirrorIndex = mirrorMap[id] ?: -1
+                    var status = ""
+                    var ips = emptyList<String>()
+                    var isConnected = false
+                    if (mirrorIndex >= 0) {
+                        status = try { Natives.mirrorStatus(mirrorIndex) ?: "" } catch (_: Throwable) { "" }
+                        val rawIps = try { Natives.getbackupIPs(mirrorIndex) } catch (_: Throwable) { null }
+                        ips = rawIps?.filterNotNull()?.filter { it.isNotBlank() } ?: emptyList()
+                        val isActive = try { Natives.getbackuphostactive(mirrorIndex) } catch (_: Throwable) { false }
+                        val isLive = status.contains("live socket: true", ignoreCase = true) ||
+                                status.contains("TCP/IP live socket</b>: true", ignoreCase = true) ||
+                                status.contains("Direct Bluetooth (BLE GATT)=true", ignoreCase = true) ||
+                                status.contains("Messages (Wear OS MessageClient)=true", ignoreCase = true)
+                        isConnected = isLive || isActive
+                    }
+
+                    list.add(
+                        WearWatchDevice(
+                            id = id,
+                            displayName = if (displayName.isNotBlank() && displayName != id) "$displayName ($id)" else id,
+                            isDirectSensor = isDirectSensor,
+                            isEnterNumsOnWatch = isEnterNums,
+                            isGalaxy = isGalaxy,
+                            mirrorIndex = mirrorIndex,
+                            mirrorStatus = status,
+                            mirrorIps = ips,
+                            isConnected = isConnected
+                        )
+                    )
+                }
+                _wearDevices.value = list
+                updateWearDiagnosticInfo(targets.size)
+            } catch (th: Throwable) {
+                Log.stack("GlucoseRepository", th)
+            }
+        }
+    }
+
+    private fun updateWearDiagnosticInfo(reachableNodesCount: Int) {
+        val port = try {
+            Natives.getreceiveport() ?: ""
+        } catch (_: Throwable) { "" }
+        val isReceiverEnabled = WatchBridge.isWearOsEnabled()
+        val appId = try { Applic.app.packageName ?: "" } catch (_: Throwable) { "" }
+        val version = try {
+            val pInfo = Applic.app.packageManager.getPackageInfo(appId, 0)
+            pInfo.versionName ?: ""
+        } catch (_: Throwable) { "" }
+
+        _wearDiagnosticInfo.value = WearDiagnosticInfo(
+            phoneAppId = appId,
+            phoneVersion = version,
+            mirrorPort = if (port.isNotBlank()) port else if (BuildConfig.DEBUG) "9113" else "8795",
+            isReceiverServiceEnabled = isReceiverEnabled,
+            reachableWearNodesCount = reachableNodesCount
+        )
+    }
+
+    fun setWearOsEnabled(context: Context, enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(wearOsEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWearOsEnabled(context, enabled)
+            delay(500L)
+            refreshWearDevices()
+        }
+    }
+
+    fun scanForWatches() {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.searchWatches()
+            delay(1_000L)
+            refreshWearDevices()
+        }
+    }
+
+    fun setWatchDirectSensor(watchId: String, direct: Boolean, isGalaxy: Boolean, hasWatchNums: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWatchDirectSensor(watchId, direct, isGalaxy, hasWatchNums)
+            delay(500L)
+            refreshWearDevices()
+        }
+    }
+
+    fun setWatchEnterNums(watchId: String, watchNums: Boolean, direct: Boolean, isGalaxy: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWatchEnterNums(watchId, watchNums, direct, isGalaxy)
+            delay(500L)
+            refreshWearDevices()
+        }
+    }
+
+    fun initWatchApp(watchId: String, isGalaxy: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.initWatchApp(watchId, isGalaxy)
+            delay(1_000L)
+            refreshWearDevices()
+        }
+    }
+
+    fun syncWatch(watchId: String) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.syncWatch(watchId)
+            delay(1_000L)
+            refreshWearDevices()
+        }
+    }
+
+    fun resetWatchDefaults(watchId: String, isGalaxy: Boolean, context: Context) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.resetWatchDefaults(watchId, isGalaxy, context)
+            delay(1_000L)
+            refreshWearDevices()
+        }
+    }
+
+    fun setWatchdripEnabled(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(watchdripEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWatchdrip(enabled)
+        }
+    }
+
+    fun setGadgetbridgeEnabled(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(gadgetbridgeEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setGadgetbridge(enabled)
+        }
+    }
+
+    fun setGarminEnabled(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(garminEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setGarmin(enabled)
+        }
+    }
+
+    fun setSeparateAlerts(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(separateAlerts = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setSeparateAlerts(enabled)
+        }
+    }
+
+    fun setNotifyWatch(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(notifyWatch = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setNotifyWatch(enabled)
+        }
+    }
+
     // --- DISPLAY & UI ACTIONS ---
 
     fun setFloatingGlucose(enabled: Boolean, activity: Activity) {
@@ -1383,6 +1591,9 @@ class GlucoseRepository(
                         loadReadingsFromNative()
                         loadSensorsFromNative()
                         loadLogsFromNative()
+                    }
+                    if (counter % 5 == 0) {
+                        refreshWearDevices()
                     }
                 } catch (_: Throwable) {}
             }
