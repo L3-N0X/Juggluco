@@ -127,7 +127,7 @@ fun WearGlucoseHero(
         ) {
             Text(
                 text = unit.label,
-                fontSize = 11.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -136,13 +136,13 @@ fun WearGlucoseHero(
                 Spacer(modifier = Modifier.width(6.dp))
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(6.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = "Δ $deltaText",
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -152,7 +152,7 @@ fun WearGlucoseHero(
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "• $timeAgo",
-                fontSize = 11.sp,
+                fontSize = 13.sp,
                 color = if (isStale) clinical.low else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
