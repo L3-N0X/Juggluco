@@ -779,7 +779,7 @@ void handleIntent(Intent intent) {
     if(extras!=null)  {
         if(extras.getBoolean(Notify.fromnotification, false)) {
             {if(doLog) {Log.i(LOG_ID,"fromnotification");};};
-            Notify.stopalarm();
+            Notify.stopAllAlarms();
             return;
             }
         else   {

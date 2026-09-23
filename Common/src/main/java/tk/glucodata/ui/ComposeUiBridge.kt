@@ -27,6 +27,8 @@ object ComposeUiBridge {
 
         val repo = GlucoseRepository(activity.lifecycleScope)
         repository = repo
+        tk.glucodata.alerts.AlertStore.ensureLoaded(activity)
+        tk.glucodata.alerts.AlertSync.pushConfig()
 
         activity.setContent {
             JugglucoApp(

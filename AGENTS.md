@@ -25,6 +25,13 @@
 
 ---
 
+## Alerts
+- **Engine, not native levels:** glucose alerts are user-defined `AlertRule`s in `Common/src/main/java/tk/glucodata/alerts/`. `AlertEngine` evaluates every reading (hooked in `SuperGattCallback.dowithglucose`) and signal loss (`GlucoseAlarms.handlealarm`) on both phone and watch; the native alarm codes only still drive the value-available chime.
+- **Playback:** `AlertPlayer` owns sound, vibration, notification and the full-screen alert (`AlertActivity` on the phone, `WearAlertActivity` on the watch). Stop alerts through `AlertPlayer.dismiss()/snooze()`, which also sync; `Notify.stopAllAlarms()` is the entry point for legacy user actions.
+- **Phone ↔ watch sync:** `AlertSync` sends ring/stop/snooze events and the phone's alert list over the `/alerts` Wear message path. Received events are applied without being re-sent. Device-local settings (on/off, sound here, mirror alerts, use phone's alerts) are never overwritten by a sync.
+
+---
+
 ## Screen Layout & Headers
 - **Shared layout module:** `Common/src/main/java/tk/glucodata/ui/screens/ScreenLayout.kt` owns the spacing scale (`Gutter` / `CardPadding` 16.dp, `SectionSpacing`, `TopPadding`, `BottomPadding` 96.dp) plus `ScreenContent { }` (standard scrolling tab body) and `SectionTitle(...)`. Use these instead of ad-hoc dp values.
 - **One title per screen:** the persistent app bar supplies it — `JugglucoApp`'s `TopAppBar` for every tab, `SettingsDetailScaffold` for detail screens. Never repeat the page title in the content, and leave descriptions out unless they earn their space.

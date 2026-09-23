@@ -20,6 +20,8 @@ object WearComposeUiBridge {
 
         val repo = GlucoseRepository(activity.lifecycleScope)
         repository = repo
+        tk.glucodata.alerts.AlertStore.ensureLoaded(activity)
+        tk.glucodata.alerts.AlertSync.requestConfig()
 
         activity.setContent {
             WearApp(

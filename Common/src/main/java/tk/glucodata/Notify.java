@@ -436,7 +436,17 @@ private static void showoldglucose() {
     static public void stopalarm() {
         stopalarmnotsend(true);
         }
+    /** Stop requested by the user here: silences both the legacy alarms and the configurable alerts. */
+    static public void stopAllAlarms() {
+        stopalarmnotsend(true);
+        if(tk.glucodata.alerts.AlertPlayer.INSTANCE.getActive().getValue()!=null)
+            tk.glucodata.alerts.AlertPlayer.INSTANCE.dismiss();
+        }
     static public void stopalarmnotsend(boolean send) {
+        if(!send) {
+            // Stop requested by a connected device: also silence the configurable alerts.
+            tk.glucodata.alerts.AlertPlayer.INSTANCE.stop(tk.glucodata.alerts.AlertPlayer.StopReason.REMOTE);
+            }
         if(!getisalarm()) {
             {if(doLog) {Log.d(LOG_ID,"stopalarm not is alarm");};};
             return;
@@ -785,7 +795,7 @@ static private String getglstring(float glvalue,int sensorgen2) {
         }
    }
 
-private void setIcon( Notification.Builder GluNotBuilder,float glvalue,int sensorgen2) {
+void setIcon( Notification.Builder GluNotBuilder,float glvalue,int sensorgen2) {
     if(makeicon) {
            final var icon=icons.getIcon(getglstring(glvalue,sensorgen2));  
            GluNotBuilder.setSmallIcon(icon);

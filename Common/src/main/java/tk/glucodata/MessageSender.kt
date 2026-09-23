@@ -449,9 +449,10 @@ companion object {
     const val MESSAGES_ACK_PATH = "/messagesack"
     const val MIRROR_TRANSPORT_PATH = "/mirrortransport"
     const val MIRROR_TRANSPORT_ACK_PATH = "/mirrortransportack"
+    const val ALERTS_PATH = tk.glucodata.alerts.AlertSync.PATH
     fun isWearControlPath(path:String):Boolean = when(path) {
         START_PATH, ASKFORSTART_PATH, DEFAULTS_PATH, SETTINGS_PATH,
-        BLUETOOTH_PATH, UNPAIR_PATH -> true
+        BLUETOOTH_PATH, UNPAIR_PATH, ALERTS_PATH -> true
         else -> false
     }
     val scope = CoroutineScope(Dispatchers.IO+SupervisorJob()  )
@@ -576,6 +577,14 @@ companion object {
             BleMirror.sendAsync(nodeName,ASKFORSTART_PATH,byteArrayOf(0))
         else
             messagesender?.nameSendMessage(nodeName,ASKFORSTART_PATH,byteArrayOf(0))
+    }
+
+    /** Alert events and alert configuration for the Juggluco app on the other device. */
+    @JvmStatic
+    public fun sendAlerts(data: ByteArray): Boolean {
+        val sender = messagesender ?: return false
+        sender.sendmessage(ALERTS_PATH, data)
+        return true
     }
 
     @JvmStatic

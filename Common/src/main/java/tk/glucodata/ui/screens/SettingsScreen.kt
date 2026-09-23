@@ -181,7 +181,9 @@ fun SettingsScreen(
     val unit by repository.unit.collectAsState()
     val targetLow by repository.targetLow.collectAsState()
     val targetHigh by repository.targetHigh.collectAsState()
-    val alarms by repository.alarms.collectAsState()
+    val alertRules by tk.glucodata.alerts.AlertStore.rules.collectAsState()
+    val alertSettings by tk.glucodata.alerts.AlertStore.settings.collectAsState()
+    val alertsOn = alertSettings.enabled && alertRules.any { it.enabled }
     val mirrorConnections by repository.mirrorConnections.collectAsState()
 
     val isReceiverActive = mirrorConnections.any { it.isReceiver }
@@ -239,10 +241,10 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = if (alarms.lowAlarmEnabled || alarms.highAlarmEnabled) "Active" else "Off",
+                        text = if (alertsOn) "Active" else "Off",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (alarms.lowAlarmEnabled || alarms.highAlarmEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                        color = if (alertsOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                     )
                 }
 

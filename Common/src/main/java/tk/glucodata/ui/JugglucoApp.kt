@@ -57,6 +57,7 @@ import tk.glucodata.ui.screens.settings.TurnServerSettingsScreen
 import tk.glucodata.ui.screens.settings.VoiceSettingsScreen
 import tk.glucodata.ui.screens.settings.WatchSettingsScreen
 import tk.glucodata.ui.screens.settings.WebServerSettingsScreen
+import tk.glucodata.ui.components.AlertIndicatorAction
 import tk.glucodata.ui.theme.JugglucoTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -195,6 +196,12 @@ fun JugglucoApp(
                                     text = if (selectedTab == NavigationTab.GLUCOSE) "Juggluco" else stringResource(selectedTab.titleRes),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            actions = {
+                                AlertIndicatorAction(
+                                    onOpenAlertSettings = { activeSettingsDestination = SettingsDestination.ALARMS },
+                                    showWhenIdle = selectedTab == NavigationTab.GLUCOSE
                                 )
                             },
                             colors = TopAppBarDefaults.topAppBarColors(

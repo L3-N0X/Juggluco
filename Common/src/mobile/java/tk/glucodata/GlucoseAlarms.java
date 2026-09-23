@@ -49,7 +49,14 @@ public    void handlealarm() {
         final long tryagain = nu + Notify.glucosetimeout;
 
     long nexttime=tryagain;
-        if(!haslossalarm) {
+        if(tk.glucodata.alerts.AlertEngine.isActive()) {
+            Notify.onenot.oldnotification(wastime);
+            long lasttime=Natives.lastglucosetime();
+            final long lossnext=tk.glucodata.alerts.AlertEngine.checkSignalLoss(lasttime!=0L?lasttime:wastime);
+            if(lossnext>nu&&lossnext<nexttime)
+                nexttime=lossnext;
+            }
+        else if(!haslossalarm) {
             Notify.onenot.oldnotification(wastime);
             }
         else  {

@@ -35,6 +35,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
+import tk.glucodata.ui.components.WearAlertButton
 import tk.glucodata.ui.components.WearGlucoseHero
 import tk.glucodata.ui.components.WearMiniGraph
 import tk.glucodata.ui.data.GlucoseRepository
@@ -45,7 +46,8 @@ fun WearHomeScreen(
     onNavigateToGraph: () -> Unit,
     onNavigateToLog: () -> Unit,
     onNavigateToSensors: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToAlerts: () -> Unit
 ) {
     val currentReading by repository.currentReading.collectAsState()
     val readings by repository.readings.collectAsState()
@@ -83,6 +85,11 @@ fun WearHomeScreen(
                     onClick = onNavigateToGraph,
                     modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
                 )
+            }
+
+            // Alert state: tap dismisses a ringing alert, otherwise opens the alerts.
+            item {
+                WearAlertButton(onOpenAlerts = onNavigateToAlerts)
             }
 
             // 2. Mini Sparkline Graph Card
