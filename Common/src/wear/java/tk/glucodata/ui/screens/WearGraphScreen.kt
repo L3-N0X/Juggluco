@@ -2,8 +2,9 @@ package tk.glucodata.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,8 +29,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +49,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -79,17 +84,50 @@ fun WearGraphScreen(
     var selectedHours by remember { mutableIntStateOf(3) }
     var scrubbedPoint by remember { mutableStateOf<GlucosePoint?>(null) }
     var scrubX by remember { mutableFloatStateOf(-1f) }
+    // How far back the visible window is scrolled from live (0 = following now).
+    // Reset on range change so switching 1h/12h always lands back on live data.
+    var windowOffsetMillis by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(selectedHours) {
+        windowOffsetMillis = 0L
+        scrubbedPoint = null
+        scrubX = -1f
+    }
 
     val clinical = LocalClinicalColors.current
+    val density = LocalDensity.current
 
     val now = remember(readings) {
         readings.lastOrNull()?.timestamp ?: System.currentTimeMillis()
     }
-    val windowStart = now - (selectedHours * 3600 * 1000L)
-
-    val visibleReadings = remember(readings, windowStart, selectedHours) {
-        readings.filter { it.timestamp >= windowStart }
+    val windowDurationMillis = selectedHours * 3600 * 1000L
+    val oldestTimestamp = remember(readings) {
+        readings.firstOrNull()?.timestamp ?: now
     }
+    // Oldest offset that still keeps some data on screen.
+    val maxOffsetMillis = remember(now, oldestTimestamp, windowDurationMillis) {
+        (now - windowDurationMillis - oldestTimestamp).coerceAtLeast(0L)
+    }
+    // Keep offset valid when new data arrives or the range changes.
+    LaunchedEffect(maxOffsetMillis) {
+        if (windowOffsetMillis > maxOffsetMillis) windowOffsetMillis = maxOffsetMillis
+    }
+    val windowEnd = now - windowOffsetMillis
+    val windowStart = windowEnd - windowDurationMillis
+    val isLive = windowOffsetMillis <= 0L
+
+    val visibleReadings = remember(readings, windowStart, windowEnd) {
+        readings.filter { it.timestamp in windowStart..windowEnd }
+    }
+    // Latest window values for the gesture handler below. The handler is keyed
+    // on Unit so an ongoing drag is never cancelled by the recompositions that
+    // panning itself triggers (same pattern as the phone graph's viewport).
+    val latestWindowStart by rememberUpdatedState(windowStart)
+    val latestWindowEnd by rememberUpdatedState(windowEnd)
+    val latestNow by rememberUpdatedState(now)
+    val latestDuration by rememberUpdatedState(windowDurationMillis)
+    val latestMaxOffset by rememberUpdatedState(maxOffsetMillis)
+    val latestVisible by rememberUpdatedState(visibleReadings)
+    val latestScrub by rememberUpdatedState(scrubbedPoint)
 
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val crosshairColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
@@ -134,11 +172,11 @@ fun WearGraphScreen(
                 },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header: Scrub inspection info OR current range
+            // Header: Scrub inspection info OR current range + live state
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 2.dp),
+                    .padding(top = 20.dp, bottom = 2.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (scrubbedPoint != null) {
@@ -171,60 +209,89 @@ fun WearGraphScreen(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "History (${selectedHours}h)",
+                            text = if (isLive) "History (${selectedHours}h)" else timeFormatter.format(Date(windowEnd)),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        if (!isLive) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            CompactButton(onClick = { windowOffsetMillis = 0L }) {
+                                Text(
+                                    text = "Now",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            // Interactive Graph Canvas
+            // Interactive graph: tap inspects a reading, horizontal drag scrolls history.
+            // Drags starting at the left edge are left unconsumed so the system
+            // swipe-to-dismiss (back) keeps working on round watches.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .pointerInput(visibleReadings, windowStart, now) {
-                        detectTapGestures(
-                            onPress = { offset ->
-                                if (visibleReadings.isNotEmpty()) {
-                                    val progress = (offset.x / size.width).coerceIn(0f, 1f)
-                                    val touchedTime = windowStart + (progress * (now - windowStart)).toLong()
-                                    scrubbedPoint = visibleReadings.minByOrNull { kotlin.math.abs(it.timestamp - touchedTime) }
-                                    scrubX = offset.x
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val touchSlopPx = with(density) { 12.dp.toPx() }
+                            val edgeBackPx = with(density) { 28.dp.toPx() }
+                            if (down.position.x < edgeBackPx) return@awaitEachGesture
+
+                            var totalDragX = 0f
+                            var totalDragY = 0f
+                            var isPan = false
+
+                            do {
+                                val event = awaitPointerEvent()
+                                if (event.changes.size != 1) break
+                                val change = event.changes[0]
+                                val dx = change.position.x - change.previousPosition.x
+                                val dy = change.position.y - change.previousPosition.y
+                                totalDragX += kotlin.math.abs(dx)
+                                totalDragY += kotlin.math.abs(dy)
+
+                                if (!isPan) {
+                                    if (totalDragX > touchSlopPx && totalDragX > totalDragY * 1.15f) {
+                                        isPan = true
+                                        scrubbedPoint = null
+                                        scrubX = -1f
+                                    }
+                                }
+                                if (isPan) {
+                                    val chartWidth = size.width.toFloat()
+                                    if (chartWidth > 0f && dx != 0f && latestMaxOffset > 0L) {
+                                        val deltaMillis = (-(dx / chartWidth) * latestDuration).toLong()
+                                        val newEnd = (latestWindowEnd + deltaMillis)
+                                            .coerceIn(latestNow - latestMaxOffset, latestNow)
+                                        windowOffsetMillis = (latestNow - newEnd)
+                                            .coerceIn(0L, latestMaxOffset)
+                                    }
+                                    change.consume()
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            if (!isPan && totalDragX < touchSlopPx && totalDragY < touchSlopPx) {
+                                val snapshot = latestVisible
+                                if (snapshot.isNotEmpty() && size.width > 0) {
+                                    val start = latestWindowStart
+                                    val end = latestWindowEnd
+                                    val progress = (down.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                    val touchedTime = start + (progress * (end - start)).toLong()
+                                    val nearest = snapshot.minByOrNull { kotlin.math.abs(it.timestamp - touchedTime) }
+                                    if (nearest != null && nearest.timestamp == latestScrub?.timestamp) {
+                                        scrubbedPoint = null
+                                        scrubX = -1f
+                                    } else {
+                                        scrubbedPoint = nearest
+                                        scrubX = down.position.x
+                                    }
                                 }
                             }
-                        )
-                    }
-                    .pointerInput(visibleReadings, windowStart, now) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                if (visibleReadings.isNotEmpty()) {
-                                    val progress = (offset.x / size.width).coerceIn(0f, 1f)
-                                    val touchedTime = windowStart + (progress * (now - windowStart)).toLong()
-                                    scrubbedPoint = visibleReadings.minByOrNull { kotlin.math.abs(it.timestamp - touchedTime) }
-                                    scrubX = offset.x
-                                }
-                            },
-                            onDrag = { change, _ ->
-                                change.consume()
-                                val x = change.position.x
-                                if (visibleReadings.isNotEmpty() && size.width > 0) {
-                                    val progress = (x / size.width).coerceIn(0f, 1f)
-                                    val touchedTime = windowStart + (progress * (now - windowStart)).toLong()
-                                    scrubbedPoint = visibleReadings.minByOrNull { kotlin.math.abs(it.timestamp - touchedTime) }
-                                    scrubX = x
-                                }
-                            },
-                            onDragEnd = {
-                                scrubbedPoint = null
-                                scrubX = -1f
-                            },
-                            onDragCancel = {
-                                scrubbedPoint = null
-                                scrubX = -1f
-                            }
-                        )
+                        }
                     }
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
@@ -242,7 +309,7 @@ fun WearGraphScreen(
                     }
 
                     fun xFor(timestamp: Long): Float {
-                        val progress = ((timestamp - windowStart).toFloat() / (now - windowStart).coerceAtLeast(1L)).coerceIn(0f, 1f)
+                        val progress = ((timestamp - windowStart).toFloat() / (windowEnd - windowStart).coerceAtLeast(1L)).coerceIn(0f, 1f)
                         return progress * width
                     }
 
@@ -341,12 +408,15 @@ fun WearGraphScreen(
                 }
             }
 
-            // Bottom controls: Time range selector pills
+            // Bottom controls: horizontally scrollable so the outer 1h/12h pills
+            // stay reachable on narrow round screens (the bottom chord is short).
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 6.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 listOf(1, 3, 6, 12).forEach { hours ->
