@@ -41,8 +41,7 @@ fun WearApp(
                         onNavigateToGraph = { navController.navigate(WearNavRoutes.GRAPH) },
                         onNavigateToLog = { navController.navigate(WearNavRoutes.LOG) },
                         onNavigateToSensors = { navController.navigate(WearNavRoutes.SENSORS) },
-                        onNavigateToSettings = { navController.navigate(WearNavRoutes.SETTINGS) },
-                        onTriggerNfcScan = onTriggerNfcScan
+                        onNavigateToSettings = { navController.navigate(WearNavRoutes.SETTINGS) }
                     )
                 }
 

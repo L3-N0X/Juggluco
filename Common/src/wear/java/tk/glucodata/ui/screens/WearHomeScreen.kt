@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
@@ -46,8 +45,7 @@ fun WearHomeScreen(
     onNavigateToGraph: () -> Unit,
     onNavigateToLog: () -> Unit,
     onNavigateToSensors: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onTriggerNfcScan: () -> Unit
+    onNavigateToSettings: () -> Unit
 ) {
     val currentReading by repository.currentReading.collectAsState()
     val readings by repository.readings.collectAsState()
@@ -165,29 +163,7 @@ fun WearHomeScreen(
                 )
             }
 
-            // 5. Action: Scan NFC Sensor
-            item {
-                FilledTonalButton(
-                    onClick = onTriggerNfcScan,
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Nfc,
-                            contentDescription = null,
-                            modifier = Modifier.size(ButtonDefaults.IconSize)
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "Scan Sensor",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                )
-            }
-
-            // 6. Action: Sensors & Status
+            // 5. Action: Sensors & Status
             item {
                 FilledTonalButton(
                     onClick = onNavigateToSensors,
@@ -209,7 +185,7 @@ fun WearHomeScreen(
                 )
             }
 
-            // 7. Action: Settings
+            // 6. Action: Settings
             item {
                 FilledTonalButton(
                     onClick = onNavigateToSettings,
