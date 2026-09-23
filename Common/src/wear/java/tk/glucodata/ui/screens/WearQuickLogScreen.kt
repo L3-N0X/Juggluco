@@ -1,19 +1,15 @@
 package tk.glucodata.ui.screens
 
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -22,12 +18,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -41,9 +35,33 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
+import tk.glucodata.ui.components.WearQuickLogDial
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogType
+import kotlin.math.roundToInt
+
+private data class QuickLogSpec(
+    val min: Float,
+    val max: Float,
+    val smallStep: Float,
+    val largeStep: Float,
+    val initial: Float
+)
+
+private fun specFor(type: LogType, unit: GlucoseUnit): QuickLogSpec {
+    return when (type) {
+        LogType.CARBS -> QuickLogSpec(min = 0f, max = 150f, smallStep = 1f, largeStep = 5f, initial = 20f)
+        LogType.RAPID_INSULIN -> QuickLogSpec(min = 0f, max = 30f, smallStep = 0.5f, largeStep = 1f, initial = 2f)
+        LogType.BASAL_INSULIN -> QuickLogSpec(min = 0f, max = 60f, smallStep = 0.5f, largeStep = 1f, initial = 10f)
+        LogType.BLOOD_GLUCOSE -> if (unit == GlucoseUnit.MMOL_L) {
+            QuickLogSpec(min = 1.1f, max = 22.2f, smallStep = 0.1f, largeStep = 1f, initial = 5.5f)
+        } else {
+            QuickLogSpec(min = 20f, max = 400f, smallStep = 1f, largeStep = 10f, initial = 100f)
+        }
+        else -> QuickLogSpec(min = 0f, max = 100f, smallStep = 1f, largeStep = 5f, initial = 0f)
+    }
+}
 
 @Composable
 fun WearQuickLogScreen(
@@ -53,48 +71,35 @@ fun WearQuickLogScreen(
     val unit by repository.unit.collectAsState()
 
     var selectedType by remember { mutableStateOf(LogType.CARBS) }
-    var value by remember(selectedType) {
-        mutableFloatStateOf(
-            when (selectedType) {
-                LogType.CARBS -> 20f
-                LogType.RAPID_INSULIN -> 2f
-                LogType.BASAL_INSULIN -> 10f
-                LogType.BLOOD_GLUCOSE -> if (unit == GlucoseUnit.MMOL_L) 5.5f else 100f
-                else -> 0f
-            }
-        )
+    val spec = remember(selectedType, unit) { specFor(selectedType, unit) }
+    var value by remember(spec) { mutableFloatStateOf(spec.initial) }
+
+    fun adjust(delta: Float) {
+        val steps = ((value + delta - spec.min) / spec.smallStep).roundToInt()
+        value = (spec.min + steps * spec.smallStep).coerceIn(spec.min, spec.max)
+    }
+
+    val (displayText, labelText) = when (selectedType) {
+        LogType.CARBS -> "${value.roundToInt()} g" to "Carbs"
+        LogType.RAPID_INSULIN -> String.format(java.util.Locale.US, "%.1f U", value) to "Bolus"
+        LogType.BASAL_INSULIN -> String.format(java.util.Locale.US, "%.1f U", value) to "Basal"
+        LogType.BLOOD_GLUCOSE -> if (unit == GlucoseUnit.MMOL_L) {
+            String.format(java.util.Locale.US, "%.1f", value) to unit.label
+        } else {
+            "${value.roundToInt()}" to unit.label
+        }
+        else -> "$value" to ""
     }
 
     val haptic = LocalHapticFeedback.current
-    val focusRequester = remember { FocusRequester() }
     val listState = rememberScalingLazyListState()
-
-    LaunchedEffect(Unit) {
-        try {
-            focusRequester.requestFocus()
-        } catch (_: Throwable) {}
-    }
 
     ScreenScaffold(
         scrollState = listState,
         timeText = { TimeText() }
     ) {
         ScalingLazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .focusRequester(focusRequester)
-                .focusable()
-                .onRotaryScrollEvent { event ->
-                    val step = if (selectedType == LogType.CARBS) 1f else 0.5f
-                    if (event.verticalScrollPixels > 0) {
-                        value += step
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    } else if (event.verticalScrollPixels < 0) {
-                        value = (value - step).coerceAtLeast(0f)
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    }
-                    true
-                },
+            modifier = Modifier.fillMaxSize(),
             state = listState,
             rotaryScrollableBehavior = RotaryScrollableDefaults.behavior(scrollableState = listState),
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 20.dp),
@@ -146,25 +151,32 @@ fun WearQuickLogScreen(
                 }
             }
 
-            // Value Display
+            // Circular rotary dial: crown + spin-the-ring to adjust
             item {
-                val formattedDisplay = when (selectedType) {
-                    LogType.CARBS -> "${value.toInt()} g"
-                    LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> String.format(java.util.Locale.US, "%.1f U", value)
-                    LogType.BLOOD_GLUCOSE -> if (unit == GlucoseUnit.MMOL_L) {
-                        String.format(java.util.Locale.US, "%.1f %s", value, unit.label)
-                    } else {
-                        "${value.toInt()} ${unit.label}"
+                WearQuickLogDial(
+                    value = value,
+                    range = spec.min..spec.max,
+                    step = spec.smallStep,
+                    onValueChange = { value = it },
+                    displayText = displayText,
+                    labelText = labelText,
+                    contentDescription = when (selectedType) {
+                        LogType.CARBS -> "Carbohydrates in grams"
+                        LogType.RAPID_INSULIN -> "Rapid insulin in units"
+                        LogType.BASAL_INSULIN -> "Basal insulin in units"
+                        LogType.BLOOD_GLUCOSE -> "Blood glucose"
+                        else -> "Value"
                     }
-                    else -> "$value"
-                }
+                )
+            }
 
+            item {
                 Text(
-                    text = formattedDisplay,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    text = "Turn crown or spin ring",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
 
@@ -175,12 +187,9 @@ fun WearQuickLogScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val stepSmall = if (selectedType == LogType.CARBS) 1f else 0.5f
-                    val stepLarge = if (selectedType == LogType.CARBS) 5f else 1.0f
-
                     CompactButton(
                         onClick = {
-                            value = (value - stepLarge).coerceAtLeast(0f)
+                            adjust(-spec.largeStep)
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         },
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -188,7 +197,7 @@ fun WearQuickLogScreen(
                         )
                     ) {
                         Text(
-                            text = "-${stepLarge.toInt().coerceAtLeast(1)}",
+                            text = "-${formatStep(spec.largeStep)}",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -196,7 +205,7 @@ fun WearQuickLogScreen(
 
                     CompactButton(
                         onClick = {
-                            value = (value - stepSmall).coerceAtLeast(0f)
+                            adjust(-spec.smallStep)
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         },
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -204,7 +213,7 @@ fun WearQuickLogScreen(
                         )
                     ) {
                         Text(
-                            text = if (stepSmall < 1f) "-0.5" else "-1",
+                            text = "-${formatStep(spec.smallStep)}",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -212,7 +221,7 @@ fun WearQuickLogScreen(
 
                     CompactButton(
                         onClick = {
-                            value += stepSmall
+                            adjust(spec.smallStep)
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         },
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -220,7 +229,7 @@ fun WearQuickLogScreen(
                         )
                     ) {
                         Text(
-                            text = if (stepSmall < 1f) "+0.5" else "+1",
+                            text = "+${formatStep(spec.smallStep)}",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -228,7 +237,7 @@ fun WearQuickLogScreen(
 
                     CompactButton(
                         onClick = {
-                            value += stepLarge
+                            adjust(spec.largeStep)
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         },
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -236,7 +245,7 @@ fun WearQuickLogScreen(
                         )
                     ) {
                         Text(
-                            text = "+${stepLarge.toInt().coerceAtLeast(1)}",
+                            text = "+${formatStep(spec.largeStep)}",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -271,6 +280,16 @@ fun WearQuickLogScreen(
                 )
             }
         }
+    }
+}
+
+private fun formatStep(step: Float): String {
+    return if (step < 1f) {
+        String.format(java.util.Locale.US, "%.1f", step).trimEnd('0').trimEnd('.').let {
+            if (it.startsWith("0")) it.substring(1) else it
+        }.let { if (it.startsWith(".")) "0$it" else it }
+    } else {
+        step.roundToInt().toString()
     }
 }
 
