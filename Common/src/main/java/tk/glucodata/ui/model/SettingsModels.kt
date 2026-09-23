@@ -19,10 +19,46 @@ data class AlarmConfig(
     val highSnoozeMinutes: Int = 30,
     val urgentLowEnabled: Boolean = true,
     val urgentLowThreshold: Float = 54f,
+    val urgentLowSnoozeMinutes: Int = 15,
+    val veryHighEnabled: Boolean = false,
+    val veryHighThreshold: Float = 250f,
+    val veryHighSnoozeMinutes: Int = 30,
+    val preLowEnabled: Boolean = false,
+    val preLowThreshold: Float = 80f,
+    val preLowSnoozeMinutes: Int = 15,
+    val preHighEnabled: Boolean = false,
+    val preHighThreshold: Float = 170f,
+    val preHighSnoozeMinutes: Int = 15,
     val lossAlarmEnabled: Boolean = true,
     val lossWaitMinutes: Int = 20,
     val valueAvailableNotification: Boolean = false,
     val soundStream: AlarmSoundStream = AlarmSoundStream.ALARM
+) {
+    /** Number of sound-producing alarms currently enabled (excludes the value chime). */
+    fun activeAlarmCount(): Int = listOf(
+        lowAlarmEnabled,
+        highAlarmEnabled,
+        urgentLowEnabled,
+        veryHighEnabled,
+        preLowEnabled,
+        preHighEnabled,
+        lossAlarmEnabled
+    ).count { it }
+}
+
+/**
+ * Per-alarm sound behavior (legacy RingTones dialog equivalent, without the
+ * ringtone picker). Kinds follow Notify: 0 low, 1 high, 2 value chime,
+ * 4 signal loss, 5 urgent low, 6 very high, 7 pre low, 8 pre high.
+ *
+ * Note: on Wear OS the do-not-disturb override is always active
+ * (Notify.mksound forces it for wearables), so there is no disturb flag here.
+ */
+data class AlarmBehavior(
+    val kind: Int,
+    val sound: Boolean = true,
+    val vibration: Boolean = true,
+    val durationSecs: Int = 60
 )
 
 data class ExchangesConfig(
@@ -55,7 +91,8 @@ data class DisplayConfig(
     val deltaCalculation: DeltaCalculation = DeltaCalculation.ONE_MINUTE,
     val calibrationEnabled: Boolean = false,
     val calibratePastReadings: Boolean = false,
-    val calibrateAllValues: Boolean = false
+    val calibrateAllValues: Boolean = false,
+    val use24Hour: Boolean = true
 )
 
 data class HardwareConfig(

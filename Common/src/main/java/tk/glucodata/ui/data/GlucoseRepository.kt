@@ -27,6 +27,7 @@ import tk.glucodata.WatchBridge
 import tk.glucodata.XInfuus
 import tk.glucodata.nums.numio
 import tk.glucodata.ui.model.AgpProfile
+import tk.glucodata.ui.model.AlarmBehavior
 import tk.glucodata.ui.model.AlarmConfig
 import tk.glucodata.ui.model.AlarmSoundStream
 import tk.glucodata.ui.model.DeltaCalculation
@@ -105,6 +106,15 @@ class GlucoseRepository(
     private val _alarms = MutableStateFlow(AlarmConfig())
     val alarms: StateFlow<AlarmConfig> = _alarms.asStateFlow()
 
+    private val _alarmBehavior = MutableStateFlow<List<AlarmBehavior>>(emptyList())
+    val alarmBehavior: StateFlow<List<AlarmBehavior>> = _alarmBehavior.asStateFlow()
+
+    private val _voiceAnnounce = MutableStateFlow(false)
+    val voiceAnnounce: StateFlow<Boolean> = _voiceAnnounce.asStateFlow()
+
+    private val _speakAlarms = MutableStateFlow(true)
+    val speakAlarms: StateFlow<Boolean> = _speakAlarms.asStateFlow()
+
     private val _exchanges = MutableStateFlow(ExchangesConfig())
     val exchanges: StateFlow<ExchangesConfig> = _exchanges.asStateFlow()
 
@@ -180,16 +190,28 @@ class GlucoseRepository(
                 if (tLow > 0f) _targetLow.value = tLow
                 if (tHigh > 0f) _targetHigh.value = tHigh
 
-                // Read Alarms
+                // Read Alarms (native getters return display-unit values, see
+                // settings.hpp gconvert/tomgperL, so fallbacks are unit-aware)
+                val mmol = _unit.value == GlucoseUnit.MMOL_L
                 _alarms.value = AlarmConfig(
                     lowAlarmEnabled = Natives.hasalarmlow(),
-                    lowThreshold = Natives.alarmlow().let { if (it > 0f) it else 70f },
+                    lowThreshold = Natives.alarmlow().let { if (it > 0f) it else if (mmol) 3.9f else 70f },
                     lowSnoozeMinutes = Natives.readalarmsuspension(0).toInt().coerceAtLeast(5),
                     highAlarmEnabled = Natives.hasalarmhigh(),
-                    highThreshold = Natives.alarmhigh().let { if (it > 0f) it else 180f },
+                    highThreshold = Natives.alarmhigh().let { if (it > 0f) it else if (mmol) 10f else 180f },
                     highSnoozeMinutes = Natives.readalarmsuspension(1).toInt().coerceAtLeast(5),
                     urgentLowEnabled = try { Natives.hasalarmverylow() } catch (_: Throwable) { true },
-                    urgentLowThreshold = try { Natives.alarmverylow().let { if (it > 0f) it else 54f } } catch (_: Throwable) { 54f },
+                    urgentLowThreshold = try { Natives.alarmverylow().let { if (it > 0f) it else if (mmol) 3f else 54f } } catch (_: Throwable) { if (mmol) 3f else 54f },
+                    urgentLowSnoozeMinutes = try { Natives.readalarmsuspension(5).toInt().coerceAtLeast(5) } catch (_: Throwable) { 15 },
+                    veryHighEnabled = try { Natives.hasalarmveryhigh() } catch (_: Throwable) { false },
+                    veryHighThreshold = try { Natives.alarmveryhigh().let { if (it > 0f) it else if (mmol) 13.9f else 250f } } catch (_: Throwable) { if (mmol) 13.9f else 250f },
+                    veryHighSnoozeMinutes = try { Natives.readalarmsuspension(6).toInt().coerceAtLeast(5) } catch (_: Throwable) { 30 },
+                    preLowEnabled = try { Natives.hasalarmprelow() } catch (_: Throwable) { false },
+                    preLowThreshold = try { Natives.alarmprelow().let { if (it > 0f) it else if (mmol) 4.4f else 80f } } catch (_: Throwable) { if (mmol) 4.4f else 80f },
+                    preLowSnoozeMinutes = try { Natives.readalarmsuspension(7).toInt().coerceAtLeast(5) } catch (_: Throwable) { 15 },
+                    preHighEnabled = try { Natives.hasalarmprehigh() } catch (_: Throwable) { false },
+                    preHighThreshold = try { Natives.alarmprehigh().let { if (it > 0f) it else if (mmol) 9.4f else 170f } } catch (_: Throwable) { if (mmol) 9.4f else 170f },
+                    preHighSnoozeMinutes = try { Natives.readalarmsuspension(8).toInt().coerceAtLeast(5) } catch (_: Throwable) { 15 },
                     lossAlarmEnabled = Natives.hasalarmloss(),
                     lossWaitMinutes = Natives.readalarmsuspension(4).toInt().coerceAtLeast(10),
                     valueAvailableNotification = Natives.hasvaluealarm(),
@@ -235,7 +257,8 @@ class GlucoseRepository(
                     deltaCalculation = deltaCalculation,
                     calibrationEnabled = try { Natives.getDoCalibrate() } catch (_: Throwable) { false },
                     calibratePastReadings = try { Natives.getCalibratePast() } catch (_: Throwable) { false },
-                    calibrateAllValues = try { Natives.getAllValues() } catch (_: Throwable) { false }
+                    calibrateAllValues = try { Natives.getAllValues() } catch (_: Throwable) { false },
+                    use24Hour = try { Natives.gethour24() } catch (_: Throwable) { true }
                 )
 
                 // Read Hardware
@@ -254,6 +277,11 @@ class GlucoseRepository(
                     separateAlerts = try { Notify.alertseparate } catch (_: Throwable) { false },
                     notifyWatch = WatchBridge.getNotifyWatch()
                 )
+
+                // Read per-alarm sound behavior, voice output and NFC sound
+                _alarmBehavior.value = readAlarmBehavior()
+                _voiceAnnounce.value = try { Natives.getVoiceActive() } catch (_: Throwable) { false }
+                _speakAlarms.value = try { Natives.speakalarms() } catch (_: Throwable) { true }
             }
         } catch (_: Throwable) {}
     }
@@ -712,6 +740,101 @@ class GlucoseRepository(
                     Natives.writealarmsuspension(1, config.highSnoozeMinutes.toShort())
                     Natives.writealarmsuspension(4, config.lossWaitMinutes.toShort())
                     Natives.setalarmSoundType(config.soundStream.id)
+                    // Advanced alarms are written as a group; values not edited by
+                    // the caller are the ones previously read, so this is a no-op for them.
+                    Natives.setAdvancedAlarms(
+                        config.urgentLowThreshold,
+                        config.veryHighThreshold,
+                        config.urgentLowEnabled,
+                        config.veryHighEnabled,
+                        config.preLowEnabled,
+                        config.preHighEnabled,
+                        config.preLowThreshold,
+                        config.preHighThreshold
+                    )
+                    Natives.writealarmsuspension(5, config.urgentLowSnoozeMinutes.toShort())
+                    Natives.writealarmsuspension(6, config.veryHighSnoozeMinutes.toShort())
+                    Natives.writealarmsuspension(7, config.preLowSnoozeMinutes.toShort())
+                    Natives.writealarmsuspension(8, config.preHighSnoozeMinutes.toShort())
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // --- ALARM BEHAVIOR (SOUND / VIBRATION / DURATION) ACTIONS ---
+
+    private fun readAlarmBehavior(): List<AlarmBehavior> {
+        return behaviorKinds.map { kind ->
+            AlarmBehavior(
+                kind = kind,
+                sound = try { Natives.alarmhassound(kind) } catch (_: Throwable) { true },
+                vibration = try { Natives.alarmhasvibration(kind) } catch (_: Throwable) { true },
+                durationSecs = try { Natives.readalarmduration(kind).takeIf { it > 0 } ?: 60 } catch (_: Throwable) { 60 }
+            )
+        }
+    }
+
+    fun behaviorFor(kind: Int): AlarmBehavior? = _alarmBehavior.value.find { it.kind == kind }
+
+    fun updateAlarmBehavior(behavior: AlarmBehavior) {
+        _alarmBehavior.value = _alarmBehavior.value.map { if (it.kind == behavior.kind) behavior else it }
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    // Preserve ringtone URI and flash flag, only sound/vibration change here.
+                    val uri = try { Natives.readring(behavior.kind) } catch (_: Throwable) { null } ?: ""
+                    val flash = try { Natives.alarmhasflash(behavior.kind) } catch (_: Throwable) { false }
+                    Natives.writering(behavior.kind, uri, behavior.sound, flash, behavior.vibration)
+                    Natives.writealarmduration(behavior.kind, behavior.durationSecs)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // --- VOICE OUTPUT ACTIONS ---
+
+    fun setVoiceAnnounce(enabled: Boolean) {
+        _voiceAnnounce.value = enabled
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    // Preserve current rate/pitch, only the on/off state changes here.
+                    val speed = try { Natives.getVoiceSpeed().let { if (it > 0) it else 1f } } catch (_: Throwable) { 1f }
+                    val pitch = try { Natives.getVoicePitch().let { if (it > 0) it else 1f } } catch (_: Throwable) { 1f }
+                    Natives.saveVoice(speed, pitch, 50, 0, enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setSpeakAlarms(enabled: Boolean) {
+        _speakAlarms.value = enabled
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setspeakalarms(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setNfcSound(enabled: Boolean) {
+        _hardwareConfig.value = _hardwareConfig.value.copy(nfcSound = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setnfcsound(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setHour24(use24Hour: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(use24Hour = use24Hour)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Applic.sethour24(use24Hour)
                 }
             } catch (_: Throwable) {}
         }
@@ -1606,5 +1729,7 @@ class GlucoseRepository(
         const val UI_PREFS = "ui_prefs"
         const val KEY_DELTA_CALCULATION = "delta_calculation_minutes"
         const val KEY_MINIMALIST_UNITS = "minimalist_units"
+        /** Native alarm kinds with user-facing sound behavior, in UI order. */
+        val behaviorKinds = listOf(0, 5, 1, 6, 7, 8, 4, 2)
     }
 }
