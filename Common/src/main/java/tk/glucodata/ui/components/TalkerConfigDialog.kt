@@ -126,7 +126,7 @@ fun TalkerConfigDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(stringResource(R.string.dialog_speech_rate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Text("${String.format(java.util.Locale.US, "%.1f", speechSpeed)}x", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text("${String.format(java.util.Locale.getDefault(), "%.1f", speechSpeed)}x", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                     Slider(
                         value = speechSpeed,
@@ -147,7 +147,7 @@ fun TalkerConfigDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(stringResource(R.string.dialog_voice_pitch), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Text("${String.format(java.util.Locale.US, "%.1f", speechPitch)}x", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text("${String.format(java.util.Locale.getDefault(), "%.1f", speechPitch)}x", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                     Slider(
                         value = speechPitch,

@@ -76,10 +76,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import tk.glucodata.Applic
+import tk.glucodata.R
 import tk.glucodata.alerts.AlertKind
 import tk.glucodata.alerts.AlertOutput
 import tk.glucodata.alerts.AlertPlayer
@@ -110,16 +112,20 @@ fun AlertEditorScreen(
     val active by AlertPlayer.active.collectAsState()
     var confirmDelete by remember { mutableStateOf(false) }
     var showSoundPicker by remember { mutableStateOf(false) }
+    val offLabel = stringResource(R.string.loc_common_off)
+    val atOnceLabel = stringResource(R.string.loc_common_at_once)
+    val onceLabel = stringResource(R.string.loc_common_once)
+    val untilDismissedLabel = stringResource(R.string.loc_alert_until_dismissed)
     fun update(transform: (AlertRule) -> AlertRule) = AlertStore.upsert(transform(rule))
 
     val testing = active?.let { it.isTest && it.rule.id == rule.id } == true
 
     SettingsDetailScaffold(
-        title = rule.name.ifBlank { "Alert" },
+        title = rule.name.ifBlank { stringResource(R.string.loc_alert_default_name) },
         onNavigateBack = onNavigateBack,
         actions = {
             IconButton(onClick = { confirmDelete = true }) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete alert")
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.loc_action_delete_alert))
             }
         }
     ) {
@@ -127,8 +133,8 @@ fun AlertEditorScreen(
         SettingsSection {
             NameRow(name = rule.name, onNameChange = { name -> update { it.copy(name = name) } })
             SettingsSwitchRow(
-                title = "Alert on",
-                subtitle = if (rule.enabled) triggerSummary(rule, unit) else "This alert never fires",
+                title = stringResource(R.string.loc_alert_on),
+                subtitle = if (rule.enabled) triggerSummary(context, rule, unit) else stringResource(R.string.alert_never_fires),
                 icon = alertIcon(rule.kind),
                 iconTint = alertColors(rule).first,
                 iconBackground = alertColors(rule).second,
@@ -137,43 +143,46 @@ fun AlertEditorScreen(
             )
             if (runtime.snoozedUntil > System.currentTimeMillis()) {
                 SettingsActionRow(
-                    title = "Snoozed",
-                    subtitle = "Until ${formatClock(runtime.snoozedUntil)}",
+                    title = stringResource(R.string.loc_alert_snoozed),
+                    subtitle = stringResource(R.string.loc_until_time, formatClock(runtime.snoozedUntil)),
                     icon = Icons.Default.Snooze,
                     trailingContent = {
-                        TextButton(onClick = { AlertStore.snoozeRule(rule.id, 0) }) { Text("Resume") }
+                        TextButton(onClick = { AlertStore.snoozeRule(rule.id, 0) }) { Text(stringResource(R.string.loc_common_resume)) }
                     }
                 )
             }
         }
 
         // --- Trigger ---------------------------------------------------------------
-        SettingsSection(title = "Trigger") {
+        SettingsSection(title = stringResource(R.string.loc_alert_trigger_section)) {
             when (rule.kind) {
                 AlertKind.LOW, AlertKind.HIGH -> {
                     LevelRow(
-                        title = if (rule.kind == AlertKind.LOW) "Alert at or below" else "Alert at or above",
+                        title = stringResource(
+                            if (rule.kind == AlertKind.LOW) R.string.loc_alert_at_or_below else R.string.loc_alert_at_or_above,
+                            "${unit.format(rule.thresholdMgdl)} ${stringResource(unit.labelRes)}"
+                        ),
                         valueMgdl = rule.thresholdMgdl,
                         range = if (rule.kind == AlertKind.LOW) 40f..150f else 110f..400f,
                         unit = unit,
                         onChange = { value -> update { it.copy(thresholdMgdl = value) } }
                     )
                     ChoiceRow(
-                        title = "Predictive",
+                        title = stringResource(R.string.loc_alert_predictive),
                         subtitle = if (rule.forecastMinutes > 0) {
-                            "Also alerts when the trend reaches the level within ${rule.forecastMinutes} min"
+                            stringResource(R.string.loc_alert_predictive_within, rule.forecastMinutes)
                         } else {
-                            "Only the current value counts"
+                            stringResource(R.string.loc_alert_current_value_only)
                         },
                         icon = Icons.AutoMirrored.Filled.TrendingFlat,
                         options = listOf(0, 10, 15, 20, 30, 45),
                         selected = rule.forecastMinutes,
-                        label = { if (it == 0) "Off" else "$it min" },
+                        label = { if (it == 0) offLabel else context.getString(R.string.loc_minutes_short, it) },
                         onSelect = { minutes -> update { it.copy(forecastMinutes = minutes) } }
                     )
                     SettingsSwitchRow(
-                        title = if (rule.kind == AlertKind.LOW) "Skip while rising" else "Skip while falling",
-                        subtitle = "Stay quiet when glucose is already heading back",
+                        title = stringResource(if (rule.kind == AlertKind.LOW) R.string.loc_alert_skip_rising else R.string.loc_alert_skip_falling),
+                        subtitle = stringResource(R.string.loc_alert_recovering),
                         icon = Icons.Default.Tune,
                         checked = rule.skipWhenRecovering,
                         onCheckedChange = { skip -> update { it.copy(skipWhenRecovering = skip) } }
@@ -187,11 +196,16 @@ fun AlertEditorScreen(
                         onChange = { rate -> update { it.copy(rateMgdlPerMin = rate) } }
                     )
                     SettingsSwitchRow(
-                        title = if (rule.kind == AlertKind.FALLING) "Only below a level" else "Only above a level",
+                        title = stringResource(if (rule.kind == AlertKind.FALLING) R.string.loc_alert_only_below else R.string.loc_alert_only_above),
                         subtitle = if (rule.thresholdMgdl > 0f) {
-                            "Ignored while glucose is ${if (rule.kind == AlertKind.FALLING) "above" else "below"} ${unit.format(rule.thresholdMgdl)} ${unit.label}"
+                            stringResource(
+                                R.string.alert_threshold_ignored,
+                                stringResource(if (rule.kind == AlertKind.FALLING) R.string.above else R.string.below),
+                                unit.format(rule.thresholdMgdl),
+                                stringResource(unit.labelRes)
+                            )
                         } else {
-                            "Alerts at any glucose level"
+                            stringResource(R.string.loc_alert_any_level)
                         },
                         icon = Icons.Default.Tune,
                         checked = rule.thresholdMgdl > 0f,
@@ -201,7 +215,7 @@ fun AlertEditorScreen(
                     )
                     if (rule.thresholdMgdl > 0f) {
                         LevelRow(
-                            title = if (rule.kind == AlertKind.FALLING) "Below" else "Above",
+                            title = stringResource(if (rule.kind == AlertKind.FALLING) R.string.below else R.string.above),
                             valueMgdl = rule.thresholdMgdl,
                             range = 60f..300f,
                             unit = unit,
@@ -211,7 +225,7 @@ fun AlertEditorScreen(
                 }
                 AlertKind.SIGNAL_LOSS -> {
                     ChoiceRow(
-                        title = "No reading for",
+                        title = stringResource(R.string.loc_alert_no_reading_for),
                         icon = Icons.Default.HourglassBottom,
                         options = listOf(5, 10, 15, 20, 30, 45, 60, 90, 120),
                         selected = rule.lossMinutes,
@@ -226,9 +240,9 @@ fun AlertEditorScreen(
         ScheduleSection(schedule = rule.schedule, onChange = { schedule -> update { it.copy(schedule = schedule) } })
 
         // --- Sound -----------------------------------------------------------------
-        SettingsSection(title = "Sound") {
+        SettingsSection(title = stringResource(R.string.loc_alert_sound_section)) {
             SettingsSegmentedRow(
-                title = "Play on",
+                title = stringResource(R.string.loc_alert_play_on),
                 subtitle = outputDescription(rule.output),
                 icon = Icons.AutoMirrored.Filled.VolumeUp
             ) {
@@ -238,10 +252,10 @@ fun AlertEditorScreen(
                         .padding(horizontal = 16.dp)
                 ) {
                     val outputs = listOf(
-                        AlertOutput.ALARM to "Alarm",
-                        AlertOutput.NOTIFICATION to "Notification",
-                        AlertOutput.MEDIA to "Media",
-                        AlertOutput.NONE to "Off"
+                        AlertOutput.ALARM to stringResource(R.string.loc_alarm_stream),
+                        AlertOutput.NOTIFICATION to stringResource(R.string.loc_alarm_notification_stream),
+                        AlertOutput.MEDIA to stringResource(R.string.loc_alarm_media_stream),
+                        AlertOutput.NONE to stringResource(R.string.loc_common_off)
                     )
                     outputs.forEachIndexed { index, (output, label) ->
                         SegmentedButton(
@@ -255,18 +269,18 @@ fun AlertEditorScreen(
             }
             val soundOn = rule.output != AlertOutput.NONE
             SettingsActionRow(
-                title = "Sound",
+                title = stringResource(R.string.loc_alert_sound),
                 subtitle = AlertSounds.label(context, rule),
                 icon = Icons.Default.MusicNote,
                 enabled = soundOn,
                 onClick = { showSoundPicker = true }
             )
             SettingsSwitchRow(
-                title = "Set volume",
+                title = stringResource(R.string.loc_alert_set_volume),
                 subtitle = if (rule.volumePercent >= 0) {
-                    "Raises the ${outputName(rule.output)} volume to ${rule.volumePercent}% while ringing"
+                    stringResource(R.string.loc_alert_raise_volume, outputName(rule.output), rule.volumePercent)
                 } else {
-                    "Uses the phone's current ${outputName(rule.output)} volume"
+                    stringResource(R.string.loc_alert_use_phone_volume, outputName(rule.output))
                 },
                 icon = Icons.Default.GraphicEq,
                 enabled = soundOn,
@@ -275,7 +289,7 @@ fun AlertEditorScreen(
             )
             if (rule.volumePercent >= 0) {
                 SettingsSliderRow(
-                    title = "Volume",
+                    title = stringResource(R.string.loc_alert_volume),
                     valueText = "${rule.volumePercent}%",
                     icon = Icons.AutoMirrored.Filled.VolumeUp,
                     value = rule.volumePercent.toFloat(),
@@ -285,29 +299,29 @@ fun AlertEditorScreen(
                 )
             }
             ChoiceRow(
-                title = "Fade in",
-                subtitle = if (rule.rampUpSec > 0) "Reaches full volume after ${formatDuration(rule.rampUpSec)}" else "Starts at full volume",
+                title = stringResource(R.string.loc_alert_fade_in),
+                subtitle = if (rule.rampUpSec > 0) stringResource(R.string.loc_alert_reaches_full_volume, formatDuration(rule.rampUpSec)) else stringResource(R.string.loc_alert_starts_full_volume),
                 icon = Icons.Default.Speed,
                 enabled = soundOn,
                 options = listOf(0, 5, 10, 20, 30, 60, 120),
                 selected = rule.rampUpSec,
-                label = { if (it == 0) "Off" else formatDuration(it) },
+                label = { if (it == 0) offLabel else formatDuration(it) },
                 onSelect = { seconds -> update { it.copy(rampUpSec = seconds) } }
             )
             ChoiceRow(
-                title = "Sound starts after",
-                subtitle = "Time from the alert until the sound starts",
+                title = stringResource(R.string.loc_alert_sound_starts_after),
+                subtitle = stringResource(R.string.loc_alert_sound_delay),
                 icon = Icons.Default.Timer,
                 enabled = soundOn,
                 options = listOf(0, 10, 30, 60, 120, 300),
                 selected = rule.soundDelaySec,
-                label = { if (it == 0) "At once" else formatDuration(it) },
+                label = { if (it == 0) atOnceLabel else formatDuration(it) },
                 onSelect = { seconds -> update { it.copy(soundDelaySec = seconds) } }
             )
             SettingsSwitchRow(
-                title = "Override Do Not Disturb",
-                subtitle = "Rings and vibrates even in silent mode or Do Not Disturb" +
-                    if (!AlertPlayer.hasDndAccess()) " (needs Do Not Disturb access)" else "",
+                title = stringResource(R.string.loc_alert_override_dnd),
+                subtitle = stringResource(R.string.loc_alert_override_dnd_desc) +
+                    if (!AlertPlayer.hasDndAccess()) stringResource(R.string.loc_alert_override_dnd_needed) else "",
                 icon = Icons.Default.DoNotDisturbOn,
                 checked = rule.overrideDnd,
                 onCheckedChange = { on -> update { it.copy(overrideDnd = on) } }
@@ -318,58 +332,58 @@ fun AlertEditorScreen(
         VibrationSection(rule = rule, onChange = { transform -> update(transform) })
 
         // --- Behaviour ------------------------------------------------------------
-        SettingsSection(title = "Behavior") {
+        SettingsSection(title = stringResource(R.string.loc_alert_behavior)) {
             ChoiceRow(
-                title = "Repeat",
+                title = stringResource(R.string.loc_alert_repeat),
                 subtitle = if (rule.repeatMinutes > 0) {
-                    "Alerts again every ${formatDuration(rule.repeatMinutes * 60)} while the condition lasts"
+                    stringResource(R.string.loc_alert_repeat_desc, formatDuration(rule.repeatMinutes * 60))
                 } else {
-                    "Alerts once until the condition clears"
+                    stringResource(R.string.loc_alert_once_desc)
                 },
                 icon = Icons.Default.Repeat,
                 options = listOf(0, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180),
                 selected = rule.repeatMinutes,
-                label = { if (it == 0) "Once" else formatDuration(it * 60) },
+                label = { if (it == 0) onceLabel else formatDuration(it * 60) },
                 onSelect = { minutes -> update { it.copy(repeatMinutes = minutes) } }
             )
             ChoiceRow(
-                title = "Ring for",
+                title = stringResource(R.string.loc_alert_ring_for),
                 subtitle = if (rule.playDurationSec > 0) {
-                    "Sound and vibration stop after ${formatDuration(rule.playDurationSec)}"
+                    stringResource(R.string.loc_alert_ring_duration, formatDuration(rule.playDurationSec))
                 } else {
-                    "Keeps ringing until dismissed"
+                    stringResource(R.string.loc_alert_ring_until_dismissed)
                 },
                 icon = Icons.Default.AccessTime,
                 options = listOf(10, 15, 30, 60, 120, 300, 600, 0),
                 selected = rule.playDurationSec,
-                label = { if (it == 0) "Until dismissed" else formatDuration(it) },
+                label = { if (it == 0) untilDismissedLabel else formatDuration(it) },
                 onSelect = { seconds -> update { it.copy(playDurationSec = seconds) } }
             )
             SettingsSwitchRow(
-                title = "Stop when resolved",
-                subtitle = "Stops ringing when a new reading no longer meets the condition",
+                title = stringResource(R.string.loc_alert_stop_resolved),
+                subtitle = stringResource(R.string.loc_alert_stop_resolved_desc),
                 icon = Icons.Default.CheckCircle,
                 checked = rule.stopWhenResolved,
                 onCheckedChange = { on -> update { it.copy(stopWhenResolved = on) } }
             )
             SettingsSwitchRow(
-                title = "Full-screen alert",
-                subtitle = "Shows the value over the lock screen with large snooze and dismiss buttons",
+                title = stringResource(R.string.loc_alert_full_screen),
+                subtitle = stringResource(R.string.loc_alert_full_screen_desc),
                 icon = Icons.Default.Fullscreen,
                 checked = rule.fullScreen,
                 onCheckedChange = { on -> update { it.copy(fullScreen = on) } }
             )
             SettingsSwitchRow(
-                title = "Speak value",
-                subtitle = "Reads the glucose value aloud before the sound",
+                title = stringResource(R.string.loc_alert_speak_value),
+                subtitle = stringResource(R.string.loc_alert_speak_value_desc),
                 icon = Icons.Default.RecordVoiceOver,
                 checked = rule.announce,
                 onCheckedChange = { on -> update { it.copy(announce = on) } }
             )
             if (!Applic.isWearable) {
                 SettingsSwitchRow(
-                    title = "Flashlight",
-                    subtitle = "Blinks the camera flash while ringing",
+                    title = stringResource(R.string.loc_alert_flashlight),
+                    subtitle = stringResource(R.string.loc_alert_flashlight_desc),
                     icon = Icons.Default.FlashlightOn,
                     checked = rule.flash,
                     onCheckedChange = { on -> update { it.copy(flash = on) } }
@@ -385,7 +399,7 @@ fun AlertEditorScreen(
         ) {
             Icon(if (testing) Icons.Default.Stop else Icons.Default.NotificationsActive, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text(if (testing) "Stop test" else "Test this alert")
+            Text(stringResource(if (testing) R.string.loc_alert_stop_test else R.string.loc_alert_test_this))
         }
     }
 
@@ -399,35 +413,38 @@ fun AlertEditorScreen(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete ${rule.name}?") },
+            title = { Text(stringResource(R.string.loc_delete_alert_named, rule.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     if (AlertPlayer.active.value?.rule?.id == rule.id) AlertPlayer.dismiss()
                     onNavigateBack()
                     AlertStore.delete(rule.id)
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
 }
 
-private fun outputName(output: AlertOutput): String = when (output) {
-    AlertOutput.ALARM -> "alarm"
-    AlertOutput.NOTIFICATION -> "notification"
-    AlertOutput.MEDIA -> "media"
-    AlertOutput.NONE -> "media"
-}
+private fun outputName(output: AlertOutput): String = Applic.getContext().getString(
+    when (output) {
+        AlertOutput.ALARM -> R.string.loc_alarm_stream
+        AlertOutput.NOTIFICATION -> R.string.loc_alarm_notification_stream
+        AlertOutput.MEDIA, AlertOutput.NONE -> R.string.loc_alarm_media_stream
+    }
+)
 
-private fun outputDescription(output: AlertOutput): String = when (output) {
-    AlertOutput.ALARM -> "Alarm volume, plays in vibrate mode like an alarm clock"
-    AlertOutput.NOTIFICATION -> "Notification volume, muted in silent and vibrate mode"
-    AlertOutput.MEDIA -> "Media volume, plays through headphones when connected"
-    AlertOutput.NONE -> "No sound, only vibration and the notification"
-}
+private fun outputDescription(output: AlertOutput): String = Applic.getContext().getString(
+    when (output) {
+        AlertOutput.ALARM -> R.string.loc_alarm_desc_alarm
+        AlertOutput.NOTIFICATION -> R.string.loc_alarm_desc_notification
+        AlertOutput.MEDIA -> R.string.loc_alarm_desc_media
+        AlertOutput.NONE -> R.string.loc_alarm_desc_none
+    }
+)
 
 @Composable
 private fun NameRow(name: String, onNameChange: (String) -> Unit) {
@@ -447,7 +464,7 @@ private fun NameRow(name: String, onNameChange: (String) -> Unit) {
                 text = it
                 if (it.isNotBlank()) onNameChange(it.trim())
             },
-            label = { Text("Name") },
+            label = { Text(stringResource(R.string.loc_name_label)) },
             singleLine = true,
             modifier = Modifier.weight(1f)
         )
@@ -488,7 +505,7 @@ private fun LevelRow(
                 Text("−", style = MaterialTheme.typography.titleMedium)
             }
             Text(
-                text = "${unit.format(valueMgdl)} ${unit.label}",
+                text = "${unit.format(valueMgdl)} ${stringResource(unit.labelRes)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -510,8 +527,8 @@ private fun LevelRow(
 @Composable
 private fun RateRow(rateMgdl: Float, unit: GlucoseUnit, falling: Boolean, onChange: (Float) -> Unit) {
     SettingsSliderRow(
-        title = if (falling) "Falling at least" else "Rising at least",
-        valueText = "${unit.formatRate(rateMgdl)} ${unit.label}/min",
+        title = stringResource(if (falling) R.string.loc_rate_falling_at_least else R.string.loc_rate_rising_at_least),
+        valueText = "${unit.formatRate(rateMgdl)} ${stringResource(unit.labelRes)}/min",
         icon = Icons.Default.Speed,
         value = rateMgdl,
         onValueChange = { value -> onChange((value * 4).roundToInt() / 4f) },
@@ -551,9 +568,9 @@ private fun <T> ChoiceRow(
 @Composable
 private fun ScheduleSection(schedule: AlertSchedule, onChange: (AlertSchedule) -> Unit) {
     var editingStart by remember { mutableStateOf<Boolean?>(null) }
-    SettingsSection(title = "Schedule") {
+    SettingsSection(title = stringResource(R.string.loc_schedule_section)) {
         SettingsSegmentedRow(
-            title = "Active on",
+            title = stringResource(R.string.loc_schedule_active_on),
             subtitle = scheduleSummary(schedule.copy(allDay = true)),
             icon = Icons.Default.CalendarMonth
         ) {
@@ -574,10 +591,13 @@ private fun ScheduleSection(schedule: AlertSchedule, onChange: (AlertSchedule) -
             }
         }
         SettingsSwitchRow(
-            title = "All day",
-            subtitle = if (schedule.allDay) "Active around the clock" else {
-                "Active ${formatMinuteOfDay(schedule.startMinute)}–${formatMinuteOfDay(schedule.endMinute)}" +
-                    if (schedule.endMinute < schedule.startMinute) " (overnight)" else ""
+            title = stringResource(R.string.loc_schedule_all_day),
+            subtitle = if (schedule.allDay) stringResource(R.string.loc_schedule_around_clock) else {
+                stringResource(
+                    R.string.loc_schedule_window,
+                    formatMinuteOfDay(schedule.startMinute),
+                    formatMinuteOfDay(schedule.endMinute)
+                ) + if (schedule.endMinute < schedule.startMinute) stringResource(R.string.loc_schedule_overnight) else ""
             },
             icon = Icons.Default.Schedule,
             checked = schedule.allDay,
@@ -585,13 +605,13 @@ private fun ScheduleSection(schedule: AlertSchedule, onChange: (AlertSchedule) -
         )
         if (!schedule.allDay) {
             SettingsActionRow(
-                title = "From",
+                title = stringResource(R.string.loc_from),
                 subtitle = formatMinuteOfDay(schedule.startMinute),
                 icon = Icons.Default.AccessTime,
                 onClick = { editingStart = true }
             )
             SettingsActionRow(
-                title = "Until",
+                title = stringResource(R.string.loc_until),
                 subtitle = formatMinuteOfDay(schedule.endMinute),
                 icon = Icons.Default.AccessTime,
                 onClick = { editingStart = false }
@@ -604,17 +624,17 @@ private fun ScheduleSection(schedule: AlertSchedule, onChange: (AlertSchedule) -
         val state = rememberTimePickerState(initialHour = minute / 60, initialMinute = minute % 60)
         AlertDialog(
             onDismissRequest = { editingStart = null },
-            title = { Text(if (isStart) "Active from" else "Active until") },
+            title = { Text(stringResource(if (isStart) R.string.loc_active_from else R.string.loc_active_until)) },
             text = { TimePicker(state = state) },
             confirmButton = {
                 TextButton(onClick = {
                     val picked = state.hour * 60 + state.minute
                     onChange(if (isStart) schedule.copy(startMinute = picked) else schedule.copy(endMinute = picked))
                     editingStart = null
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { editingStart = null }) { Text("Cancel") }
+                TextButton(onClick = { editingStart = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -623,17 +643,18 @@ private fun ScheduleSection(schedule: AlertSchedule, onChange: (AlertSchedule) -
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VibrationSection(rule: AlertRule, onChange: ((AlertRule) -> AlertRule) -> Unit) {
-    SettingsSection(title = "Vibration") {
+    val atOnceLabel = stringResource(R.string.loc_common_at_once)
+    SettingsSection(title = stringResource(R.string.loc_vibration_section)) {
         SettingsSwitchRow(
-            title = "Vibrate",
-            subtitle = if (rule.vibrate) rule.vibrationPattern.label else "No vibration",
+            title = stringResource(R.string.loc_vibrate),
+            subtitle = if (rule.vibrate) stringResource(rule.vibrationPattern.labelRes) else stringResource(R.string.loc_no_vibration),
             icon = Icons.Default.Vibration,
             checked = rule.vibrate,
             onCheckedChange = { on -> onChange { it.copy(vibrate = on) } }
         )
         if (rule.vibrate) {
             SettingsSegmentedRow(
-                title = "Pattern",
+                title = stringResource(R.string.loc_pattern),
                 icon = Icons.Default.GraphicEq
             ) {
                 FlowRow(
@@ -650,7 +671,7 @@ private fun VibrationSection(rule: AlertRule, onChange: ((AlertRule) -> AlertRul
                                 onChange { it.copy(vibrationPattern = pattern) }
                                 if (pattern != VibrationPattern.CUSTOM) AlertPlayer.previewVibration(updated)
                             },
-                            label = { Text(pattern.label) }
+                            label = { Text(stringResource(pattern.labelRes)) }
                         )
                     }
                 }
@@ -659,7 +680,7 @@ private fun VibrationSection(rule: AlertRule, onChange: ((AlertRule) -> AlertRul
                 CustomPatternRow(rule = rule, onChange = onChange)
             }
             SettingsSliderRow(
-                title = "Strength",
+                title = stringResource(R.string.loc_strength),
                 valueText = "${rule.vibrationIntensity}%",
                 icon = Icons.Default.Vibration,
                 value = rule.vibrationIntensity.toFloat(),
@@ -668,16 +689,16 @@ private fun VibrationSection(rule: AlertRule, onChange: ((AlertRule) -> AlertRul
                 steps = 8
             )
             ChoiceRow(
-                title = "Vibration starts after",
+                title = stringResource(R.string.loc_vibration_starts_after),
                 icon = Icons.Default.Timer,
                 options = listOf(0, 10, 30, 60, 120, 300),
                 selected = rule.vibrationDelaySec,
-                label = { if (it == 0) "At once" else formatDuration(it) },
+                label = { if (it == 0) atOnceLabel else formatDuration(it) },
                 onSelect = { seconds -> onChange { it.copy(vibrationDelaySec = seconds) } }
             )
             SettingsActionRow(
-                title = "Try pattern",
-                subtitle = "Vibrates once with the current pattern and strength",
+                title = stringResource(R.string.loc_try_pattern),
+                subtitle = stringResource(R.string.loc_try_pattern_desc),
                 icon = Icons.Default.PlayArrow,
                 onClick = { AlertPlayer.previewVibration(rule) }
             )
@@ -700,11 +721,11 @@ private fun CustomPatternRow(rule: AlertRule, onChange: ((AlertRule) -> AlertRul
                 text = it
                 if (VibrationPattern.parseCustom(it) != null) onChange { rule -> rule.copy(customPattern = it) }
             },
-            label = { Text("Pattern in ms: on, off, on, …") },
-            placeholder = { Text("500, 200, 500, 1000") },
+            label = { Text(stringResource(R.string.loc_custom_pattern_label)) },
+            placeholder = { Text(stringResource(R.string.loc_custom_pattern_placeholder)) },
             isError = text.isNotEmpty() && !valid,
             supportingText = {
-                Text(if (text.isNotEmpty() && !valid) "Use numbers up to 10000, separated by commas" else "Vibrate, pause, vibrate, … in milliseconds; the pattern loops")
+                Text(stringResource(if (text.isNotEmpty() && !valid) R.string.loc_custom_pattern_invalid else R.string.loc_custom_pattern_help))
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             singleLine = true,
@@ -777,7 +798,7 @@ private fun SoundPickerDialog(rule: AlertRule, onPick: (String?) -> Unit, onDism
     val currentUri = AlertSounds.resolve(context, rule).toString()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Alert sound") },
+        title = { Text(stringResource(R.string.loc_alert_sound_dialog)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 AlertSounds.builtIns.forEach { sound ->
@@ -796,7 +817,11 @@ private fun SoundPickerDialog(rule: AlertRule, onPick: (String?) -> Unit, onDism
                         RadioButton(selected = currentUri == uri.toString(), onClick = null)
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            text = if (sound == AlertSounds.defaultFor(rule)) "${sound.label} (default)" else sound.label,
+                            text = if (sound == AlertSounds.defaultFor(rule)) {
+                                stringResource(R.string.loc_default_suffix, stringResource(sound.labelRes))
+                            } else {
+                                stringResource(sound.labelRes)
+                            },
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.weight(1f)
                         )
@@ -810,15 +835,15 @@ private fun SoundPickerDialog(rule: AlertRule, onPick: (String?) -> Unit, onDism
                         putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
                         putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(currentUri))
                     })
-                }) { Text("Phone sounds…") }
+                }) { Text(stringResource(R.string.loc_phone_sounds)) }
                 TextButton(onClick = {
                     SoundPreview.stop()
                     fileLauncher.launch(arrayOf("audio/*"))
-                }) { Text("Audio file…") }
+                }) { Text(stringResource(R.string.loc_audio_file)) }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Done") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.loc_common_done)) }
         }
     )
 }

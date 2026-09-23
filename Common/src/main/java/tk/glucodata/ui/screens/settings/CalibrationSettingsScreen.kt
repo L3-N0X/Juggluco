@@ -23,7 +23,7 @@ fun CalibrationSettingsScreen(
         title = stringResource(R.string.calibration_title),
         onNavigateBack = onNavigateBack
     ) {
-        SettingsSection(title = "Sensor calibration") {
+        SettingsSection(title = stringResource(R.string.loc_calibration_sensor)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.calibration_enable),
                 subtitle = stringResource(R.string.calibration_enable_desc),
@@ -34,7 +34,7 @@ fun CalibrationSettingsScreen(
         }
 
         if (displayConfig.calibrationEnabled) {
-            SettingsSection(title = "Scope & application") {
+            SettingsSection(title = stringResource(R.string.loc_calibration_scope)) {
                 SettingsSwitchRow(
                     title = stringResource(R.string.calibration_past),
                     subtitle = stringResource(R.string.calibration_past_desc),
@@ -54,7 +54,7 @@ fun CalibrationSettingsScreen(
         }
 
         SettingsInfoCard(
-            text = "Calibration calculates an offset factor from fingerstick blood glucose entries. Use only stable reference values (no rapid rising or falling arrows) for the most accurate adjustments.",
+            text = stringResource(R.string.loc_calibration_info),
             icon = Icons.Default.Info
         )
     }

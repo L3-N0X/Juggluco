@@ -1,10 +1,13 @@
 package tk.glucodata.alerts
 
+import androidx.annotation.StringRes
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.util.UUID
+import tk.glucodata.Applic
+import tk.glucodata.R
 
 /** What an alert watches for. Glucose kinds compare against [AlertRule.thresholdMgdl]. */
 enum class AlertKind {
@@ -35,16 +38,16 @@ enum class AlertOutput {
 }
 
 /** Built-in vibration patterns; timings alternate off/on in milliseconds and loop. */
-enum class VibrationPattern(val label: String, val timings: LongArray) {
-    URGENT("Urgent", longArrayOf(0, 1000, 400, 1000, 400, 1000, 1200)),
-    PULSE("Pulse", longArrayOf(0, 700, 500, 700, 500, 700, 1500)),
-    GENTLE("Gentle", longArrayOf(0, 400, 900, 400, 2000)),
-    HEARTBEAT("Heartbeat", longArrayOf(0, 120, 120, 250, 1200)),
-    RAPID("Rapid", longArrayOf(0, 100, 60, 100, 60, 100, 60, 100, 60, 100, 800)),
-    WAVE("Wave", longArrayOf(0, 200, 100, 400, 100, 800, 1000)),
-    SOS("SOS", longArrayOf(0, 150, 150, 150, 150, 150, 400, 500, 150, 500, 150, 500, 400, 150, 150, 150, 150, 150, 1500)),
-    SHORT("Short", longArrayOf(0, 400, 200, 500, 3000)),
-    CUSTOM("Custom", longArrayOf(0, 500, 500));
+enum class VibrationPattern(@StringRes val labelRes: Int, val timings: LongArray) {
+    URGENT(R.string.loc_vibration_urgent, longArrayOf(0, 1000, 400, 1000, 400, 1000, 1200)),
+    PULSE(R.string.loc_vibration_pulse, longArrayOf(0, 700, 500, 700, 500, 700, 1500)),
+    GENTLE(R.string.loc_vibration_gentle, longArrayOf(0, 400, 900, 400, 2000)),
+    HEARTBEAT(R.string.loc_vibration_heartbeat, longArrayOf(0, 120, 120, 250, 1200)),
+    RAPID(R.string.loc_vibration_rapid, longArrayOf(0, 100, 60, 100, 60, 100, 60, 100, 60, 100, 800)),
+    WAVE(R.string.loc_vibration_wave, longArrayOf(0, 200, 100, 400, 100, 800, 1000)),
+    SOS(R.string.loc_vibration_sos, longArrayOf(0, 150, 150, 150, 150, 150, 400, 500, 150, 500, 150, 500, 400, 150, 150, 150, 150, 150, 1500)),
+    SHORT(R.string.loc_vibration_short, longArrayOf(0, 400, 200, 500, 3000)),
+    CUSTOM(R.string.loc_vibration_custom, longArrayOf(0, 500, 500));
 
     companion object {
         fun fromKey(key: String?): VibrationPattern = entries.firstOrNull { it.name == key } ?: PULSE
@@ -261,32 +264,35 @@ data class AlertRule(
         }
 
         /** A fresh alert of [kind] with sensible starting values, used by "Add alert". */
-        fun template(kind: AlertKind): AlertRule = when (kind) {
+        fun template(kind: AlertKind): AlertRule {
+            val context = Applic.getContext()
+            return when (kind) {
             AlertKind.LOW -> AlertRule(
-                name = "Low", kind = kind, thresholdMgdl = 70f,
+                name = context.getString(R.string.loc_alert_choice_low), kind = kind, thresholdMgdl = 70f,
                 output = AlertOutput.ALARM, vibrationPattern = VibrationPattern.PULSE,
                 repeatMinutes = 15, playDurationSec = 120, skipWhenRecovering = true, fullScreen = true
             )
             AlertKind.HIGH -> AlertRule(
-                name = "High", kind = kind, thresholdMgdl = 180f,
+                name = context.getString(R.string.loc_alert_choice_high), kind = kind, thresholdMgdl = 180f,
                 output = AlertOutput.NOTIFICATION, vibrationPattern = VibrationPattern.GENTLE,
                 repeatMinutes = 60, playDurationSec = 30, skipWhenRecovering = true
             )
             AlertKind.FALLING -> AlertRule(
-                name = "Falling fast", kind = kind, thresholdMgdl = 0f, rateMgdlPerMin = 2f,
+                name = context.getString(R.string.loc_alert_choice_falling), kind = kind, thresholdMgdl = 0f, rateMgdlPerMin = 2f,
                 output = AlertOutput.NOTIFICATION, vibrationPattern = VibrationPattern.RAPID,
                 repeatMinutes = 30, playDurationSec = 30
             )
             AlertKind.RISING -> AlertRule(
-                name = "Rising fast", kind = kind, thresholdMgdl = 0f, rateMgdlPerMin = 2f,
+                name = context.getString(R.string.loc_alert_choice_rising), kind = kind, thresholdMgdl = 0f, rateMgdlPerMin = 2f,
                 output = AlertOutput.NOTIFICATION, vibrationPattern = VibrationPattern.WAVE,
                 repeatMinutes = 30, playDurationSec = 30
             )
             AlertKind.SIGNAL_LOSS -> AlertRule(
-                name = "Signal loss", kind = kind, lossMinutes = 20,
+                name = context.getString(R.string.loc_alert_choice_loss), kind = kind, lossMinutes = 20,
                 output = AlertOutput.NOTIFICATION, vibrationPattern = VibrationPattern.SHORT,
                 repeatMinutes = 30, playDurationSec = 30
             )
+            }
         }
     }
 }

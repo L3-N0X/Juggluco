@@ -66,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -83,6 +84,7 @@ import tk.glucodata.ui.model.HourlyPercentiles
 import tk.glucodata.ui.model.StatsPeriod
 import tk.glucodata.ui.theme.DarkClinicalColors
 import tk.glucodata.ui.theme.LocalClinicalColors
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -133,7 +135,7 @@ fun StatsScreen(
             }
             context.startActivity(intent)
         } catch (e: Throwable) {
-            Toast.makeText(context, "Report error: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.report_error, e.message), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -155,7 +157,11 @@ fun StatsScreen(
                     onClick = { repository.setStatsPeriod(period) },
                     label = {
                         Text(
-                            text = if (period.labelRes != null) stringResource(period.labelRes) else period.label,
+                            text = if (period.labelRes != null) {
+                                stringResource(period.labelRes)
+                            } else {
+                                pluralStringResource(R.plurals.day_count, period.days, period.days)
+                            },
                             fontSize = 12.sp
                         )
                     },
@@ -174,7 +180,7 @@ fun StatsScreen(
                 label = {
                     Text(
                         text = if (isCustomPeriod) {
-                            "${selectedPeriod.days} ${stringResource(R.string.days)}"
+                            pluralStringResource(R.plurals.day_count, selectedPeriod.days, selectedPeriod.days)
                         } else {
                             stringResource(R.string.timerange_custom)
                         },
@@ -248,7 +254,11 @@ fun StatsScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = stringResource(R.string.agp_card_subtitle, if (selectedPeriod.labelRes != null) stringResource(selectedPeriod.labelRes!!) else selectedPeriod.label),
+                        text = stringResource(
+                            R.string.agp_card_subtitle,
+                            selectedPeriod.labelRes?.let { stringResource(it) }
+                                ?: pluralStringResource(R.plurals.day_count, selectedPeriod.days, selectedPeriod.days)
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -480,7 +490,7 @@ private fun ClinicalKpiCards(
             )
             KpiCard(
                 title = stringResource(R.string.kpi_gmi),
-                value = if (hasData && stats.estimatedA1c > 0) "${String.format(java.util.Locale.US, "%.1f", stats.estimatedA1c)}%" else "—",
+                value = if (hasData && stats.estimatedA1c > 0) "${String.format(Locale.getDefault(), "%.1f", stats.estimatedA1c)}%" else "—",
                 subtitle = stringResource(R.string.target_gmi_sub),
                 valueColor = gmiColor,
                 onClick = { onShowInfo(gmiTitle, gmiDesc) },
@@ -493,7 +503,7 @@ private fun ClinicalKpiCards(
         ) {
             KpiCard(
                 title = stringResource(R.string.kpi_cv),
-                value = if (hasData && stats.cvPercent > 0) "${String.format(java.util.Locale.US, "%.1f", stats.cvPercent)}%" else "—",
+                value = if (hasData && stats.cvPercent > 0) "${String.format(Locale.getDefault(), "%.1f", stats.cvPercent)}%" else "—",
                 subtitle = stringResource(R.string.target_cv_sub),
                 valueColor = cvColor,
                 onClick = { onShowInfo(cvTitle, cvDesc) },
@@ -501,7 +511,7 @@ private fun ClinicalKpiCards(
             )
             KpiCard(
                 title = stringResource(R.string.kpi_active_time),
-                value = if (hasData) "${String.format(java.util.Locale.US, "%.1f", stats.activeTimePercent)}%" else "—",
+                value = if (hasData) "${String.format(Locale.getDefault(), "%.1f", stats.activeTimePercent)}%" else "—",
                 subtitle = stringResource(R.string.target_active_sub),
                 valueColor = activeColor,
                 onClick = { onShowInfo(activeTitle, activeDesc) },
@@ -797,7 +807,7 @@ fun CustomStatsPeriodDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Custom Stats Period",
+                text = stringResource(R.string.custom_stats_period_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -808,7 +818,7 @@ fun CustomStatsPeriodDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Select time interval for clinical stats, TIR and AGP profile analysis",
+                    text = stringResource(R.string.custom_stats_period_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -830,7 +840,7 @@ fun CustomStatsPeriodDialog(
                         FilterChip(
                             selected = isSelected,
                             onClick = { daysSlider = d.toFloat() },
-                            label = { Text("${d}d", fontSize = 11.sp) }
+                            label = { Text(pluralStringResource(R.plurals.day_count, d, d), fontSize = 11.sp) }
                         )
                     }
                 }
@@ -843,12 +853,12 @@ fun CustomStatsPeriodDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Days Analyzed",
+                        text = stringResource(R.string.stats_days_analyzed),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${daysSlider.toInt()} days",
+                        text = pluralStringResource(R.plurals.day_count, daysSlider.toInt(), daysSlider.toInt()),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

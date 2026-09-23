@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import tk.glucodata.Applic
 import tk.glucodata.R
 import tk.glucodata.alerts.AlertKind
 import tk.glucodata.alerts.AlertOutput
@@ -123,11 +124,11 @@ fun AlarmsSettingsScreen(
         onNavigateBack = onNavigateBack,
         actions = {
             IconButton(onClick = { showMenu = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More")
+                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.loc_action_more))
             }
             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                 DropdownMenuItem(
-                    text = { Text("Restore default alerts") },
+                    text = { Text(stringResource(R.string.loc_alarm_restore_default)) },
                     onClick = {
                         showMenu = false
                         confirmReset = true
@@ -140,13 +141,13 @@ fun AlarmsSettingsScreen(
         if (activeAlert != null) {
             SettingsSection {
                 SettingsActionRow(
-                    title = if (activeAlert.ringing) "${activeAlert.rule.name} is ringing" else activeAlert.rule.name,
+                    title = if (activeAlert.ringing) stringResource(R.string.loc_alarm_is_ringing, activeAlert.rule.name) else activeAlert.rule.name,
                     subtitle = AlertPlayer.detail(activeAlert),
                     icon = Icons.Default.NotificationsActive,
                     iconTint = MaterialTheme.colorScheme.error,
                     iconBackground = MaterialTheme.colorScheme.errorContainer,
                     trailingContent = {
-                        TextButton(onClick = { AlertPlayer.dismiss() }) { Text("Dismiss") }
+                        TextButton(onClick = { AlertPlayer.dismiss() }) { Text(stringResource(R.string.dismiss)) }
                     }
                 )
             }
@@ -156,8 +157,8 @@ fun AlarmsSettingsScreen(
         SettingsSection {
             val enabledCount = rules.count { it.enabled }
             SettingsSwitchRow(
-                title = "Alerts",
-                subtitle = if (settings.enabled) "$enabledCount of ${rules.size} alerts on" else "All alerts are off",
+                title = stringResource(R.string.loc_alerts),
+                subtitle = if (settings.enabled) stringResource(R.string.loc_alerts_enabled_count, enabledCount, rules.size) else stringResource(R.string.loc_all_alerts_off),
                 icon = if (settings.enabled) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
                 checked = settings.enabled,
                 onCheckedChange = { enabled ->
@@ -172,7 +173,7 @@ fun AlarmsSettingsScreen(
 
         val levelRules = rules.filter { it.kind.isGlucoseLevel }.sortedByDescending { it.thresholdMgdl }
         if (levelRules.isNotEmpty()) {
-            SettingsSection(title = "Glucose levels") {
+            SettingsSection(title = stringResource(R.string.loc_glucose_levels)) {
                 levelRules.forEach { rule ->
                     AlertRuleRow(rule, runtime[rule.id], unit, now, onClick = { editingId = rule.id })
                 }
@@ -180,7 +181,7 @@ fun AlarmsSettingsScreen(
         }
         val trendRules = rules.filter { it.kind.isRate }
         if (trendRules.isNotEmpty()) {
-            SettingsSection(title = "Trends") {
+            SettingsSection(title = stringResource(R.string.loc_trends)) {
                 trendRules.forEach { rule ->
                     AlertRuleRow(rule, runtime[rule.id], unit, now, onClick = { editingId = rule.id })
                 }
@@ -188,7 +189,7 @@ fun AlarmsSettingsScreen(
         }
         val lossRules = rules.filter { it.kind == AlertKind.SIGNAL_LOSS }
         if (lossRules.isNotEmpty()) {
-            SettingsSection(title = "Connection") {
+            SettingsSection(title = stringResource(R.string.loc_connection)) {
                 lossRules.forEach { rule ->
                     AlertRuleRow(rule, runtime[rule.id], unit, now, onClick = { editingId = rule.id })
                 }
@@ -201,13 +202,13 @@ fun AlarmsSettingsScreen(
         ) {
             Icon(Icons.Default.Add, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text("Add alert")
+            Text(stringResource(R.string.loc_add_alert))
         }
 
-        SettingsSection(title = "Alert buttons") {
+        SettingsSection(title = stringResource(R.string.loc_alert_buttons)) {
             SettingsSegmentedRow(
-                title = "Snooze choices",
-                subtitle = "Offered on the notification and the full-screen alert (up to 3)",
+                title = stringResource(R.string.loc_snooze_choices),
+                subtitle = stringResource(R.string.loc_snooze_choices_desc),
                 icon = Icons.Default.Snooze
             ) {
                 ChipRow {
@@ -232,39 +233,39 @@ fun AlarmsSettingsScreen(
             }
         }
 
-        SettingsSection(title = "Watch") {
+        SettingsSection(title = stringResource(R.string.loc_watch_section)) {
             val watchConnected = AlertSync.hasWearPeer()
             SettingsActionRow(
-                title = "Send alerts to watch",
+                title = stringResource(R.string.loc_send_alerts_watch),
                 subtitle = if (watchConnected) {
-                    "The watch app uses these alerts unless it keeps its own. Changes are sent automatically."
+                    stringResource(R.string.loc_watch_uses_alerts)
                 } else {
-                    "No watch with Juggluco is connected right now"
+                    stringResource(R.string.loc_no_watch_connected)
                 },
                 icon = Icons.Default.Watch,
                 enabled = watchConnected,
                 onClick = { AlertSync.pushConfig() },
                 trailingContent = if (watchConnected) {
-                    { TextButton(onClick = { AlertSync.pushConfig() }) { Text("Send") } }
+                    { TextButton(onClick = { AlertSync.pushConfig() }) { Text(stringResource(R.string.loc_common_send)) } }
                 } else null
             )
             SettingsSwitchRow(
-                title = "Ring for watch alerts",
-                subtitle = "Rings here when the watch raises an alert. Dismissing or snoozing on either device stops both.",
+                title = stringResource(R.string.loc_ring_watch_alerts),
+                subtitle = stringResource(R.string.loc_ring_watch_alerts_desc),
                 icon = Icons.Default.SyncAlt,
                 checked = settings.mirrorAlerts,
                 onCheckedChange = { on -> AlertStore.updateSettings { it.copy(mirrorAlerts = on) } }
             )
             SettingsSwitchRow(
-                title = "Sound on this phone",
-                subtitle = if (settings.soundOnThisDevice) "Alerts play their sound here" else "Alerts only vibrate on this phone",
+                title = stringResource(R.string.loc_sound_on_phone),
+                subtitle = if (settings.soundOnThisDevice) stringResource(R.string.loc_alerts_play_here) else stringResource(R.string.loc_alerts_vibrate_here),
                 icon = Icons.AutoMirrored.Filled.VolumeUp,
                 checked = settings.soundOnThisDevice,
                 onCheckedChange = { on -> AlertStore.updateSettings { it.copy(soundOnThisDevice = on) } }
             )
         }
 
-        SettingsSection(title = "Other sounds") {
+        SettingsSection(title = stringResource(R.string.loc_other_sounds)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_alarm_value_available),
                 subtitle = stringResource(R.string.settings_alarm_value_available_desc),
@@ -289,17 +290,17 @@ fun AlarmsSettingsScreen(
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
-            title = { Text("Restore default alerts?") },
-            text = { Text("Your alerts are replaced by the starter set. This cannot be undone.") },
+            title = { Text(stringResource(R.string.loc_restore_alerts_title)) },
+            text = { Text(stringResource(R.string.loc_restore_alerts_desc)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmReset = false
                     AlertPlayer.dismiss()
                     AlertStore.resetToDefaults()
-                }) { Text("Restore") }
+                }) { Text(stringResource(R.string.loc_common_restore)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmReset = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -310,24 +311,24 @@ private fun SnoozeAllRow(snoozeUntil: Long, now: Long, enabled: Boolean) {
     var showChoices by remember { mutableStateOf(false) }
     val snoozed = snoozeUntil > now
     SettingsActionRow(
-        title = if (snoozed) "All alerts snoozed" else "Snooze all alerts",
-        subtitle = if (snoozed) "Until ${formatClock(snoozeUntil)}" else "Pause every alert for a while",
+        title = if (snoozed) stringResource(R.string.loc_all_alerts_snoozed) else stringResource(R.string.loc_snooze_all_alerts),
+        subtitle = if (snoozed) stringResource(R.string.loc_until_time, formatClock(snoozeUntil)) else stringResource(R.string.loc_pause_all_alerts),
         icon = Icons.Default.Snooze,
         enabled = enabled,
         onClick = { if (!snoozed) showChoices = true },
         trailingContent = if (snoozed) {
-            { TextButton(onClick = { AlertStore.snoozeAll(0) }) { Text("Resume") } }
+            { TextButton(onClick = { AlertStore.snoozeAll(0) }) { Text(stringResource(R.string.loc_common_resume)) } }
         } else null
     )
     if (showChoices) {
         AlertDialog(
             onDismissRequest = { showChoices = false },
-            title = { Text("Snooze all alerts") },
+            title = { Text(stringResource(R.string.loc_snooze_all_alerts)) },
             text = {
                 Column {
                     listOf(30, 60, 120, 240, 480).forEach { minutes ->
                         Text(
-                            text = "For ${formatDuration(minutes * 60)}",
+                            text = stringResource(R.string.loc_snooze_for_duration, formatDuration(minutes * 60)),
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -342,7 +343,7 @@ private fun SnoozeAllRow(snoozeUntil: Long, now: Long, enabled: Boolean) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showChoices = false }) { Text("Cancel") }
+                TextButton(onClick = { showChoices = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -357,11 +358,11 @@ private fun PermissionRows(context: Context, rules: List<AlertRule>) {
     val notificationsOff = !androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
     if (!needsDnd && !needsFullScreen && !notificationsOff) return
 
-    SettingsSection(title = "Needs your attention") {
+    SettingsSection(title = stringResource(R.string.loc_needs_attention)) {
         if (notificationsOff) {
             SettingsActionRow(
-                title = "Notifications are blocked",
-                subtitle = "Alerts cannot show until notifications are allowed",
+                title = stringResource(R.string.loc_notifications_blocked),
+                subtitle = stringResource(R.string.loc_notifications_blocked_desc),
                 icon = Icons.Default.NotificationsOff,
                 iconTint = MaterialTheme.colorScheme.error,
                 iconBackground = MaterialTheme.colorScheme.errorContainer,
@@ -370,8 +371,8 @@ private fun PermissionRows(context: Context, rules: List<AlertRule>) {
         }
         if (needsDnd) {
             SettingsActionRow(
-                title = "Allow Do Not Disturb access",
-                subtitle = "Needed for alerts that ring through Do Not Disturb and silent mode",
+                title = stringResource(R.string.loc_allow_dnd_access),
+                subtitle = stringResource(R.string.loc_allow_dnd_access_desc),
                 icon = Icons.Default.DoNotDisturbOn,
                 iconTint = MaterialTheme.colorScheme.error,
                 iconBackground = MaterialTheme.colorScheme.errorContainer,
@@ -380,8 +381,8 @@ private fun PermissionRows(context: Context, rules: List<AlertRule>) {
         }
         if (needsFullScreen) {
             SettingsActionRow(
-                title = "Allow full-screen alerts",
-                subtitle = "Needed to show alerts over the lock screen",
+                title = stringResource(R.string.loc_allow_full_screen),
+                subtitle = stringResource(R.string.loc_allow_full_screen_desc),
                 icon = Icons.Default.Fullscreen,
                 iconTint = MaterialTheme.colorScheme.error,
                 iconBackground = MaterialTheme.colorScheme.errorContainer,
@@ -433,13 +434,17 @@ private fun AlertRuleRow(
     onClick: () -> Unit
 ) {
     val (tint, background) = alertColors(rule)
+    val context = LocalContext.current
     val snoozedUntil = runtime?.snoozedUntil ?: 0L
     val subtitle = buildString {
-        append(triggerSummary(rule, unit))
+        append(triggerSummary(context, rule, unit))
         append(" · ")
         append(deliverySummary(rule))
         if (!rule.schedule.isAlways) append(" · ").append(scheduleSummary(rule.schedule))
-        if (snoozedUntil > now) append(" · snoozed until ").append(formatClock(snoozedUntil))
+        if (snoozedUntil > now) {
+            append(" · ")
+            append(context.getString(R.string.loc_until_time, formatClock(snoozedUntil)))
+        }
     }
     SettingsNavRow(
         title = rule.name,
@@ -456,15 +461,15 @@ private fun AlertRuleRow(
 @Composable
 private fun AddAlertDialog(onDismiss: () -> Unit, onAdd: (AlertKind) -> Unit) {
     val choices = listOf(
-        AlertKind.LOW to ("Low glucose" to "When glucose drops below a level"),
-        AlertKind.HIGH to ("High glucose" to "When glucose rises above a level"),
-        AlertKind.FALLING to ("Falling fast" to "When glucose drops quickly"),
-        AlertKind.RISING to ("Rising fast" to "When glucose rises quickly"),
-        AlertKind.SIGNAL_LOSS to ("Signal loss" to "When no reading arrives for a while")
+        AlertKind.LOW to (stringResource(R.string.loc_alert_choice_low) to stringResource(R.string.loc_alert_choice_low_desc)),
+        AlertKind.HIGH to (stringResource(R.string.loc_alert_choice_high) to stringResource(R.string.loc_alert_choice_high_desc)),
+        AlertKind.FALLING to (stringResource(R.string.loc_alert_choice_falling) to stringResource(R.string.loc_alert_choice_falling_desc)),
+        AlertKind.RISING to (stringResource(R.string.loc_alert_choice_rising) to stringResource(R.string.loc_alert_choice_rising_desc)),
+        AlertKind.SIGNAL_LOSS to (stringResource(R.string.loc_alert_choice_loss) to stringResource(R.string.loc_alert_choice_loss_desc))
     )
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add alert") },
+        title = { Text(stringResource(R.string.loc_add_alert)) },
         text = {
             Column {
                 choices.forEach { (kind, labels) ->
@@ -491,7 +496,7 @@ private fun AddAlertDialog(onDismiss: () -> Unit, onAdd: (AlertKind) -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -528,37 +533,54 @@ internal fun alertColors(rule: AlertRule): Pair<Color, Color> {
     }
 }
 
-internal fun triggerSummary(rule: AlertRule, unit: GlucoseUnit): String {
-    val level = "${unit.format(rule.thresholdMgdl)} ${unit.label}"
-    val forecast = if (rule.forecastMinutes > 0) " in ${rule.forecastMinutes} min" else ""
+internal fun triggerSummary(rule: AlertRule, unit: GlucoseUnit): String = triggerSummary(Applic.getContext(), rule, unit)
+
+internal fun triggerSummary(context: Context, rule: AlertRule, unit: GlucoseUnit): String {
+    val level = context.getString(R.string.log_glucose_value, unit.format(rule.thresholdMgdl), context.getString(unit.labelRes))
+    val forecast = if (rule.forecastMinutes > 0) {
+        context.getString(R.string.alert_forecast, rule.forecastMinutes)
+    } else {
+        ""
+    }
     return when (rule.kind) {
-        AlertKind.LOW -> "Below $level$forecast"
-        AlertKind.HIGH -> "Above $level$forecast"
-        AlertKind.FALLING -> "Falling ${unit.formatRate(rule.rateMgdlPerMin)}/min" +
-            if (rule.thresholdMgdl > 0f) " under $level" else ""
-        AlertKind.RISING -> "Rising ${unit.formatRate(rule.rateMgdlPerMin)}/min" +
-            if (rule.thresholdMgdl > 0f) " over $level" else ""
-        AlertKind.SIGNAL_LOSS -> "No reading for ${formatDuration(rule.lossMinutes * 60)}"
+        AlertKind.LOW -> context.getString(R.string.alert_trigger_below, level) + forecast
+        AlertKind.HIGH -> context.getString(R.string.alert_trigger_above, level) + forecast
+        AlertKind.FALLING -> context.getString(
+            R.string.alert_trigger_falling,
+            unit.formatRate(rule.rateMgdlPerMin),
+            context.getString(unit.labelRes)
+        ) + if (rule.thresholdMgdl > 0f) context.getString(R.string.alert_trigger_under, level) else ""
+        AlertKind.RISING -> context.getString(
+            R.string.alert_trigger_rising,
+            unit.formatRate(rule.rateMgdlPerMin),
+            context.getString(unit.labelRes)
+        ) + if (rule.thresholdMgdl > 0f) context.getString(R.string.alert_trigger_over, level) else ""
+        AlertKind.SIGNAL_LOSS -> context.getString(R.string.alert_trigger_signal_loss, formatDuration(rule.lossMinutes * 60))
     }
 }
 
 internal fun deliverySummary(rule: AlertRule): String {
+    val context = Applic.getContext()
     val sound = when (rule.output) {
-        AlertOutput.ALARM -> "Alarm"
-        AlertOutput.NOTIFICATION -> "Notification"
-        AlertOutput.MEDIA -> "Media"
-        AlertOutput.NONE -> if (rule.vibrate) "Vibrate only" else "Silent"
+        AlertOutput.ALARM -> context.getString(R.string.loc_alarm_stream)
+        AlertOutput.NOTIFICATION -> context.getString(R.string.loc_alarm_notification_stream)
+        AlertOutput.MEDIA -> context.getString(R.string.loc_alarm_media_stream)
+        AlertOutput.NONE -> context.getString(if (rule.vibrate) R.string.loc_delivery_vibrate_only else R.string.loc_delivery_silent)
     }
-    val repeat = if (rule.repeatMinutes > 0) "every ${formatDuration(rule.repeatMinutes * 60)}" else "once"
-    return "$sound · $repeat"
+    return if (rule.repeatMinutes > 0) {
+        context.getString(R.string.loc_delivery_repeat, sound, formatDuration(rule.repeatMinutes * 60))
+    } else {
+        context.getString(R.string.loc_delivery_once, sound)
+    }
 }
 
 internal fun scheduleSummary(schedule: tk.glucodata.alerts.AlertSchedule): String {
+    val context = Applic.getContext()
     val days = when (schedule.days) {
-        tk.glucodata.alerts.AlertSchedule.ALL_DAYS -> "Every day"
-        tk.glucodata.alerts.AlertSchedule.WEEKDAYS -> "Weekdays"
-        tk.glucodata.alerts.AlertSchedule.WEEKEND -> "Weekends"
-        0 -> "Never"
+        tk.glucodata.alerts.AlertSchedule.ALL_DAYS -> context.getString(R.string.loc_schedule_every_day)
+        tk.glucodata.alerts.AlertSchedule.WEEKDAYS -> context.getString(R.string.loc_schedule_weekdays)
+        tk.glucodata.alerts.AlertSchedule.WEEKEND -> context.getString(R.string.loc_schedule_weekends)
+        0 -> context.getString(R.string.loc_schedule_never)
         else -> java.time.DayOfWeek.entries
             .filter { schedule.isActiveOn(it) }
             .joinToString(" ") { it.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) }
@@ -568,20 +590,24 @@ internal fun scheduleSummary(schedule: tk.glucodata.alerts.AlertSchedule): Strin
 }
 
 internal fun formatMinuteOfDay(minute: Int): String {
-    val time = java.time.LocalTime.of(minute / 60, minute % 60)
-    return time.format(java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT))
+    val locale = java.util.Locale.getDefault()
+    val formatter = java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT).withLocale(locale)
+    return java.time.LocalTime.of(minute / 60, minute % 60).format(formatter)
 }
 
 internal fun formatClock(millis: Long): String =
-    DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(millis))
+    DateFormat.getTimeInstance(DateFormat.SHORT, java.util.Locale.getDefault()).format(Date(millis))
 
-internal fun formatDuration(seconds: Int): String = when {
-    seconds <= 0 -> "0 s"
-    seconds < 60 -> "$seconds s"
-    seconds % 3600 == 0 -> "${seconds / 3600} h"
-    seconds > 3600 -> "${seconds / 3600} h ${(seconds % 3600) / 60} min"
-    seconds % 60 == 0 -> "${seconds / 60} min"
-    else -> "${seconds / 60} min ${seconds % 60} s"
+internal fun formatDuration(seconds: Int): String {
+    val context = Applic.getContext()
+    return when {
+        seconds <= 0 -> context.getString(R.string.loc_duration_zero)
+        seconds < 60 -> context.getString(R.string.loc_duration_seconds, seconds)
+        seconds % 3600 == 0 -> context.getString(R.string.loc_duration_hours, seconds / 3600)
+        seconds > 3600 -> context.getString(R.string.loc_duration_hours_minutes, seconds / 3600, (seconds % 3600) / 60)
+        seconds % 60 == 0 -> context.getString(R.string.loc_duration_minutes, seconds / 60)
+        else -> context.getString(R.string.loc_duration_minutes_seconds, seconds / 60, seconds % 60)
+    }
 }
 
 /** Horizontally scrolling chip row aligned with the text of a settings row. */

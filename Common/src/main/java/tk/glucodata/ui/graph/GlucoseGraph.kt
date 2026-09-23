@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -78,6 +79,7 @@ import tk.glucodata.ui.theme.ClinicalColors
 import tk.glucodata.ui.theme.LocalClinicalColors
 import tk.glucodata.ui.theme.LocalLogbookColors
 import tk.glucodata.ui.theme.LogbookColors
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -363,9 +365,10 @@ private fun GraphHeader(
     val dayKey = viewportState.dayKey
     val isLive = viewportState.isLive
     val locale = Locale.getDefault()
-    val windowLabel = remember(dayKey, isLive, locale) {
+    val context = LocalContext.current
+    val windowLabel = remember(dayKey, isLive, locale, context) {
         Snapshot.withoutReadObservation {
-            formatWindowLabel(viewportState.startTimeMillis, viewportState.endTimeMillis, isLive, locale)
+            formatWindowLabel(context, viewportState.startTimeMillis, viewportState.endTimeMillis, isLive, locale)
         }
     }
 
@@ -523,8 +526,8 @@ private fun InspectionSummary(
     val locale = Locale.getDefault()
     val timeLabel = remember(reading.timestamp, locale) {
         val sameDay = isSameDay(reading.timestamp, System.currentTimeMillis())
-        val pattern = if (sameDay) "HH:mm" else "MMM d, HH:mm"
-        SimpleDateFormat(pattern, locale).format(Date(reading.timestamp))
+        val skeleton = if (sameDay) "Hm" else "MMMd, Hm"
+        SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(Date(reading.timestamp))
     }
     val statusColor = statusColor(reading.statusOrdinal, clinicalColors)
     val trend = TrendArrow.fromRate(reading.ratePerMinute)
@@ -545,7 +548,7 @@ private fun InspectionSummary(
         if (!minimalistUnits) {
             Spacer(modifier = Modifier.width(3.dp))
             Text(
-                text = unit.label,
+                text = stringResource(unit.labelRes),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -564,7 +567,7 @@ private fun InspectionSummary(
             val delta = reading.valueMgDl - reading.previousValueMgDl
             val sign = if (delta >= 0f) "+" else "-"
             Text(
-                text = "Δ$sign${unit.format(abs(delta))} · ${reading.deltaMinutes}m",
+                text = stringResource(R.string.graph_delta_minutes, sign, unit.format(abs(delta)), reading.deltaMinutes),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1299,8 +1302,9 @@ private class GraphPaints(density: Density, textColor: Color, clinicalColors: Cl
     val axisBaselineOffset = axisTextSize * 0.36f
     val timeLabelOffset = with(density) { 16.dp.toPx() }
 
-    val timeFormat: SimpleDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-    val dayFormat: SimpleDateFormat = SimpleDateFormat("EEE d MMM", Locale.getDefault())
+    private val locale = Locale.getDefault()
+    val timeFormat: DateFormat = DateFormat.getTimeInstance(DateFormat.SHORT, locale)
+    val dayFormat: SimpleDateFormat = SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "EEEMMMd"), locale)
 }
 
 private class ZoneBrushes(val line: Brush, val area: Brush)
@@ -1454,6 +1458,7 @@ private fun isSameDay(a: Long, b: Long): Boolean {
  * Human label for the visible window: "Today", "Yesterday", "Mon, 15 Sep" or a range across days.
  */
 internal fun formatWindowLabel(
+    context: android.content.Context,
     startMillis: Long,
     endMillis: Long,
     isLive: Boolean,
@@ -1467,13 +1472,13 @@ internal fun formatWindowLabel(
     cal.timeInMillis = System.currentTimeMillis()
     val today = cal.get(Calendar.YEAR) * 1000 + cal.get(Calendar.DAY_OF_YEAR)
 
-    val dayFormat = SimpleDateFormat("EEE, d MMM", locale)
-    val shortFormat = SimpleDateFormat("d MMM", locale)
-    val yearFormat = SimpleDateFormat("EEE, d MMM yyyy", locale)
+    val dayFormat = SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "EEEMMMd"), locale)
+    val shortFormat = SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "dMMM"), locale)
+    val yearFormat = SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "yEEEMMMd"), locale)
 
     fun dayName(dayIndex: Int, timeMillis: Long): String = when (dayIndex) {
-        today -> "Today"
-        today - 1 -> "Yesterday"
+        today -> context.getString(R.string.loc_graph_today)
+        today - 1 -> context.getString(R.string.loc_graph_yesterday)
         else -> {
             val targetCal = Calendar.getInstance().apply { this.timeInMillis = timeMillis }
             if (targetCal.get(Calendar.YEAR) == cal.get(Calendar.YEAR)) {
@@ -1485,11 +1490,11 @@ internal fun formatWindowLabel(
     }
 
     return when {
-        isLive -> "Today · ${shortFormat.format(Date(System.currentTimeMillis()))}"
+        isLive -> context.getString(R.string.loc_graph_today_date, shortFormat.format(Date(System.currentTimeMillis())))
         startDay == endDay -> {
             val name = dayName(endDay, endMillis)
             if (endDay == today || endDay == today - 1) {
-                "$name · ${shortFormat.format(Date(endMillis))}"
+                context.getString(R.string.loc_graph_day_time, name, shortFormat.format(Date(endMillis)))
             } else {
                 name
             }

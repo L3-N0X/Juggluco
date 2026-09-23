@@ -39,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -69,7 +70,7 @@ fun WatchSettingsScreen(
         modifier = modifier
     ) {
         // Section 1: Wear OS Integration
-        SettingsSection(title = "Wear OS Integration") {
+        SettingsSection(title = stringResource(R.string.loc_wear_integration)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_wearos_service),
                 subtitle = stringResource(R.string.settings_wearos_service_desc),
@@ -79,7 +80,7 @@ fun WatchSettingsScreen(
                     repository.setWearOsEnabled(context, enabled)
                     Toast.makeText(
                         context,
-                        if (enabled) "Wear OS service enabled" else "Wear OS service disabled",
+                        context.getString(if (enabled) R.string.loc_wear_service_enabled else R.string.loc_wear_service_disabled),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -88,11 +89,11 @@ fun WatchSettingsScreen(
             if (watchConfig.wearOsEnabled) {
                 SettingsActionRow(
                     title = stringResource(R.string.settings_search_watches),
-                    subtitle = "Scan for connected Wear OS watches via Google Play Services & BLE",
+                    subtitle = stringResource(R.string.loc_wear_scan_desc),
                     icon = Icons.Default.Refresh,
                     onClick = {
                         repository.scanForWatches()
-                        Toast.makeText(context, "Scanning for watches...", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.loc_scanning_watches), Toast.LENGTH_SHORT).show()
                     }
                 )
             }
@@ -102,7 +103,7 @@ fun WatchSettingsScreen(
         if (watchConfig.wearOsEnabled) {
             if (wearDevices.isNotEmpty()) {
                 Text(
-                    text = "${stringResource(R.string.settings_connected_watches)} (${wearDevices.size})",
+                    text = pluralStringResource(R.plurals.loc_connected_watches, wearDevices.size, wearDevices.size),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -120,15 +121,15 @@ fun WatchSettingsScreen(
                         },
                         onInitWatch = {
                             repository.initWatchApp(device.id, device.isGalaxy)
-                            Toast.makeText(context, "Initializing watch app...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.loc_init_watch_app), Toast.LENGTH_SHORT).show()
                         },
                         onSync = {
                             repository.syncWatch(device.id)
-                            Toast.makeText(context, "Triggering sync with watch...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.loc_trigger_watch_sync), Toast.LENGTH_SHORT).show()
                         },
                         onResetDefaults = {
                             repository.resetWatchDefaults(device.id, device.isGalaxy, context)
-                            Toast.makeText(context, "Reset watch settings to defaults", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.loc_reset_watch_defaults), Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
@@ -141,12 +142,7 @@ fun WatchSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "To connect your Wear OS watch:\n" +
-                                "1. Install and launch Juggluco Wear OS on your watch.\n" +
-                                "2. Ensure Bluetooth is connected in your watch companion app (Galaxy Wearable, Pixel Watch, etc.).\n" +
-                                "3. Important: Watch and phone apps must have matching build types and package names (see Diagnostics below).\n" +
-                                "4. In your watch's companion app, enable \"Allow background activity\" for Juggluco.\n" +
-                                "5. Tap \"Search for Watches\" above once the watch app is open.",
+                        text = stringResource(R.string.loc_wear_connect_instructions),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 20.sp
@@ -156,7 +152,7 @@ fun WatchSettingsScreen(
         }
 
         // Section 3: Compatibility & Diagnostics
-        SettingsSection(title = "App IDs & Compatibility Diagnostics") {
+        SettingsSection(title = stringResource(R.string.loc_app_ids_diagnostics)) {
             val isMismatchRisk = wearDiagnosticInfo.phoneAppId.endsWith(".dub") ||
                     wearDiagnosticInfo.phoneAppId.endsWith(".debug")
 
@@ -171,7 +167,7 @@ fun WatchSettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Phone Application ID",
+                        text = stringResource(R.string.loc_phone_app_id),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -192,7 +188,7 @@ fun WatchSettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Sync Mirror Port",
+                        text = stringResource(R.string.loc_sync_mirror_port),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -213,12 +209,12 @@ fun WatchSettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Wearable Receiver State",
+                        text = stringResource(R.string.loc_wearable_receiver_state),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = if (wearDiagnosticInfo.isReceiverServiceEnabled) "Active" else "Inactive",
+                        text = stringResource(if (wearDiagnosticInfo.isReceiverServiceEnabled) R.string.loc_state_active else R.string.loc_state_inactive),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (wearDiagnosticInfo.isReceiverServiceEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -230,12 +226,7 @@ fun WatchSettingsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "Application ID Matching Rule:\n" +
-                            "Google Play Services Wearable DataLayer only communicates between apps with identical Package Names and signing certificates:\n" +
-                            "• Debug Watch (tk.glucodata.debug) ➔ requires Debug Phone (tk.glucodata.debug)\n" +
-                            "• Play Store Phone (tk.glucodata) ➔ requires Release Watch (tk.glucodata)\n" +
-                            "• Dub Phone (tk.glucodata.dub) ➔ requires Dub Watch (tk.glucodata.dub)\n\n" +
-                            "If you sideloaded the debug watch APK, install the debug phone APK (or vice versa).",
+                    text = stringResource(R.string.loc_app_id_matching_rule),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 17.sp
@@ -297,10 +288,10 @@ fun WatchSettingsScreen(
         }
 
         // Section 5: Manual Wi-Fi Mirror Fallback
-        SettingsSection(title = "Manual Wi-Fi Connection Fallback") {
+        SettingsSection(title = stringResource(R.string.loc_manual_wifi_fallback)) {
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_mirror_title),
-                subtitle = "Connect watch and phone over local Wi-Fi TCP mirror if Wear OS auto-discovery fails",
+                subtitle = stringResource(R.string.loc_manual_wifi_desc),
                 icon = Icons.Default.Sync,
                 onClick = onOpenMirrorConfig
             )
@@ -343,7 +334,7 @@ private fun WearDeviceCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "ID: ${device.id}",
+                        text = stringResource(R.string.sensor_id, device.id),
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.outline
@@ -351,7 +342,7 @@ private fun WearDeviceCard(
                 }
 
                 Text(
-                    text = if (device.isConnected) "Connected" else "Registered",
+                    text = stringResource(if (device.isConnected) R.string.loc_connected else R.string.loc_registered),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = if (device.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -361,7 +352,7 @@ private fun WearDeviceCard(
             if (device.mirrorIps.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "IP: ${device.mirrorIps.joinToString(", ")}",
+                    text = stringResource(R.string.loc_ip_address, device.mirrorIps.joinToString(", ")),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -374,7 +365,7 @@ private fun WearDeviceCard(
             // Setting 1: Direct Sensor Connection
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_direct_sensor_title),
-                subtitle = if (device.isDirectSensor) "Watch connects directly to sensor via Bluetooth" else "Phone connects to sensor (streams data to watch)",
+                subtitle = if (device.isDirectSensor) stringResource(R.string.loc_watch_direct_sensor_desc) else stringResource(R.string.loc_phone_sensor_stream_desc),
                 icon = Icons.Default.Sensors,
                 checked = device.isDirectSensor,
                 onCheckedChange = onDirectSensorChanged,
@@ -386,7 +377,7 @@ private fun WearDeviceCard(
             // Setting 2: Enter Nums on Watch
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_enter_nums_title),
-                subtitle = if (device.isEnterNumsOnWatch) "Enter insulin doses and meals on watch" else "Enter amounts on phone",
+                subtitle = if (device.isEnterNumsOnWatch) stringResource(R.string.loc_enter_insulin_meals_watch) else stringResource(R.string.loc_enter_amounts_phone),
                 icon = Icons.Default.WatchLater,
                 checked = device.isEnterNumsOnWatch,
                 onCheckedChange = onEnterNumsChanged,
@@ -407,7 +398,7 @@ private fun WearDeviceCard(
                 ) {
                     Icon(imageVector = Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Sync", fontSize = 12.sp)
+                    Text(stringResource(R.string.sync), fontSize = 12.sp)
                 }
 
                 OutlinedButton(
@@ -417,7 +408,7 @@ private fun WearDeviceCard(
                 ) {
                     Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Init App", fontSize = 12.sp)
+                    Text(stringResource(R.string.loc_init_app), fontSize = 12.sp)
                 }
 
                 OutlinedButton(
@@ -427,7 +418,7 @@ private fun WearDeviceCard(
                 ) {
                     Icon(imageVector = Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Defaults", fontSize = 12.sp)
+                    Text(stringResource(R.string.loc_defaults), fontSize = 12.sp)
                 }
             }
         }

@@ -33,6 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,6 +49,7 @@ fun TimeRangeSelector(
     modifier: Modifier = Modifier
 ) {
     var showCustomDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Row(
         modifier = modifier
@@ -64,7 +67,11 @@ fun TimeRangeSelector(
                 onClick = { onRangeSelected(range) },
                 label = {
                     Text(
-                        text = if (range.labelRes != null) stringResource(range.labelRes) else range.label,
+                        text = if (range.labelRes != null) {
+                            stringResource(range.labelRes)
+                        } else {
+                            formatDurationLabel(context, range.durationMillis)
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         fontSize = 12.sp
                     )
@@ -83,7 +90,11 @@ fun TimeRangeSelector(
             onClick = { showCustomDialog = true },
             label = {
                 Text(
-                    text = if (isCustomRange) selectedRange.label else stringResource(R.string.timerange_custom),
+                    text = if (isCustomRange) {
+                        formatDurationLabel(context, selectedRange?.durationMillis ?: 0L)
+                    } else {
+                        stringResource(R.string.timerange_custom)
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = if (isCustomRange) FontWeight.Bold else FontWeight.Normal,
                     fontSize = 12.sp
@@ -112,6 +123,18 @@ fun TimeRangeSelector(
                 onRangeSelected(customRange)
             }
         )
+    }
+}
+
+private fun formatDurationLabel(context: android.content.Context, durationMillis: Long): String {
+    val hours = (durationMillis / (3600 * 1000L)).toInt()
+    val days = hours / 24
+    val remainingHours = hours % 24
+    return when {
+        days > 0 && remainingHours == 0 -> context.resources.getQuantityString(R.plurals.day_count, days, days)
+        days > 0 -> context.getString(R.string.duration_days_hours, days, remainingHours)
+        hours > 0 -> context.resources.getQuantityString(R.plurals.hour_count, hours, hours)
+        else -> context.resources.getQuantityString(R.plurals.minute_count, (durationMillis / 60_000L).toInt(), (durationMillis / 60_000L).toInt())
     }
 }
 
@@ -159,7 +182,7 @@ fun CustomTimeRangeDialog(
                         onClick = { isDaysMode = false }
                     ) {
                         Text(
-                            text = "Hours",
+                            text = stringResource(R.string.duration_hours),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = if (!isDaysMode) FontWeight.Bold else FontWeight.Normal,
                             color = if (!isDaysMode) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -173,7 +196,7 @@ fun CustomTimeRangeDialog(
                         onClick = { isDaysMode = true }
                     ) {
                         Text(
-                            text = "Days",
+                            text = stringResource(R.string.days),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = if (isDaysMode) FontWeight.Bold else FontWeight.Normal,
                             color = if (isDaysMode) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -203,7 +226,7 @@ fun CustomTimeRangeDialog(
                             FilterChip(
                                 selected = isCurrent,
                                 onClick = { hoursSlider = h.toFloat() },
-                                label = { Text("${h}h", fontSize = 11.sp) }
+                                label = { Text(pluralStringResource(R.plurals.hour_count, h, h), fontSize = 11.sp) }
                             )
                         }
                     } else {
@@ -212,7 +235,7 @@ fun CustomTimeRangeDialog(
                             FilterChip(
                                 selected = isCurrent,
                                 onClick = { daysSlider = d.toFloat() },
-                                label = { Text("${d}d", fontSize = 11.sp) }
+                                label = { Text(pluralStringResource(R.plurals.day_count, d, d), fontSize = 11.sp) }
                             )
                         }
                     }
@@ -229,12 +252,12 @@ fun CustomTimeRangeDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Duration",
+                            text = stringResource(R.string.duration_label),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "$currentH hours",
+                            text = pluralStringResource(R.plurals.hour_count, currentH, currentH),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -254,12 +277,12 @@ fun CustomTimeRangeDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Duration",
+                            text = stringResource(R.string.duration_label),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "$currentD days",
+                            text = pluralStringResource(R.plurals.day_count, currentD, currentD),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary

@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,16 +66,17 @@ import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.theme.LocalLogbookColors
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class LogbookTimeFilter(val label: String, val days: Int) {
-    TODAY("Today", 1),
-    SEVEN_DAYS("7 Days", 7),
-    FOURTEEN_DAYS("14 Days", 14),
-    THIRTY_DAYS("30 Days", 30),
-    ALL("All Time", 0)
+enum class LogbookTimeFilter(@androidx.annotation.StringRes val labelRes: Int, val days: Int) {
+    TODAY(R.string.logbook_time_today, 1),
+    SEVEN_DAYS(R.string.logbook_time_7d, 7),
+    FOURTEEN_DAYS(R.string.logbook_time_14d, 14),
+    THIRTY_DAYS(R.string.logbook_time_30d, 30),
+    ALL(R.string.logbook_time_all, 0)
 }
 
 @Composable
@@ -135,12 +137,15 @@ fun LogbookScreen(
     val windowChecks = timeFilteredLogs.count { it.type == LogType.BLOOD_GLUCOSE }
 
     val totalsTitle = when {
-        customDays != null -> "Totals (${customDays}d)"
-        selectedTimeFilter == LogbookTimeFilter.TODAY -> "Today's Totals"
-        selectedTimeFilter == LogbookTimeFilter.SEVEN_DAYS -> "7-Day Totals"
-        selectedTimeFilter == LogbookTimeFilter.FOURTEEN_DAYS -> "14-Day Totals"
-        selectedTimeFilter == LogbookTimeFilter.THIRTY_DAYS -> "30-Day Totals"
-        else -> "All-Time Totals"
+        customDays != null -> stringResource(
+            R.string.logbook_totals_custom_days,
+            pluralStringResource(R.plurals.day_count, customDays!!, customDays!!)
+        )
+        selectedTimeFilter == LogbookTimeFilter.TODAY -> stringResource(R.string.logbook_totals_today)
+        selectedTimeFilter == LogbookTimeFilter.SEVEN_DAYS -> stringResource(R.string.logbook_totals_7d)
+        selectedTimeFilter == LogbookTimeFilter.FOURTEEN_DAYS -> stringResource(R.string.logbook_totals_14d)
+        selectedTimeFilter == LogbookTimeFilter.THIRTY_DAYS -> stringResource(R.string.logbook_totals_30d)
+        else -> stringResource(R.string.logbook_totals_all)
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -187,7 +192,7 @@ fun LogbookScreen(
                             customDays = null
                             selectedTimeFilter = filter
                         },
-                        label = { Text(filter.label, fontSize = 12.sp) },
+                        label = { Text(stringResource(filter.labelRes), fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                             selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -202,7 +207,7 @@ fun LogbookScreen(
                     label = {
                         Text(
                             text = if (customDays != null) {
-                                "$customDays ${stringResource(R.string.days)}"
+                                pluralStringResource(R.plurals.day_count, customDays!!, customDays!!)
                             } else {
                                 stringResource(R.string.timerange_custom)
                             },
@@ -240,10 +245,26 @@ fun LogbookScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        DailyTotalPill(label = "Bolus", value = "${String.format(Locale.US, "%.1f", windowBolus)} U", color = logbookColors.bolus.primary)
-                        DailyTotalPill(label = "Basal", value = "${String.format(Locale.US, "%.1f", windowBasal)} U", color = logbookColors.basal.primary)
-                        DailyTotalPill(label = "Carbs", value = "${windowCarbs.toInt()} g", color = logbookColors.carbs.primary)
-                        DailyTotalPill(label = "Checks", value = "$windowChecks", color = logbookColors.bloodGlucose.primary)
+                        DailyTotalPill(
+                            label = stringResource(R.string.log_short_bolus),
+                            value = stringResource(R.string.log_value_insulin, String.format(Locale.getDefault(), "%.1f", windowBolus)),
+                            color = logbookColors.bolus.primary
+                        )
+                        DailyTotalPill(
+                            label = stringResource(R.string.log_short_basal),
+                            value = stringResource(R.string.log_value_insulin, String.format(Locale.getDefault(), "%.1f", windowBasal)),
+                            color = logbookColors.basal.primary
+                        )
+                        DailyTotalPill(
+                            label = stringResource(R.string.log_short_carbs),
+                            value = stringResource(R.string.log_value_carbs, windowCarbs.toInt().toString()),
+                            color = logbookColors.carbs.primary
+                        )
+                        DailyTotalPill(
+                            label = stringResource(R.string.log_type_finger_prick),
+                            value = windowChecks.toString(),
+                            color = logbookColors.bloodGlucose.primary
+                        )
                     }
                 }
             }
@@ -259,27 +280,27 @@ fun LogbookScreen(
                 FilterChip(
                     selected = selectedTypeFilter == null,
                     onClick = { selectedTypeFilter = null },
-                    label = { Text("All", fontSize = 12.sp) }
+                    label = { Text(stringResource(R.string.log_all), fontSize = 12.sp) }
                 )
                 FilterChip(
                     selected = selectedTypeFilter == LogType.RAPID_INSULIN,
                     onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.RAPID_INSULIN) null else LogType.RAPID_INSULIN },
-                    label = { Text("Bolus", fontSize = 12.sp) }
+                    label = { Text(stringResource(R.string.log_short_bolus), fontSize = 12.sp) }
                 )
                 FilterChip(
                     selected = selectedTypeFilter == LogType.BASAL_INSULIN,
                     onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BASAL_INSULIN) null else LogType.BASAL_INSULIN },
-                    label = { Text("Basal", fontSize = 12.sp) }
+                    label = { Text(stringResource(R.string.log_short_basal), fontSize = 12.sp) }
                 )
                 FilterChip(
                     selected = selectedTypeFilter == LogType.CARBS,
                     onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.CARBS) null else LogType.CARBS },
-                    label = { Text("Carbs", fontSize = 12.sp) }
+                    label = { Text(stringResource(R.string.log_short_carbs), fontSize = 12.sp) }
                 )
                 FilterChip(
                     selected = selectedTypeFilter == LogType.BLOOD_GLUCOSE,
                     onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BLOOD_GLUCOSE) null else LogType.BLOOD_GLUCOSE },
-                    label = { Text("BG", fontSize = 12.sp) }
+                    label = { Text(stringResource(R.string.log_short_bg), fontSize = 12.sp) }
                 )
             }
 
@@ -291,7 +312,7 @@ fun LogbookScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No log records in selected range\nTap + to log insulin, carbs, meals or glucose checks",
+                        text = stringResource(R.string.logbook_no_records_range),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -318,7 +339,7 @@ fun LogbookScreen(
                             minimalistUnits = displayConfig.minimalistUnits,
                             onDelete = {
                                 repository.deleteLogEntry(item)
-                                Toast.makeText(context, "Log entry deleted", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.log_entry_deleted), Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
@@ -334,7 +355,7 @@ fun LogbookScreen(
                 .align(Alignment.BottomEnd)
                 .padding(end = 20.dp, bottom = 24.dp)
         ) {
-            Icon(imageVector = Icons.Default.Add, contentDescription = "Add Log")
+            Icon(imageVector = Icons.Default.Add, contentDescription = stringResource(R.string.logbook_add_description))
         }
     }
 
@@ -366,8 +387,9 @@ fun LogItemCard(
     minimalistUnits: Boolean = true,
     onDelete: () -> Unit
 ) {
-    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+    val locale = Locale.getDefault()
+    val timeFormat: DateFormat = remember(locale) { DateFormat.getTimeInstance(DateFormat.SHORT, locale) }
+    val dateFormat = remember(locale) { SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "yMMMd"), locale) }
 
     val logbookColors = LocalLogbookColors.current
     val itemColors = logbookColors.forType(record.type)
@@ -382,10 +404,17 @@ fun LogItemCard(
 
     // Clean value display without repetitive cluttered units
     val valueDisplay = when (record.type) {
-        LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> "${String.format(Locale.US, "%.1f", record.value)} U"
-        LogType.CARBS, LogType.MEAL -> "${record.value.toInt()} g"
-        LogType.BLOOD_GLUCOSE -> if (minimalistUnits) unit.format(record.value) else "${unit.format(record.value)} ${unit.label}"
-        LogType.NOTE -> if (record.value > 0) "${record.value}" else ""
+        LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> stringResource(
+            R.string.log_value_insulin,
+            String.format(Locale.getDefault(), "%.1f", record.value)
+        )
+        LogType.CARBS, LogType.MEAL -> stringResource(R.string.log_value_carbs, record.value.toInt().toString())
+        LogType.BLOOD_GLUCOSE -> if (minimalistUnits) {
+            unit.format(record.value)
+        } else {
+            stringResource(R.string.log_glucose_value, unit.format(record.value), stringResource(unit.labelRes))
+        }
+        LogType.NOTE -> if (record.value > 0) record.value.toString() else ""
     }
 
     // Flat M3 list row placed directly on the page: no Card container, no
@@ -404,7 +433,7 @@ fun LogItemCard(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = record.type.label,
+                contentDescription = stringResource(record.type.labelRes),
                 tint = itemColors.onContainer,
                 modifier = Modifier.size(24.dp)
             )
@@ -419,7 +448,7 @@ fun LogItemCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = record.type.label,
+                    text = stringResource(record.type.labelRes),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -440,7 +469,11 @@ fun LogItemCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${dateFormat.format(Date(record.timestamp))} at ${timeFormat.format(Date(record.timestamp))}",
+                    text = stringResource(
+                        R.string.logbook_date_at_time,
+                        dateFormat.format(Date(record.timestamp)),
+                        timeFormat.format(Date(record.timestamp))
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -461,7 +494,7 @@ fun LogItemCard(
         IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
             Icon(
                 imageVector = Icons.Default.Delete,
-                contentDescription = "Delete",
+                contentDescription = stringResource(R.string.delete),
                 tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                 modifier = Modifier.size(18.dp)
             )
@@ -482,7 +515,7 @@ fun CustomLogbookRangeDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Custom Logbook Range",
+                                text = stringResource(R.string.custom_logbook_range_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -493,7 +526,7 @@ fun CustomLogbookRangeDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Select time range for calculating logbook insulin, carb totals and history",
+                    text = stringResource(R.string.custom_logbook_range_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -515,7 +548,7 @@ fun CustomLogbookRangeDialog(
                         FilterChip(
                             selected = isSelected,
                             onClick = { daysSlider = d.toFloat() },
-                            label = { Text("${d}d", fontSize = 11.sp) }
+                            label = { Text(pluralStringResource(R.plurals.day_count, d, d), fontSize = 11.sp) }
                         )
                     }
                 }
@@ -528,12 +561,12 @@ fun CustomLogbookRangeDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Days Included",
+                        text = stringResource(R.string.logbook_days_included),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${daysSlider.toInt()} days",
+                        text = pluralStringResource(R.plurals.day_count, daysSlider.toInt(), daysSlider.toInt()),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
 import tk.glucodata.Applic
+import tk.glucodata.R
 import tk.glucodata.Log
 import tk.glucodata.Natives
 
@@ -187,32 +188,32 @@ object AlertStore {
     }
 
     /** The starter set for new users: the safety-critical alerts on, the noisy ones off. */
-    fun defaultRules(): List<AlertRule> = listOf(
+    fun defaultRules(context: Context = Applic.getContext()): List<AlertRule> = listOf(
         AlertRule(
-            name = "Urgent low", kind = AlertKind.LOW, thresholdMgdl = 55f,
+            name = context.getString(R.string.loc_alert_default_urgent_low), kind = AlertKind.LOW, thresholdMgdl = 55f,
             output = AlertOutput.ALARM, overrideDnd = true,
             vibrationPattern = VibrationPattern.URGENT,
             repeatMinutes = 5, playDurationSec = 0, fullScreen = true
         ),
         AlertRule(
-            name = "Low", kind = AlertKind.LOW, thresholdMgdl = 70f,
+            name = context.getString(R.string.loc_alert_default_low), kind = AlertKind.LOW, thresholdMgdl = 70f,
             output = AlertOutput.ALARM, vibrationPattern = VibrationPattern.PULSE,
             soundDelaySec = 30, rampUpSec = 20, skipWhenRecovering = true,
             repeatMinutes = 15, playDurationSec = 120, fullScreen = true
         ),
         AlertRule(
-            name = "Going low", kind = AlertKind.LOW, thresholdMgdl = 70f, forecastMinutes = 20,
+            name = context.getString(R.string.loc_alert_default_going_low), kind = AlertKind.LOW, thresholdMgdl = 70f, forecastMinutes = 20,
             enabled = false, output = AlertOutput.NOTIFICATION,
             vibrationPattern = VibrationPattern.GENTLE, skipWhenRecovering = true,
             repeatMinutes = 30, playDurationSec = 30
         ),
         AlertRule(
-            name = "High", kind = AlertKind.HIGH, thresholdMgdl = 180f,
+            name = context.getString(R.string.loc_alert_default_high), kind = AlertKind.HIGH, thresholdMgdl = 180f,
             output = AlertOutput.NONE, vibrationPattern = VibrationPattern.GENTLE,
             skipWhenRecovering = true, repeatMinutes = 60, playDurationSec = 15
         ),
         AlertRule(
-            name = "Very high", kind = AlertKind.HIGH, thresholdMgdl = 250f,
+            name = context.getString(R.string.loc_alert_default_very_high), kind = AlertKind.HIGH, thresholdMgdl = 250f,
             output = AlertOutput.ALARM, vibrationPattern = VibrationPattern.WAVE,
             rampUpSec = 20, skipWhenRecovering = true, repeatMinutes = 30, playDurationSec = 60
         ),
@@ -261,22 +262,25 @@ object AlertStore {
             }
 
             val defaults = defaultRules()
-            val byName = defaults.associateBy { it.name }
-            val loss = byName.getValue("Signal loss")
+            val urgent = defaults.first { it.thresholdMgdl == 55f && it.forecastMinutes == 0 }
+            val low = defaults.first { it.thresholdMgdl == 70f && it.forecastMinutes == 0 }
+            val goingLow = defaults.first { it.thresholdMgdl == 70f && it.forecastMinutes > 0 }
+            val high = defaults.first { it.thresholdMgdl == 180f }
+            val veryHigh = defaults.first { it.thresholdMgdl == 250f }
+            val loss = defaults.first { it.kind == AlertKind.SIGNAL_LOSS }
             listOf(
-                // The urgent low safety net stays on even when the old very-low alarm was off.
-                fromNative(byName.getValue("Urgent low"), 5, true, Natives.alarmverylow()),
-                fromNative(byName.getValue("Low"), 0, Natives.hasalarmlow(), Natives.alarmlow()),
-                fromNative(byName.getValue("Going low"), 7, Natives.hasalarmprelow(), Natives.alarmprelow())
+                fromNative(urgent, 5, true, Natives.alarmverylow()),
+                fromNative(low, 0, Natives.hasalarmlow(), Natives.alarmlow()),
+                fromNative(goingLow, 7, Natives.hasalarmprelow(), Natives.alarmprelow())
                     .copy(forecastMinutes = 20),
-                fromNative(byName.getValue("High"), 1, Natives.hasalarmhigh(), Natives.alarmhigh()),
-                fromNative(byName.getValue("Very high"), 6, Natives.hasalarmveryhigh(), Natives.alarmveryhigh()),
+                fromNative(high, 1, Natives.hasalarmhigh(), Natives.alarmhigh()),
+                fromNative(veryHigh, 6, Natives.hasalarmveryhigh(), Natives.alarmveryhigh()),
                 fromNative(
-                    AlertRule(name = "Going high", kind = AlertKind.HIGH, thresholdMgdl = 170f, forecastMinutes = 20),
+                    AlertRule(name = Applic.getContext().getString(R.string.loc_alert_default_going_high), kind = AlertKind.HIGH, thresholdMgdl = 170f, forecastMinutes = 20),
                     8, Natives.hasalarmprehigh(), Natives.alarmprehigh()
                 ).copy(forecastMinutes = 20),
-                byName.getValue("Falling fast"),
-                byName.getValue("Rising fast"),
+                defaults.first { it.kind == AlertKind.FALLING },
+                defaults.first { it.kind == AlertKind.RISING },
                 fromNative(loss, 4, Natives.hasalarmloss(), 0f).copy(
                     lossMinutes = Natives.readalarmsuspension(4).toInt().coerceAtLeast(5),
                     repeatMinutes = loss.repeatMinutes

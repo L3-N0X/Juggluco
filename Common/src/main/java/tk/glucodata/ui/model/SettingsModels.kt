@@ -1,9 +1,12 @@
 package tk.glucodata.ui.model
 
-enum class AlarmSoundStream(val label: String, val id: Int) {
-    ALARM("Alarm Stream", 0),
-    NOTIFICATION("Notification Stream", 1),
-    MEDIA("Media Stream", 2);
+import androidx.annotation.StringRes
+import tk.glucodata.R
+
+enum class AlarmSoundStream(@StringRes val labelRes: Int, val id: Int) {
+    ALARM(R.string.loc_model_alarm_stream, 0),
+    NOTIFICATION(R.string.loc_model_notification_stream, 1),
+    MEDIA(R.string.loc_model_media_stream, 2);
 
     companion object {
         fun fromId(id: Int): AlarmSoundStream = entries.find { it.id == id } ?: ALARM

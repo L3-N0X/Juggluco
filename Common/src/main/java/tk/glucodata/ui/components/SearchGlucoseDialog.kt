@@ -56,8 +56,8 @@ fun SearchGlucoseDialog(
     var keywordText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableIntStateOf(-1) } // -1: Any, 0: Bolus, 1: Carbs, 2: Basal, 3: BG
 
-    val defaultLow = if (unit == GlucoseUnit.MMOL_L) "3.9" else "70"
-    val defaultHigh = if (unit == GlucoseUnit.MMOL_L) "10.0" else "180"
+    val defaultLow = if (unit == GlucoseUnit.MMOL_L) GlucoseUnit.MMOL_L.format(3.9f) else GlucoseUnit.MG_DL.format(70f)
+    val defaultHigh = if (unit == GlucoseUnit.MMOL_L) GlucoseUnit.MMOL_L.format(10f) else GlucoseUnit.MG_DL.format(180f)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -108,7 +108,7 @@ fun SearchGlucoseDialog(
                 }
 
                 Text(
-                    text = "Find readings outside target or search logged events:",
+                    text = stringResource(R.string.search_dialog_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -121,8 +121,8 @@ fun SearchGlucoseDialog(
                     OutlinedTextField(
                         value = underText,
                         onValueChange = { underText = it },
-                        label = { Text("Below", fontSize = 12.sp) },
-                        suffix = { Text(unit.label, fontSize = 11.sp, color = MaterialTheme.colorScheme.outline) },
+                        label = { Text(stringResource(R.string.below), fontSize = 12.sp) },
+                        suffix = { Text(stringResource(unit.labelRes), fontSize = 11.sp, color = MaterialTheme.colorScheme.outline) },
                         placeholder = { Text(defaultLow, fontSize = 12.sp) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
@@ -132,8 +132,8 @@ fun SearchGlucoseDialog(
                     OutlinedTextField(
                         value = aboveText,
                         onValueChange = { aboveText = it },
-                        label = { Text("Above", fontSize = 12.sp) },
-                        suffix = { Text(unit.label, fontSize = 11.sp, color = MaterialTheme.colorScheme.outline) },
+                        label = { Text(stringResource(R.string.above), fontSize = 12.sp) },
+                        suffix = { Text(stringResource(unit.labelRes), fontSize = 11.sp, color = MaterialTheme.colorScheme.outline) },
                         placeholder = { Text(defaultHigh, fontSize = 12.sp) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
@@ -152,7 +152,7 @@ fun SearchGlucoseDialog(
                             underText = if (underText == defaultLow) "" else defaultLow
                             if (underText.isNotEmpty()) aboveText = ""
                         },
-                        label = { Text("Lows (< $defaultLow)", fontSize = 11.sp) }
+                        label = { Text(stringResource(R.string.lows_below, defaultLow), fontSize = 11.sp) }
                     )
                     FilterChip(
                         selected = aboveText == defaultHigh,
@@ -160,14 +160,14 @@ fun SearchGlucoseDialog(
                             aboveText = if (aboveText == defaultHigh) "" else defaultHigh
                             if (aboveText.isNotEmpty()) underText = ""
                         },
-                        label = { Text("Highs (> $defaultHigh)", fontSize = 11.sp) }
+                        label = { Text(stringResource(R.string.highs_above, defaultHigh), fontSize = 11.sp) }
                     )
                 }
 
                 // Category filter
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = "Event Category:",
+                        text = stringResource(R.string.event_category),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -180,27 +180,27 @@ fun SearchGlucoseDialog(
                         FilterChip(
                             selected = selectedCategory == -1,
                             onClick = { selectedCategory = -1 },
-                            label = { Text("All", fontSize = 11.sp) }
+                            label = { Text(stringResource(R.string.log_all), fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = selectedCategory == 0,
                             onClick = { selectedCategory = 0 },
-                            label = { Text("Bolus", fontSize = 11.sp) }
+                            label = { Text(stringResource(R.string.log_short_bolus), fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = selectedCategory == 1,
                             onClick = { selectedCategory = 1 },
-                            label = { Text("Carbs", fontSize = 11.sp) }
+                            label = { Text(stringResource(R.string.log_short_carbs), fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = selectedCategory == 2,
                             onClick = { selectedCategory = 2 },
-                            label = { Text("Basal", fontSize = 11.sp) }
+                            label = { Text(stringResource(R.string.log_short_basal), fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = selectedCategory == 3,
                             onClick = { selectedCategory = 3 },
-                            label = { Text("BG", fontSize = 11.sp) }
+                            label = { Text(stringResource(R.string.log_short_bg), fontSize = 11.sp) }
                         )
                     }
                 }
@@ -209,8 +209,8 @@ fun SearchGlucoseDialog(
                 OutlinedTextField(
                     value = keywordText,
                     onValueChange = { keywordText = it },
-                    label = { Text("Notes or food name", fontSize = 12.sp) },
-                    placeholder = { Text("e.g. Pizza, Coffee, Exercise", fontSize = 12.sp) },
+                    label = { Text(stringResource(R.string.search_notes_food), fontSize = 12.sp) },
+                    placeholder = { Text(stringResource(R.string.search_food_examples), fontSize = 12.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

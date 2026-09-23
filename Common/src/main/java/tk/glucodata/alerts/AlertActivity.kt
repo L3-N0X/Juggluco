@@ -27,10 +27,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import tk.glucodata.R
 import tk.glucodata.ui.theme.JugglucoTheme
 import tk.glucodata.ui.theme.LocalClinicalColors
 
@@ -76,6 +80,7 @@ private fun AlertScreen(
     onSnooze: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val clinical = LocalClinicalColors.current
     val rule = alert.rule
     val critical = rule.output == AlertOutput.ALARM
@@ -113,7 +118,7 @@ private fun AlertScreen(
                 val reading = alert.reading
                 if (rule.kind == AlertKind.SIGNAL_LOSS || reading == null) {
                     Text(
-                        text = "${alert.lostMinutes} min",
+                        text = pluralStringResource(R.plurals.loc_minutes_value, alert.lostMinutes, alert.lostMinutes),
                         fontSize = 72.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -148,7 +153,7 @@ private fun AlertScreen(
                             onClick = { onSnooze(minutes) },
                             modifier = Modifier.weight(1f).height(56.dp)
                         ) {
-                            Text("Snooze ${formatMinutes(minutes)}", maxLines = 1)
+                            Text(stringResource(R.string.loc_snooze_duration, formatMinutes(context, minutes)), maxLines = 1)
                         }
                     }
                 }
@@ -160,16 +165,16 @@ private fun AlertScreen(
                         contentColor = container
                     )
                 ) {
-                    Text("Dismiss", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.dismiss), style = MaterialTheme.typography.titleLarge)
                 }
             }
         }
     }
 }
 
-internal fun formatMinutes(minutes: Int): String = when {
-    minutes <= 0 -> "Off"
-    minutes % 60 == 0 -> "${minutes / 60} h"
-    minutes > 60 -> "${minutes / 60} h ${minutes % 60} min"
-    else -> "$minutes min"
+internal fun formatMinutes(context: android.content.Context, minutes: Int): String = when {
+    minutes <= 0 -> context.getString(R.string.loc_common_off)
+    minutes % 60 == 0 -> context.getString(R.string.loc_duration_hours, minutes / 60)
+    minutes > 60 -> context.getString(R.string.loc_duration_hours_minutes, minutes / 60, minutes % 60)
+    else -> context.getString(R.string.loc_duration_minutes, minutes)
 }

@@ -84,7 +84,8 @@ fun MirrorConfigDialog(
     // Quick Setup state for Side-by-Side testing
     var targetHost by remember { mutableStateOf("127.0.0.1") }
     var targetPort by remember { mutableStateOf("17580") }
-    var connLabel by remember { mutableStateOf("Local Production App") }
+    val localProductionLabel = stringResource(R.string.loc_local_production_app)
+    var connLabel by remember(localProductionLabel) { mutableStateOf(localProductionLabel) }
 
     // Listen Port state
     var editListenPort by remember { mutableStateOf(currentListenPort) }
@@ -203,7 +204,7 @@ fun MirrorConfigDialog(
                                     if (ok) {
                                         Toast.makeText(context, connAddedMsg, Toast.LENGTH_SHORT).show()
                                     } else {
-                                        Toast.makeText(context, "Failed to add receiver", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.loc_failed_add_receiver), Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier.weight(1f),
@@ -222,7 +223,7 @@ fun MirrorConfigDialog(
                                     if (ok) {
                                         Toast.makeText(context, connAddedMsg, Toast.LENGTH_SHORT).show()
                                     } else {
-                                        Toast.makeText(context, "Failed to add sender", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.loc_failed_add_sender), Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier.weight(1f),
@@ -285,7 +286,7 @@ fun MirrorConfigDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = conn.label.ifBlank { "Mirror Connection #${conn.index + 1}" },
+                                            text = conn.label.ifBlank { stringResource(R.string.loc_mirror_connection_default, conn.index + 1) },
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
@@ -323,7 +324,7 @@ fun MirrorConfigDialog(
                                     val statusSummary = getMirrorConnectionStatusSummary(conn)
                                     if (statusSummary.isNotBlank()) {
                                         Text(
-                                            text = "Status: $statusSummary",
+                                            text = stringResource(R.string.loc_mirror_status, statusSummary),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.outline
                                         )
@@ -343,7 +344,7 @@ fun MirrorConfigDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Sync,
-                                                contentDescription = "Reset Sync",
+                                                contentDescription = stringResource(R.string.loc_action_reset_sync),
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -357,7 +358,7 @@ fun MirrorConfigDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
-                                                contentDescription = "Delete",
+                                                contentDescription = stringResource(R.string.loc_action_delete),
                                                 tint = MaterialTheme.colorScheme.error,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -393,7 +394,7 @@ fun MirrorConfigDialog(
                             OutlinedTextField(
                                 value = editListenPort,
                                 onValueChange = { editListenPort = it },
-                                label = { Text("Listen Port") },
+                                label = { Text(stringResource(R.string.dialog_tcp_port)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f)
@@ -475,7 +476,7 @@ fun MirrorConfigDialog(
                                 repository.refreshMirrorConnections()
                                 Toast.makeText(context, syncToggledMsg, Toast.LENGTH_SHORT).show()
                             } catch (e: Throwable) {
-                                Toast.makeText(context, "Sync: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_sync_error_with_detail, e.message), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -493,7 +494,7 @@ fun MirrorConfigDialog(
                                 repository.refreshMirrorConnections()
                                 Toast.makeText(context, reinitSuccessMsg, Toast.LENGTH_SHORT).show()
                             } catch (e: Throwable) {
-                                Toast.makeText(context, "Reinit: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_reinit_error_with_detail, e.message), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -515,10 +516,10 @@ fun MirrorConfigDialog(
 
     // Delete Confirmation Dialog
     connectionToDelete?.let { conn ->
-        val connName = conn.label.ifBlank { "Host #${conn.index + 1}" }
+        val connName = conn.label.ifBlank { stringResource(R.string.loc_host_default, conn.index + 1) }
         AlertDialog(
             onDismissRequest = { connectionToDelete = null },
-            title = { Text("Delete Connection") },
+            title = { Text(stringResource(R.string.loc_delete_connection)) },
             text = { Text(stringResource(R.string.dialog_mirror_delete_confirm, connName)) },
             confirmButton = {
                 Button(

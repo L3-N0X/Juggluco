@@ -64,14 +64,15 @@ import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.MirrorConnection
 
 fun getMirrorConnectionStatusSummary(conn: MirrorConnection): String {
-    if (conn.isDeactivated) return "Disabled"
+    val context = Applic.getContext()
+    if (conn.isDeactivated) return context.getString(R.string.loc_mirror_status_disabled)
     val raw = conn.status
-    if (raw.isBlank()) return if (conn.isActive) "Active" else ""
+    if (raw.isBlank()) return if (conn.isActive) context.getString(R.string.loc_state_active) else ""
 
     val errorMatch = Regex("""\w{3}\s+\w{3}\s+\d+\s+[\d:]+\s+\d{4}:\s*(.+)""").find(raw)
     if (errorMatch != null) {
         val err = errorMatch.groupValues[1].trim().removeSuffix(":")
-        if (err.isNotBlank()) return "Error: $err"
+        if (err.isNotBlank()) return context.getString(R.string.loc_mirror_status_error, err)
     }
 
     val isTcpLive = raw.contains("live socket: true", ignoreCase = true) ||
@@ -80,24 +81,24 @@ fun getMirrorConnectionStatusSummary(conn: MirrorConnection): String {
     val isWearLive = raw.contains("Messages (Wear OS MessageClient)=true", ignoreCase = true)
 
     if (isTcpLive || isBleLive || isWearLive) {
-        return "Connected"
+        return context.getString(R.string.loc_connected)
     }
 
     if (raw.contains("running=true", ignoreCase = true) ||
         raw.contains("wait for commands: true", ignoreCase = true) ||
         raw.contains("wait for commands:true", ignoreCase = true)
     ) {
-        return if (conn.isReceiver) "Listening" else "Connecting"
+        return context.getString(if (conn.isReceiver) R.string.loc_mirror_status_listening else R.string.loc_mirror_status_connecting)
     }
 
     if (raw.contains("running=false", ignoreCase = true) ||
         raw.contains("live socket: false", ignoreCase = true) ||
         raw.contains("No active carrier", ignoreCase = true)
     ) {
-        return "Disconnected"
+        return context.getString(R.string.loc_mirror_status_disconnected)
     }
 
-    return if (conn.isActive) "Active" else ""
+    return if (conn.isActive) context.getString(R.string.loc_state_active) else ""
 }
 
 @Composable
@@ -126,7 +127,8 @@ fun MirrorSettingsScreen(
     // Quick Setup state
     var targetHost by remember { mutableStateOf("127.0.0.1") }
     var targetPort by remember { mutableStateOf("17580") }
-    var connLabel by remember { mutableStateOf("Local Production App") }
+    val localProductionLabel = stringResource(R.string.loc_local_production_app)
+    var connLabel by remember(localProductionLabel) { mutableStateOf(localProductionLabel) }
 
     // Listen Port state
     var editListenPort by remember { mutableStateOf(currentListenPort) }
@@ -160,7 +162,7 @@ fun MirrorSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // RELAY & PROXY SERVERS
-        SettingsSection(title = "Relay servers") {
+        SettingsSection(title = stringResource(R.string.loc_relay_servers)) {
             SettingsNavRow(
                 title = stringResource(R.string.settings_title_turn_server),
                 subtitle = stringResource(R.string.settings_desc_turn_server),
@@ -170,10 +172,10 @@ fun MirrorSettingsScreen(
         }
 
         // DEVICE ROLE & NETWORK STATUS
-        SettingsSection(title = "Device network role") {
+        SettingsSection(title = stringResource(R.string.loc_device_network_role)) {
             SettingsActionRow(
-                title = "Synchronization role",
-                subtitle = "$roleText • Listen port: $currentListenPort",
+                title = stringResource(R.string.loc_sync_role),
+                subtitle = stringResource(R.string.loc_role_listen_port, roleText, currentListenPort),
                 icon = Icons.Default.Devices
             )
 
@@ -198,7 +200,7 @@ fun MirrorSettingsScreen(
         }
 
         // LISTEN PORT
-        SettingsSection(title = "TCP socket listen port") {
+        SettingsSection(title = stringResource(R.string.loc_tcp_listen_port)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -220,7 +222,7 @@ fun MirrorSettingsScreen(
                     OutlinedTextField(
                         value = editListenPort,
                         onValueChange = { editListenPort = it },
-                        label = { Text("Listen Port") },
+                        label = { Text(stringResource(R.string.dialog_tcp_port)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
@@ -244,10 +246,10 @@ fun MirrorSettingsScreen(
         }
 
         // CONFIGURED CONNECTIONS
-        SettingsSection(title = "Peer connections (${connections.size})") {
+        SettingsSection(title = stringResource(R.string.loc_peer_connections, connections.size)) {
             SettingsActionRow(
-                title = "Add custom connection",
-                subtitle = "Configure new sender or receiver peer address",
+                title = stringResource(R.string.loc_add_custom_connection),
+                subtitle = stringResource(R.string.loc_add_custom_connection_desc),
                 icon = Icons.Default.Add,
                 onClick = { onOpenConnectionEdit(-1) }
             )
@@ -262,13 +264,13 @@ fun MirrorSettingsScreen(
             } else {
                 connections.forEach { conn ->
                     val ipText = if (conn.ips.isNotEmpty()) conn.ips.joinToString(", ") else "127.0.0.1"
-                    val roleLabel = if (conn.isReceiver) "Receiver" else "Sender"
+                    val roleLabel = stringResource(if (conn.isReceiver) R.string.settings_role_receiver else R.string.settings_role_sender)
                     val statusSummary = getMirrorConnectionStatusSummary(conn)
                     val statusSuffix = if (statusSummary.isNotBlank()) " • $statusSummary" else ""
 
                     SettingsNavRow(
-                        title = conn.label.ifBlank { "Connection #${conn.index + 1}" },
-                        subtitle = "$ipText:${conn.port} • $roleLabel$statusSuffix",
+                        title = conn.label.ifBlank { stringResource(R.string.loc_connection_default_name, conn.index + 1) },
+                        subtitle = stringResource(R.string.loc_connection_list, ipText, conn.port, roleLabel, statusSuffix),
                         icon = Icons.Default.Devices,
                         onClick = { onOpenConnectionEdit(conn.index) }
                     )
@@ -291,7 +293,7 @@ fun MirrorSettingsScreen(
                                 repository.refreshMirrorConnections()
                                 Toast.makeText(context, syncToggledMsg, Toast.LENGTH_SHORT).show()
                             } catch (e: Throwable) {
-                                Toast.makeText(context, "Sync: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_sync_error_with_detail, e.message), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -309,7 +311,7 @@ fun MirrorSettingsScreen(
                                 repository.refreshMirrorConnections()
                                 Toast.makeText(context, reinitSuccessMsg, Toast.LENGTH_SHORT).show()
                             } catch (e: Throwable) {
-                                Toast.makeText(context, "Reinit: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_reinit_error_with_detail, e.message), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -324,7 +326,7 @@ fun MirrorSettingsScreen(
         }
 
         // QUICK SETUP: SIDE-BY-SIDE LOCAL RELAY
-        SettingsSection(title = "Quick setup (127.0.0.1 local relay)") {
+        SettingsSection(title = stringResource(R.string.loc_quick_setup_local_relay)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -380,7 +382,7 @@ fun MirrorSettingsScreen(
                             if (ok) {
                                 Toast.makeText(context, connAddedMsg, Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "Failed to add receiver", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_failed_add_receiver), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -399,7 +401,7 @@ fun MirrorSettingsScreen(
                             if (ok) {
                                 Toast.makeText(context, connAddedMsg, Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "Failed to add sender", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_failed_add_sender), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -415,7 +417,7 @@ fun MirrorSettingsScreen(
         }
 
         // DEV TESTING GUIDE (EXPANDABLE)
-        SettingsSection(title = "Developer testing instructions") {
+        SettingsSection(title = stringResource(R.string.loc_developer_testing)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -435,7 +437,7 @@ fun MirrorSettingsScreen(
                         SettingsIcon(icon = Icons.Default.Info)
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
-                            text = "How to relay live data side-by-side",
+                            text = stringResource(R.string.loc_how_to_relay),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium
                         )
@@ -443,7 +445,7 @@ fun MirrorSettingsScreen(
                     IconButton(onClick = { showGuideExpanded = !showGuideExpanded }) {
                         Icon(
                             imageVector = if (showGuideExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = "Toggle Guide"
+                            contentDescription = stringResource(R.string.loc_action_toggle_guide)
                         )
                     }
                 }

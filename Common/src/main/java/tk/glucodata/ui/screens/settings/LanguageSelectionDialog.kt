@@ -118,7 +118,7 @@ fun LanguageSelectionDialog(
                             IconButton(onClick = { searchQuery = "" }) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Clear search",
+                                    contentDescription = stringResource(R.string.loc_action_clear_search),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }

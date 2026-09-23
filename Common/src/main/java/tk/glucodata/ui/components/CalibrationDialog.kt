@@ -143,7 +143,7 @@ fun CalibrationDialog(
                             OutlinedTextField(
                                 value = bloodGlucoseText,
                                 onValueChange = { bloodGlucoseText = it },
-                                label = { Text("Fingerprick BG (${unit.label})") },
+                                label = { Text(stringResource(R.string.log_value_blood_glucose, stringResource(unit.labelRes))) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()

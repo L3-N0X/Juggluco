@@ -206,12 +206,12 @@ fun SettingsScreen(
                 // Unit badge
                 Column {
                     Text(
-                        text = "Unit",
+                        text = stringResource(R.string.settings_summary_unit),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = unit.label,
+                        text = stringResource(unit.labelRes),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -221,12 +221,12 @@ fun SettingsScreen(
                 // Range badge
                 Column {
                     Text(
-                        text = "Target Range",
+                        text = stringResource(R.string.settings_summary_target_range),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${unit.format(targetLow)} - ${unit.format(targetHigh)}",
+                        text = stringResource(R.string.target_label, unit.format(targetLow), unit.format(targetHigh)),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -236,12 +236,12 @@ fun SettingsScreen(
                 // Alarms badge
                 Column {
                     Text(
-                        text = "Alarms",
+                        text = stringResource(R.string.alarms),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = if (alertsOn) "Active" else "Off",
+                        text = stringResource(if (alertsOn) R.string.active else R.string.off),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = if (alertsOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -251,16 +251,18 @@ fun SettingsScreen(
                 // Role badge
                 Column {
                     Text(
-                        text = "Role",
+                        text = stringResource(R.string.settings_summary_role),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = when {
-                            isReceiverActive -> "Receiver"
-                            isSenderActive -> "Sender"
-                            else -> "Standalone"
-                        },
+                        text = stringResource(
+                            when {
+                                isReceiverActive -> R.string.settings_role_receiver
+                                isSenderActive -> R.string.settings_role_sender
+                                else -> R.string.settings_role_standalone
+                            }
+                        ),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -270,7 +272,7 @@ fun SettingsScreen(
         }
 
         // Section: Glucose & alerts
-        SettingsSection(title = "Glucose & alerts") {
+        SettingsSection(title = stringResource(R.string.settings_section_glucose_alerts)) {
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_glucose_title),
                 subtitle = stringResource(R.string.settings_group_glucose_desc),
@@ -286,7 +288,7 @@ fun SettingsScreen(
         }
 
         // Section: Display & speech
-        SettingsSection(title = "Display & speech") {
+        SettingsSection(title = stringResource(R.string.settings_section_display_speech)) {
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_display_title),
                 subtitle = stringResource(R.string.settings_group_display_desc),
@@ -302,7 +304,7 @@ fun SettingsScreen(
         }
 
         // Section: Connectivity & sharing
-        SettingsSection(title = "Connectivity & sharing") {
+        SettingsSection(title = stringResource(R.string.settings_section_connectivity_sharing)) {
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_watch_title),
                 subtitle = stringResource(R.string.settings_group_watch_desc),
@@ -330,7 +332,7 @@ fun SettingsScreen(
         }
 
         // Section: System & data
-        SettingsSection(title = "System & data") {
+        SettingsSection(title = stringResource(R.string.settings_section_system_data)) {
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_data_title),
                 subtitle = stringResource(R.string.settings_group_data_desc),

@@ -29,7 +29,7 @@ fun BroadcastsSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // LOCAL INTER-APP BROADCASTS
-        SettingsSection(title = "Local app broadcasts") {
+        SettingsSection(title = stringResource(R.string.loc_local_app_broadcasts)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_glucodata_broadcast),
                 subtitle = stringResource(R.string.settings_glucodata_broadcast_desc),
@@ -56,7 +56,7 @@ fun BroadcastsSettingsScreen(
         }
 
         // HEALTH CLOUD & LOCAL SERVERS
-        SettingsSection(title = "Cloud & local servers") {
+        SettingsSection(title = stringResource(R.string.loc_cloud_local_servers)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_health_connect),
                 subtitle = stringResource(R.string.settings_health_connect_desc),
@@ -76,7 +76,7 @@ fun BroadcastsSettingsScreen(
 
             SettingsNavRow(
                 title = stringResource(R.string.settings_xdrip_server),
-                subtitle = "Local REST API on port ${exchanges.webServerPort}",
+                subtitle = stringResource(R.string.loc_rest_api_port, exchanges.webServerPort),
                 icon = Icons.Default.Code,
                 checked = exchanges.xdripWebServer,
                 onCheckedChange = { repository.setXdripWebServer(it) },
@@ -86,7 +86,7 @@ fun BroadcastsSettingsScreen(
 
         // INFO
         SettingsInfoCard(
-            text = "Broadcasts allow local companion apps such as xDrip+, AndroidAPS, and smartwatch faces to receive real-time glucose values as soon as Juggluco receives them.",
+            text = stringResource(R.string.loc_broadcast_info),
             icon = Icons.Default.Info
         )
     }

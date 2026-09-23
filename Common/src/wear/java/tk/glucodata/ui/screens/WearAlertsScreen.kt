@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,6 +43,7 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.material3.TitleCard
+import tk.glucodata.R
 import tk.glucodata.alerts.AlertKind
 import tk.glucodata.alerts.AlertOutput
 import tk.glucodata.alerts.AlertPlayer
@@ -334,7 +336,7 @@ fun WearAlertEditScreen(
             item {
                 AlarmSwitchRow(
                     title = "Vibrate",
-                    summary = if (rule.vibrate) rule.vibrationPattern.label else "Off",
+                    summary = if (rule.vibrate) stringResource(rule.vibrationPattern.labelRes) else stringResource(R.string.loc_common_off),
                     checked = rule.vibrate,
                     onCheckedChange = { on -> update { it.copy(vibrate = on) } }
                 )
@@ -353,7 +355,7 @@ fun WearAlertEditScreen(
                         modifier = Modifier.fillMaxWidth(),
                         icon = { Icon(Icons.Default.Vibration, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize)) },
                         label = { Text("Pattern") },
-                        secondaryLabel = { Text(rule.vibrationPattern.label) }
+                        secondaryLabel = { Text(stringResource(rule.vibrationPattern.labelRes)) }
                     )
                 }
             }

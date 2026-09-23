@@ -66,6 +66,7 @@ import tk.glucodata.ui.graph.rememberSettledWindow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -91,6 +92,7 @@ import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.screens.DailyTotalPill
 import tk.glucodata.ui.screens.LogItemCard
 import tk.glucodata.ui.theme.LocalLogbookColors
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -193,12 +195,16 @@ fun GlucoseScreen(
         if (settledWindow.isLive) {
             val range = selectedRange
             if (range != null) {
-                if (range.labelRes != null) context.getString(range.labelRes) else range.label
+                if (range.labelRes != null) {
+                    context.getString(range.labelRes)
+                } else {
+                    formatDurationLabel(context, range.durationMillis)
+                }
             } else {
-                formatDurationLabel(settledWindow.durationMillis)
+                formatDurationLabel(context, settledWindow.durationMillis)
             }
         } else {
-            val dateFmt = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+            val dateFmt = SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "MMMd, Hm"), Locale.getDefault())
             "${dateFmt.format(Date(settledWindow.startMillis))} - ${dateFmt.format(Date(settledWindow.endMillis))}"
         }
     }
@@ -273,7 +279,12 @@ fun GlucoseScreen(
 
                 if (isSearchActive && searchMatches.isNotEmpty()) {
                     SearchActiveBar(
-                        summaryText = "Match ${searchMatchIndex + 1} of ${searchMatches.size} ($searchSummaryText)",
+                        summaryText = stringResource(
+                            R.string.search_match_position,
+                            searchMatchIndex + 1,
+                            searchMatches.size,
+                            searchSummaryText
+                        ),
                         onPrev = {
                             if (searchMatches.isNotEmpty()) {
                                 searchMatchIndex = (searchMatchIndex - 1 + searchMatches.size) % searchMatches.size
@@ -388,7 +399,12 @@ fun GlucoseScreen(
 
                     if (isSearchActive && searchMatches.isNotEmpty()) {
                         SearchActiveBar(
-                            summaryText = "Match ${searchMatchIndex + 1} of ${searchMatches.size} ($searchSummaryText)",
+                            summaryText = stringResource(
+                            R.string.search_match_position,
+                            searchMatchIndex + 1,
+                            searchMatches.size,
+                            searchSummaryText
+                        ),
                             onPrev = {
                                 if (searchMatches.isNotEmpty()) {
                                     searchMatchIndex = (searchMatchIndex - 1 + searchMatches.size) % searchMatches.size
@@ -484,7 +500,12 @@ fun GlucoseScreen(
                 // Search Active Banner
                 if (isSearchActive && searchMatches.isNotEmpty()) {
                     SearchActiveBar(
-                        summaryText = "Match ${searchMatchIndex + 1} of ${searchMatches.size} ($searchSummaryText)",
+                        summaryText = stringResource(
+                            R.string.search_match_position,
+                            searchMatchIndex + 1,
+                            searchMatches.size,
+                            searchSummaryText
+                        ),
                         onPrev = {
                             if (searchMatches.isNotEmpty()) {
                                 searchMatchIndex = (searchMatchIndex - 1 + searchMatches.size) % searchMatches.size
@@ -585,7 +606,7 @@ fun GlucoseScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Customize visible curves, calibration lines, and events",
+                        text = stringResource(R.string.graph_layers_description_short),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -727,12 +748,16 @@ fun GlucoseScreen(
         // 8. Amount Log Entry Detail Dialog (Inspection / Deletion)
         if (selectedLogForDetail != null) {
             val log = selectedLogForDetail!!
-            val timeFmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+            val timeFmt = SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "yMMMd, Hm"), Locale.getDefault())
             AlertDialog(
                 onDismissRequest = { selectedLogForDetail = null },
                 title = {
                     Text(
-                        text = "${log.type.label}: ${log.value}",
+                        text = stringResource(
+                            R.string.log_detail_title,
+                            stringResource(log.type.labelRes),
+                            log.value.toString()
+                        ),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -740,13 +765,13 @@ fun GlucoseScreen(
                 text = {
                     Column {
                         Text(
-                            text = "Time: ${timeFmt.format(Date(log.timestamp))}",
+                            text = stringResource(R.string.log_detail_time, timeFmt.format(Date(log.timestamp))),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         if (!log.note.isNullOrEmpty()) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Note: ${log.note}",
+                                text = stringResource(R.string.log_detail_note, log.note),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -763,7 +788,7 @@ fun GlucoseScreen(
                         onClick = {
                             repository.deleteLogEntry(log)
                             selectedLogForDetail = null
-                            Toast.makeText(context, "Log entry deleted", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.log_entry_deleted), Toast.LENGTH_SHORT).show()
                         }
                     ) {
                         Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -781,21 +806,31 @@ fun GlucoseScreen(
                 onDismiss = { showSearchDialog = false },
                 onExecuteSearch = { under, above, label, keyword ->
                     showSearchDialog = false
-                    val matches = repository.searchGlucose(label, under, above, keyword)
+                    val matches = repository.searchGlucose(
+                        label,
+                        under,
+                        above,
+                        keyword,
+                        LogType.entries.associateWith { context.getString(it.labelRes) }
+                    )
                     if (matches.isNotEmpty()) {
                         searchMatches = matches
                         searchMatchIndex = 0
                         isSearchActive = true
                         searchSummaryText = when {
-                            under > 0f -> "< ${unit.format(under)}"
-                            above > 0f -> "> ${unit.format(above)}"
+                            under > 0f -> context.getString(R.string.tir_range_less_than, unit.format(under))
+                            above > 0f -> context.getString(R.string.tir_range_greater_than, unit.format(above))
                             keyword.isNotEmpty() -> "\"$keyword\""
-                            else -> "Results"
+                            else -> context.getString(R.string.search_results)
                         }
                         viewportState.jumpTo(matches[0] + (viewportState.durationMillis / 2))
-                        Toast.makeText(context, "Found ${matches.size} matches", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            context.resources.getQuantityString(R.plurals.search_matches_found, matches.size, matches.size),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     } else {
-                        Toast.makeText(context, "No matching readings or events found", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.search_no_matches), Toast.LENGTH_SHORT).show()
                     }
                 }
             )
@@ -820,8 +855,12 @@ fun GlucoseScreen(
                                 val day = cal.get(Calendar.DAY_OF_MONTH)
                                 repository.moveToDate(year, month, day)
 
-                                val dateFmt = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
-                                Toast.makeText(context, "Navigated to ${dateFmt.format(Date(viewportState.startTimeMillis))}", Toast.LENGTH_SHORT).show()
+                                val dateFmt = SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "yMMMd"), Locale.getDefault())
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.date_navigated, dateFmt.format(Date(viewportState.startTimeMillis))),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                     ) {
@@ -864,14 +903,14 @@ private fun handleShowLastScan(
     val lastScan = readings.filter { it.isScan }.maxByOrNull { it.timestamp }
     if (lastScan != null) {
         viewportState.jumpTo(lastScan.timestamp + (viewportState.durationMillis / 3))
-        val timeFmt = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+        val timeFmt = SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "MMMd, Hm"), Locale.getDefault())
         Toast.makeText(
             context,
-            "Jumped to last scan: ${timeFmt.format(Date(lastScan.timestamp))}",
+            context.getString(R.string.jumped_to_last_scan, timeFmt.format(Date(lastScan.timestamp))),
             Toast.LENGTH_SHORT
         ).show()
     } else {
-        Toast.makeText(context, "No NFC scans recorded yet", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.no_nfc_scans_recorded), Toast.LENGTH_SHORT).show()
     }
     repository.showLastScan()
 }
@@ -913,7 +952,7 @@ private fun SearchActiveBar(
             IconButton(onClick = onPrev, modifier = Modifier.size(32.dp)) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Prev Match",
+                    contentDescription = stringResource(R.string.previous_match),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -921,7 +960,7 @@ private fun SearchActiveBar(
             IconButton(onClick = onNext, modifier = Modifier.size(32.dp)) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = "Next Match",
+                    contentDescription = stringResource(R.string.next_match),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -929,7 +968,7 @@ private fun SearchActiveBar(
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Close Search",
+                    contentDescription = stringResource(R.string.close_search),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1165,10 +1204,26 @@ fun LogbookSection(
                 .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            DailyTotalPill(label = "Bolus", value = "${String.format(Locale.US, "%.1f", todayBolus)} U", color = logbookColors.bolus.primary)
-            DailyTotalPill(label = "Basal", value = "${String.format(Locale.US, "%.1f", todayBasal)} U", color = logbookColors.basal.primary)
-            DailyTotalPill(label = "Carbs", value = "${todayCarbs.toInt()} g", color = logbookColors.carbs.primary)
-            DailyTotalPill(label = "Checks", value = "$todayChecks", color = logbookColors.bloodGlucose.primary)
+            DailyTotalPill(
+                label = stringResource(R.string.log_short_bolus),
+                value = stringResource(R.string.log_value_insulin, String.format(Locale.getDefault(), "%.1f", todayBolus)),
+                color = logbookColors.bolus.primary
+            )
+            DailyTotalPill(
+                label = stringResource(R.string.log_short_basal),
+                value = stringResource(R.string.log_value_insulin, String.format(Locale.getDefault(), "%.1f", todayBasal)),
+                color = logbookColors.basal.primary
+            )
+            DailyTotalPill(
+                label = stringResource(R.string.log_short_carbs),
+                value = stringResource(R.string.log_value_carbs, todayCarbs.toInt().toString()),
+                color = logbookColors.carbs.primary
+            )
+            DailyTotalPill(
+                label = stringResource(R.string.log_type_finger_prick),
+                value = todayChecks.toString(),
+                color = logbookColors.bloodGlucose.primary
+            )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -1182,27 +1237,27 @@ fun LogbookSection(
             FilterChip(
                 selected = selectedTypeFilter == null,
                 onClick = { selectedTypeFilter = null },
-                label = { Text("All", fontSize = 11.sp) }
+                label = { Text(stringResource(R.string.log_all), fontSize = 11.sp) }
             )
             FilterChip(
                 selected = selectedTypeFilter == LogType.RAPID_INSULIN,
                 onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.RAPID_INSULIN) null else LogType.RAPID_INSULIN },
-                label = { Text("Bolus", fontSize = 11.sp) }
+                label = { Text(stringResource(R.string.log_short_bolus), fontSize = 11.sp) }
             )
             FilterChip(
                 selected = selectedTypeFilter == LogType.BASAL_INSULIN,
                 onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BASAL_INSULIN) null else LogType.BASAL_INSULIN },
-                label = { Text("Basal", fontSize = 11.sp) }
+                label = { Text(stringResource(R.string.log_short_basal), fontSize = 11.sp) }
             )
             FilterChip(
                 selected = selectedTypeFilter == LogType.CARBS,
                 onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.CARBS) null else LogType.CARBS },
-                label = { Text("Carbs", fontSize = 11.sp) }
+                label = { Text(stringResource(R.string.log_short_carbs), fontSize = 11.sp) }
             )
             FilterChip(
                 selected = selectedTypeFilter == LogType.BLOOD_GLUCOSE,
                 onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BLOOD_GLUCOSE) null else LogType.BLOOD_GLUCOSE },
-                label = { Text("BG", fontSize = 11.sp) }
+                label = { Text(stringResource(R.string.log_short_bg), fontSize = 11.sp) }
             )
         }
 
@@ -1235,7 +1290,7 @@ fun LogbookSection(
                         minimalistUnits = minimalistUnits,
                         onDelete = {
                             repository.deleteLogEntry(logItem)
-                            Toast.makeText(context, "Log entry deleted", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.log_entry_deleted), Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
@@ -1264,12 +1319,18 @@ private fun findIndexRange(readings: List<GlucosePoint>, startTime: Long, endTim
     return if (startIdx < endIdx) startIdx until endIdx else IntRange.EMPTY
 }
 
-private fun formatDurationLabel(durationMillis: Long): String {
+private fun formatDurationLabel(context: android.content.Context, durationMillis: Long): String {
     val hours = (durationMillis / (3600 * 1000L)).toInt()
+    val days = hours / 24
+    val remainingHours = hours % 24
     return when {
-        hours >= 24 && hours % 24 == 0 -> "${hours / 24}d"
-        hours >= 24 -> "${hours / 24}d ${hours % 24}h"
-        hours > 0 -> "${hours}h"
-        else -> "${durationMillis / 60_000L}m"
+        days > 0 && remainingHours == 0 -> context.resources.getQuantityString(R.plurals.day_count, days, days)
+        days > 0 -> context.getString(R.string.duration_days_hours, days, remainingHours)
+        hours > 0 -> context.resources.getQuantityString(R.plurals.hour_count, hours, hours)
+        else -> context.resources.getQuantityString(
+            R.plurals.minute_count,
+            (durationMillis / 60_000L).toInt(),
+            (durationMillis / 60_000L).toInt()
+        )
     }
 }

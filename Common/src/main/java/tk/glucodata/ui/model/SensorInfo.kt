@@ -1,11 +1,14 @@
 package tk.glucodata.ui.model
 
-enum class SensorState(val label: String) {
-    ACTIVE("Active"),
-    WARMING_UP("Warming Up"),
-    EXPIRED("Expired"),
-    ENDED("Ended"),
-    DISCONNECTED("Disconnected");
+import androidx.annotation.StringRes
+import tk.glucodata.R
+
+enum class SensorState(@StringRes val labelRes: Int) {
+    ACTIVE(R.string.loc_state_active),
+    WARMING_UP(R.string.loc_model_warming_up),
+    EXPIRED(R.string.loc_model_expired),
+    ENDED(R.string.loc_model_ended),
+    DISCONNECTED(R.string.sensor_status_disconnected);
 }
 
 data class SensorInfo(

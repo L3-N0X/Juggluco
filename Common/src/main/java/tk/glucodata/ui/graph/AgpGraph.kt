@@ -45,12 +45,15 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Job
+import java.text.DateFormat
+import java.util.Calendar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tk.glucodata.R
@@ -93,6 +96,13 @@ fun AgpGraph(
     val maxY = 260f
 
     val noDataLabel = stringResource(R.string.nodata)
+    val timeFormat = DateFormat.getTimeInstance(DateFormat.SHORT)
+    fun formatHour(hour: Int): String = timeFormat.format(
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, if (hour == 24) 0 else hour)
+            set(Calendar.MINUTE, 0)
+        }.time
+    )
 
     Box(
         modifier = modifier
@@ -227,7 +237,7 @@ fun AgpGraph(
                     end = Offset(xPos, paddingTop + chartHeight),
                     strokeWidth = 1f
                 )
-                val label = String.format(java.util.Locale.US, "%02d:00", if (h == 24) 0 else h)
+                val label = formatHour(h)
                 textPaint.textAlign = when (h) {
                     0 -> Paint.Align.LEFT
                     24 -> Paint.Align.RIGHT
@@ -555,15 +565,20 @@ fun AgpGraph(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = String.format(java.util.Locale.US, "%02d:00", ih.hour),
+                            text = formatHour(ih.hour),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         if (ih.hasData) {
                             Text(
-                                text = "Median: ${unit.format(ih.p50)} • IQR: ${unit.format(ih.p25)}–${unit.format(ih.p75)}" +
-                                    (if (ih.count > 0) " (${ih.count})" else ""),
+                                text = stringResource(
+                                    R.string.agp_hour_inspection,
+                                    unit.format(ih.p50),
+                                    unit.format(ih.p25),
+                                    unit.format(ih.p75)
+                                ) +
+                                    (if (ih.count > 0) " (" + pluralStringResource(R.plurals.agp_reading_count, ih.count, ih.count) + ")" else ""),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

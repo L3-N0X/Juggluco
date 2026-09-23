@@ -84,10 +84,10 @@ fun WebServerSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // SERVER STATUS & TOGGLE
-        SettingsSection(title = "Service status") {
+        SettingsSection(title = stringResource(R.string.loc_service_status)) {
             SettingsSwitchRow(
-                title = "Embedded REST API server",
-                subtitle = if (exchanges.xdripWebServer) "Active and listening on port $httpPort" else "Server is currently disabled",
+                title = stringResource(R.string.loc_embedded_rest_server),
+                subtitle = if (exchanges.xdripWebServer) stringResource(R.string.loc_server_listening, httpPort) else stringResource(R.string.loc_server_disabled),
                 icon = Icons.Default.Code,
                 checked = exchanges.xdripWebServer,
                 onCheckedChange = { repository.setXdripWebServer(it) }
@@ -95,7 +95,7 @@ fun WebServerSettingsScreen(
         }
 
         // PORT & AUTH CONFIGURATION
-        SettingsSection(title = "Network ports & authentication") {
+        SettingsSection(title = stringResource(R.string.loc_network_ports_auth)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -108,7 +108,7 @@ fun WebServerSettingsScreen(
                     OutlinedTextField(
                         value = httpPort,
                         onValueChange = { httpPort = it },
-                        label = { Text("HTTP Port") },
+                        label = { Text(stringResource(R.string.loc_http_port)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
@@ -117,7 +117,7 @@ fun WebServerSettingsScreen(
                     OutlinedTextField(
                         value = sslPort,
                         onValueChange = { sslPort = it },
-                        label = { Text("SSL Port") },
+                        label = { Text(stringResource(R.string.loc_ssl_port)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
@@ -129,14 +129,14 @@ fun WebServerSettingsScreen(
                 OutlinedTextField(
                     value = apiSecret,
                     onValueChange = { apiSecret = it },
-                    label = { Text("API Secret (Password)") },
+                    label = { Text(stringResource(R.string.loc_api_secret)) },
                     singleLine = true,
                     visualTransformation = if (showSecret) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showSecret = !showSecret }) {
                             Icon(
                                 imageVector = if (showSecret) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = "Toggle Secret"
+                                contentDescription = stringResource(R.string.loc_action_toggle_secret)
                             )
                         }
                     },
@@ -148,7 +148,7 @@ fun WebServerSettingsScreen(
                 OutlinedTextField(
                     value = pollInterval,
                     onValueChange = { pollInterval = it },
-                    label = { Text("Update Interval (seconds)") },
+                    label = { Text(stringResource(R.string.loc_update_interval)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -163,11 +163,11 @@ fun WebServerSettingsScreen(
                         val iv = pollInterval.toIntOrNull() ?: 60
 
                         if (hp == null || hp !in 1024..65535 || sp == null || sp !in 1024..65535) {
-                            Toast.makeText(context, "Ports must be valid numbers between 1024 and 65535", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.loc_ports_range), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         if (hp == sp) {
-                            Toast.makeText(context, "HTTP and SSL ports cannot be identical", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.loc_ports_identical), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
 
@@ -180,9 +180,9 @@ fun WebServerSettingsScreen(
                                 repository.setXdripWebServer(false)
                                 repository.setXdripWebServer(true)
                             }
-                            Toast.makeText(context, "Web server configuration saved", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.loc_web_server_saved), Toast.LENGTH_SHORT).show()
                         } catch (e: Throwable) {
-                            Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.loc_error_saving, e.message), Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -190,13 +190,13 @@ fun WebServerSettingsScreen(
                 ) {
                     Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Save & Restart Server", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.loc_save_restart_server), fontWeight = FontWeight.Bold)
                 }
             }
         }
 
         // ENDPOINT REFERENCE CARD
-        SettingsSection(title = "REST API compatibility") {
+        SettingsSection(title = stringResource(R.string.loc_rest_compatibility)) {
             val cleanPort = httpPort.ifBlank { "17580" }
             Column(
                 modifier = Modifier
@@ -204,14 +204,14 @@ fun WebServerSettingsScreen(
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 Text(
-                    text = "Nightscout & xDrip Endpoints:",
+                    text = stringResource(R.string.loc_rest_endpoints_title),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "• Entries: http://127.0.0.1:$cleanPort/api/v1/entries.json\n• Status: http://127.0.0.1:$cleanPort/api/v1/status.json\n• AGP Report: http://127.0.0.1:$cleanPort/x/report",
+                    text = stringResource(R.string.loc_rest_endpoints, cleanPort),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     lineHeight = 20.sp
@@ -221,7 +221,7 @@ fun WebServerSettingsScreen(
 
         // INFO CARD
         SettingsInfoCard(
-            text = "The local web server allows external applications, Nightscout widgets, emulator environments, and other phone apps to consume glucose streams without Bluetooth pairing.",
+            text = stringResource(R.string.loc_web_server_info),
             icon = Icons.Default.Info
         )
     }

@@ -198,7 +198,7 @@ fun WearGraphScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "${unit.label} • ${timeFormatter.format(Date(p.timestamp))}",
+                            text = "${unit.symbol} • ${timeFormatter.format(Date(p.timestamp))}",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

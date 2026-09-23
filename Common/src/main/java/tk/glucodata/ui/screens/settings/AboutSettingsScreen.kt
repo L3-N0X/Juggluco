@@ -20,7 +20,7 @@ fun AboutSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // APP VERSION & IDENTITY
-        SettingsSection(title = "Application") {
+        SettingsSection(title = stringResource(R.string.loc_about_application)) {
             SettingsActionRow(
                 title = stringResource(R.string.settings_version_title),
                 subtitle = stringResource(R.string.settings_about_details),
@@ -29,44 +29,44 @@ fun AboutSettingsScreen(
         }
 
         // SENSOR HARDWARE ECOSYSTEM
-        SettingsSection(title = "Supported sensor hardware") {
+        SettingsSection(title = stringResource(R.string.loc_supported_sensor_hardware)) {
             SettingsActionRow(
                 title = "Abbott FreeStyle Libre",
-                subtitle = "Libre 1, Libre 2 (European & US), and Libre 3 with direct BLE streaming & NFC scans",
+                subtitle = stringResource(R.string.loc_libre_hardware_desc),
                 icon = Icons.Default.Sensors
             )
 
             SettingsActionRow(
                 title = "Dexcom CGM",
-                subtitle = "Dexcom G7 and Dexcom ONE+ direct Bluetooth Low Energy connectivity",
+                subtitle = stringResource(R.string.loc_dexcom_hardware_desc),
                 icon = Icons.Default.Sensors
             )
 
             SettingsActionRow(
                 title = "Sibionics CGM",
-                subtitle = "Continuous sensor readings and Bluetooth telemetry",
+                subtitle = stringResource(R.string.loc_sibionics_hardware_desc),
                 icon = Icons.Default.Sensors
             )
         }
 
         // PRIVACY & ARCHITECTURE
-        SettingsSection(title = "Privacy & open source") {
+        SettingsSection(title = stringResource(R.string.loc_privacy_open_source)) {
             SettingsActionRow(
-                title = "Local-first privacy philosophy",
-                subtitle = "100% offline-capable. Medical records never leave your phone without explicit third-party service setup.",
+                title = stringResource(R.string.loc_local_first_privacy),
+                subtitle = stringResource(R.string.loc_local_first_privacy_desc),
                 icon = Icons.Default.Security
             )
 
             SettingsActionRow(
-                title = "Free software (GPLv3)",
-                subtitle = "Licensed under GNU General Public License v3. Created by Jaap Korthals Altes.",
+                title = stringResource(R.string.loc_free_software),
+                subtitle = stringResource(R.string.loc_license_desc),
                 icon = Icons.Default.Favorite
             )
         }
 
         // INFO
         SettingsInfoCard(
-            text = "Juggluco gives you full control and ownership of your continuous glucose monitor data.",
+            text = stringResource(R.string.loc_about_info),
             icon = Icons.Default.Info
         )
     }

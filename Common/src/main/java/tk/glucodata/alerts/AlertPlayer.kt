@@ -189,7 +189,7 @@ object AlertPlayer {
         if (!alert.remote) {
             AlertSync.sendRing(alert)
             if (!alert.isTest) {
-                val prefix = if (rule.kind == AlertKind.HIGH || rule.kind == AlertKind.RISING) "HIGH" else "LOW"
+                val prefix = context.getString(if (rule.kind == AlertKind.HIGH || rule.kind == AlertKind.RISING) R.string.loc_watch_alert_high else R.string.loc_watch_alert_low)
                 alert.reading?.let { AlertBridge.alarmToWatches("$prefix ${it.displayValue}") }
             }
         }
@@ -420,7 +420,7 @@ object AlertPlayer {
 
     private fun announce(alert: ActiveAlert) {
         val text = when {
-            alert.rule.kind == AlertKind.SIGNAL_LOSS -> "${alert.rule.name}, ${alert.lostMinutes} minutes"
+            alert.rule.kind == AlertKind.SIGNAL_LOSS -> context.getString(R.string.loc_alarm_announce_loss, alert.rule.name, alert.lostMinutes)
             else -> alert.reading?.displayValue ?: return
         }
         val output = if (alert.rule.output == AlertOutput.NONE) AlertOutput.NOTIFICATION else alert.rule.output
@@ -480,8 +480,12 @@ object AlertPlayer {
 
     private fun ensureChannel() {
         if (channelCreated || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val channel = NotificationChannel(CHANNEL_ID, "Glucose alerts", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "Low, high, trend and signal loss alerts. Sound and vibration are controlled by each alert."
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            context.getString(R.string.alert_channel_title),
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = context.getString(R.string.alert_channel_description)
             setSound(null, null)
             enableVibration(false)
             setBypassDnd(true)
@@ -498,7 +502,7 @@ object AlertPlayer {
         val value = alert.reading?.displayValue
         return when {
             alert.rule.kind == AlertKind.SIGNAL_LOSS -> alert.rule.name
-            value != null -> "${alert.rule.name}  $value ${unitLabel()} ${arrow(alert.reading.rate)}".trim()
+            value != null -> context.getString(R.string.loc_alarm_title_value, alert.rule.name, value, unitLabel(), arrow(alert.reading.rate)).trim()
             else -> alert.rule.name
         }
     }
@@ -507,21 +511,21 @@ object AlertPlayer {
         val rule = alert.rule
         val unit = currentUnit()
         val condition = when (rule.kind) {
-            AlertKind.LOW -> "Below ${unit.format(rule.thresholdMgdl)} ${unit.label}" +
-                if (rule.forecastMinutes > 0) " within ${rule.forecastMinutes} min" else ""
-            AlertKind.HIGH -> "Above ${unit.format(rule.thresholdMgdl)} ${unit.label}" +
-                if (rule.forecastMinutes > 0) " within ${rule.forecastMinutes} min" else ""
-            AlertKind.FALLING -> "Falling ${unit.formatRate(rule.rateMgdlPerMin)} ${unit.label}/min or faster"
-            AlertKind.RISING -> "Rising ${unit.formatRate(rule.rateMgdlPerMin)} ${unit.label}/min or faster"
-            AlertKind.SIGNAL_LOSS -> "No reading for ${alert.lostMinutes} min"
+            AlertKind.LOW -> context.getString(R.string.alert_detail_below, unit.format(rule.thresholdMgdl), context.getString(unit.labelRes)) +
+                if (rule.forecastMinutes > 0) context.getString(R.string.alert_detail_within, rule.forecastMinutes) else ""
+            AlertKind.HIGH -> context.getString(R.string.alert_detail_above, unit.format(rule.thresholdMgdl), context.getString(unit.labelRes)) +
+                if (rule.forecastMinutes > 0) context.getString(R.string.alert_detail_within, rule.forecastMinutes) else ""
+            AlertKind.FALLING -> context.getString(R.string.alert_detail_falling, unit.formatRate(rule.rateMgdlPerMin), context.getString(unit.labelRes))
+            AlertKind.RISING -> context.getString(R.string.alert_detail_rising, unit.formatRate(rule.rateMgdlPerMin), context.getString(unit.labelRes))
+            AlertKind.SIGNAL_LOSS -> context.getString(R.string.alert_detail_signal_loss, alert.lostMinutes)
         }
         val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(alert.reading?.timeMillis ?: alert.startedAt))
-        return if (alert.isTest) "Test · $condition" else "$condition · $time"
+        return if (alert.isTest) context.getString(R.string.alert_test_detail, condition) else context.getString(R.string.loc_alarm_detail_time, condition, time)
     }
 
     private fun currentUnit(): GlucoseUnit = if (Applic.unit == 1) GlucoseUnit.MMOL_L else GlucoseUnit.MG_DL
 
-    private fun unitLabel(): String = currentUnit().label
+    private fun unitLabel(): String = context.getString(currentUnit().labelRes)
 
     fun arrow(rate: Float): String = when {
         !rate.isFinite() -> ""
@@ -584,8 +588,8 @@ object AlertPlayer {
                 // A watch running Juggluco rings the alert itself; do not bridge a copy there.
                 .setLocalOnly(AlertSync.hasWearPeer())
                 .setDeleteIntent(actionIntent(AlertActionReceiver.ACTION_DISMISS))
-                .addAction(Notification.Action.Builder(null, "Snooze $snoozeMinutes min", actionIntent(AlertActionReceiver.ACTION_SNOOZE, snoozeMinutes)).build())
-                .addAction(Notification.Action.Builder(null, "Dismiss", actionIntent(AlertActionReceiver.ACTION_DISMISS)).build())
+                .addAction(Notification.Action.Builder(null, context.getString(R.string.snooze_minutes, snoozeMinutes), actionIntent(AlertActionReceiver.ACTION_SNOOZE, snoozeMinutes)).build())
+                .addAction(Notification.Action.Builder(null, context.getString(R.string.dismiss), actionIntent(AlertActionReceiver.ACTION_DISMISS)).build())
 
             if ((alert.rule.fullScreen || Applic.isWearable) && canUseFullScreen()) {
                 builder.setContentIntent(fullScreenIntent())

@@ -36,9 +36,9 @@ object ComposeUiBridge {
                 onTriggerNfcScan = {
                     try {
                         activity.setnfc()
-                        Applic.argToaster(activity, "NFC ready: Hold back of phone to sensor", Toast.LENGTH_SHORT)
+                        Applic.argToaster(activity, activity.getString(R.string.nfc_ready_instruction), Toast.LENGTH_SHORT)
                     } catch (e: Throwable) {
-                        Applic.argToaster(activity, "NFC not available: ${e.message}", Toast.LENGTH_SHORT)
+                        Applic.argToaster(activity, activity.getString(R.string.nfc_unavailable_error, e.message), Toast.LENGTH_SHORT)
                     }
                 },
                 onOpenLegacyView = {
@@ -61,7 +61,7 @@ object ComposeUiBridge {
             activity.setContentView(c)
             activity.applyScreenOrientation(activity.resources.configuration)
             c.requestRender()
-            Applic.argToaster(activity, "Switched to Legacy OpenGL View. Press Back to return.", Toast.LENGTH_SHORT)
+            Applic.argToaster(activity, activity.getString(R.string.switched_to_legacy_view), Toast.LENGTH_SHORT)
             MainActivity.setonback {
                 switchToComposeUi(activity)
             }

@@ -65,7 +65,7 @@ fun DisplaySettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // THEME PREFERENCE & LANGUAGE
-        SettingsSection(title = "Appearance") {
+        SettingsSection(title = stringResource(R.string.loc_appearance)) {
             SettingsSegmentedRow(
                 title = stringResource(R.string.settings_theme_pref),
                 subtitle = stringResource(R.string.settings_theme_pref_desc),
@@ -180,7 +180,7 @@ fun DisplaySettingsScreen(
         }
 
         // SYSTEM UI & LAYOUT
-        SettingsSection(title = "System UI & curve layout") {
+        SettingsSection(title = stringResource(R.string.loc_system_ui_curve)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_status_bar),
                 subtitle = stringResource(R.string.settings_status_bar_desc),
@@ -245,7 +245,7 @@ fun DisplaySettingsScreen(
         }
 
         // ADVANCED TOOLS
-        SettingsSection(title = "Advanced tools") {
+        SettingsSection(title = stringResource(R.string.loc_advanced_tools)) {
             SettingsNavRow(
                 title = stringResource(R.string.settings_floating_widget),
                 subtitle = stringResource(R.string.settings_floating_widget_desc),

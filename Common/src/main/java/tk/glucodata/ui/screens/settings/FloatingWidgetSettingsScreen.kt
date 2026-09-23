@@ -35,7 +35,7 @@ fun FloatingWidgetSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // OVERLAY CONTROL
-        SettingsSection(title = "Overlay window") {
+        SettingsSection(title = stringResource(R.string.loc_overlay_window)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_floating_widget),
                 subtitle = stringResource(R.string.settings_floating_widget_desc),
@@ -50,7 +50,7 @@ fun FloatingWidgetSettingsScreen(
         }
 
         if (displayConfig.floatingGlucose) {
-            SettingsSection(title = "Appearance & behavior") {
+            SettingsSection(title = stringResource(R.string.loc_appearance_behavior)) {
                 SettingsSwitchRow(
                     title = stringResource(R.string.dialog_touchable_overlay),
                     subtitle = stringResource(R.string.dialog_touchable_overlay_desc),

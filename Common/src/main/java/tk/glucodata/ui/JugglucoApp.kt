@@ -26,10 +26,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import tk.glucodata.R
 import tk.glucodata.ui.components.AddEntryBottomSheet
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.NavigationTab
@@ -59,6 +61,7 @@ import tk.glucodata.ui.screens.settings.WatchSettingsScreen
 import tk.glucodata.ui.screens.settings.WebServerSettingsScreen
 import tk.glucodata.ui.components.AlertIndicatorAction
 import tk.glucodata.ui.theme.JugglucoTheme
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +78,7 @@ fun JugglucoApp(
     var showAddEntrySheet by rememberSaveable { mutableStateOf(false) }
     var isFullscreenGraph by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -293,7 +297,13 @@ fun JugglucoApp(
                         onSave = { type, value, note ->
                             repository.addLogEntry(type, value, note)
                             coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Logged ${type.label}: $value")
+                                snackbarHostState.showSnackbar(
+                                    context.getString(
+                                        R.string.app_log_saved,
+                                        context.getString(type.labelRes),
+                                        String.format(Locale.getDefault(), "%.1f", value)
+                                    )
+                                )
                             }
                         }
                     )

@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,6 +36,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
+import tk.glucodata.R
 import tk.glucodata.ui.components.WearQuickLogDial
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
@@ -80,13 +82,13 @@ fun WearQuickLogScreen(
     }
 
     val (displayText, labelText) = when (selectedType) {
-        LogType.CARBS -> "${value.roundToInt()} g" to "Carbs"
-        LogType.RAPID_INSULIN -> String.format(java.util.Locale.US, "%.1f U", value) to "Bolus"
-        LogType.BASAL_INSULIN -> String.format(java.util.Locale.US, "%.1f U", value) to "Basal"
+        LogType.CARBS -> "${value.roundToInt()} g" to stringResource(R.string.log_short_carbs)
+        LogType.RAPID_INSULIN -> String.format(java.util.Locale.getDefault(), "%.1f U", value) to stringResource(R.string.log_short_bolus)
+        LogType.BASAL_INSULIN -> String.format(java.util.Locale.getDefault(), "%.1f U", value) to stringResource(R.string.log_short_basal)
         LogType.BLOOD_GLUCOSE -> if (unit == GlucoseUnit.MMOL_L) {
-            String.format(java.util.Locale.US, "%.1f", value) to unit.label
+            String.format(java.util.Locale.getDefault(), "%.1f", value) to stringResource(unit.labelRes)
         } else {
-            "${value.roundToInt()}" to unit.label
+            "${value.roundToInt()}" to stringResource(unit.labelRes)
         }
         else -> "$value" to ""
     }

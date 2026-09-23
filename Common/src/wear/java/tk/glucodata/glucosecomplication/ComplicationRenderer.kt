@@ -28,6 +28,7 @@ import androidx.wear.watchface.complications.data.SmallImage
 import androidx.wear.watchface.complications.data.SmallImageComplicationData
 import androidx.wear.watchface.complications.data.SmallImageType
 import tk.glucodata.Applic
+import tk.glucodata.R
 import tk.glucodata.Natives
 import tk.glucodata.Notify
 import tk.glucodata.ui.model.GlucoseStatus
@@ -524,7 +525,7 @@ object ComplicationRenderer {
         val glucose = if (isPreview) getPreviewGlucose() else getLatestGlucose()
         val trend = if (glucose.isOld) TrendArrow.UNKNOWN else TrendArrow.fromRate(glucose.rate)
         val descText = PlainComplicationText.Builder(
-            "Glucose ${glucose.value}, ${trend.label}"
+            "${Applic.getContext().getString(R.string.glucose)} ${glucose.value}, ${Applic.getContext().getString(trend.labelRes)}"
         ).build()
         val valueText = PlainComplicationText.Builder(glucose.value).build()
 

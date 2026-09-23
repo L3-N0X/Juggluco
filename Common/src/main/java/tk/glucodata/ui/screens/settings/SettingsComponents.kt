@@ -64,7 +64,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.core.text.HtmlCompat
+import tk.glucodata.R
 import tk.glucodata.ui.screens.ScreenLayout
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,7 +98,7 @@ fun SettingsDetailScaffold(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(R.string.loc_action_back)
                         )
                     }
                 },
@@ -321,7 +323,7 @@ fun SettingsNavRow(
             ) {
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "Open $title",
+                    contentDescription = stringResource(R.string.loc_action_open, title),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )

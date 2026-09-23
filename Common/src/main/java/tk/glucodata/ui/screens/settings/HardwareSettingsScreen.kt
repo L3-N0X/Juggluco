@@ -24,13 +24,17 @@ fun HardwareSettingsScreen(
     onNavigateBack: () -> Unit
 ) {
     val hardwareConfig by repository.hardwareConfig.collectAsState()
+    val nfcActivation = stringResource(R.string.loc_nfc_activation)
+    val nfcActivationDesc = stringResource(R.string.loc_nfc_activation_desc)
+    val bleHeading = stringResource(R.string.loc_ble_heading)
+    val bleDesc = stringResource(R.string.loc_ble_desc)
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_group_hardware_title),
         onNavigateBack = onNavigateBack
     ) {
         // NFC SCANNING OPTIONS
-        SettingsSection(title = "NFC scanner options") {
+        SettingsSection(title = stringResource(R.string.loc_nfc_scanner_options)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_nfc_sound),
                 subtitle = stringResource(R.string.settings_nfc_sound_desc),
@@ -55,7 +59,7 @@ fun HardwareSettingsScreen(
         // HARDWARE PROTOCOLS & TIPS (COMMENT)
         SettingsInfoCard(icon = Icons.Default.Info) {
             Text(
-                text = "Hardware interfacing protocols",
+                text = stringResource(R.string.loc_hardware_protocols),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -64,9 +68,9 @@ fun HardwareSettingsScreen(
             Text(
                 text = buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)) {
-                        append("NFC sensor activation: ")
+                        append(nfcActivation)
                     }
-                    append("Tap phone against sensor to begin warm-up and transfer encryption keys.")
+                    append(nfcActivationDesc)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -76,9 +80,9 @@ fun HardwareSettingsScreen(
             Text(
                 text = buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)) {
-                        append("Bluetooth Low Energy (BLE): ")
+                        append(bleHeading)
                     }
-                    append("Continuous readings are decrypted directly by Juggluco every minute without re-scanning.")
+                    append(bleDesc)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -86,7 +90,7 @@ fun HardwareSettingsScreen(
             )
 
             Text(
-                text = "If NFC scans fail to register, verify that your phone's NFC toggle is switched on in Android System Settings and remove thick metal cases that might shield the internal antenna.",
+                text = stringResource(R.string.loc_nfc_troubleshoot),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                 lineHeight = 18.sp

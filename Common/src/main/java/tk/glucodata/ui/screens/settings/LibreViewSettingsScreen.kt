@@ -75,9 +75,9 @@ fun LibreViewSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // UPLOAD SERVICE TOGGLE
-        SettingsSection(title = "Cloud synchronization") {
+        SettingsSection(title = stringResource(R.string.loc_cloud_sync)) {
             SettingsSwitchRow(
-                title = "Automatic cloud upload",
+                title = stringResource(R.string.loc_automatic_cloud_upload),
                 subtitle = stringResource(R.string.settings_libreview_desc),
                 icon = Icons.Default.CloudSync,
                 checked = exchanges.libreViewEnabled,
@@ -86,7 +86,7 @@ fun LibreViewSettingsScreen(
         }
 
         // ACCOUNT CREDENTIALS
-        SettingsSection(title = "Account credentials") {
+        SettingsSection(title = stringResource(R.string.loc_account_credentials)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -113,7 +113,7 @@ fun LibreViewSettingsScreen(
                         IconButton(onClick = { showPassword = !showPassword }) {
                             Icon(
                                 imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = "Toggle password"
+                                contentDescription = stringResource(R.string.loc_action_toggle_password)
                             )
                         }
                     },
@@ -125,7 +125,7 @@ fun LibreViewSettingsScreen(
                 OutlinedTextField(
                     value = accountId,
                     onValueChange = { accountId = it },
-                    label = { Text("Account / Patient ID (Optional)") },
+                    label = { Text(stringResource(R.string.loc_account_patient_id)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -134,7 +134,7 @@ fun LibreViewSettingsScreen(
 
             SettingsSwitchRow(
                 title = stringResource(R.string.sendamounts),
-                subtitle = "Upload logged carbs and insulin doses along with glucose stream",
+                subtitle = stringResource(R.string.loc_upload_amounts_desc),
                 icon = Icons.Default.CloudUpload,
                 checked = sendAmounts,
                 onCheckedChange = {
@@ -163,9 +163,9 @@ fun LibreViewSettingsScreen(
                                     accountId.toLongOrNull()?.let { Natives.setlibreAccountIDnumber(it) }
                                 }
                                 Natives.setSendNumbers(sendAmounts)
-                                Toast.makeText(context, "LibreView credentials saved", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_libreview_saved), Toast.LENGTH_SHORT).show()
                             } catch (e: Throwable) {
-                                Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_error_saving, e.message), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -180,9 +180,9 @@ fun LibreViewSettingsScreen(
                         onClick = {
                             try {
                                 Natives.wakelibreview(0)
-                                Toast.makeText(context, "LibreView upload started in background", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_libreview_upload_started), Toast.LENGTH_SHORT).show()
                             } catch (e: Throwable) {
-                                Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_upload_failed, e.message), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -190,7 +190,7 @@ fun LibreViewSettingsScreen(
                     ) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Upload Now")
+                        Text(stringResource(R.string.loc_common_upload_now))
                     }
                 }
             }
@@ -198,7 +198,7 @@ fun LibreViewSettingsScreen(
 
         // INFO
         SettingsInfoCard(
-            text = "LibreView is Abbott's official diabetes cloud platform. Syncing transmits Libre 2 and Libre 3 glucose records so that your clinical care team can view your ambulatory glucose profile (AGP).",
+            text = stringResource(R.string.loc_libreview_info),
             icon = Icons.Default.Info
         )
     }

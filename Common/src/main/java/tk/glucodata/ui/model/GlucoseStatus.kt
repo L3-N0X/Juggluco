@@ -4,15 +4,14 @@ import androidx.annotation.StringRes
 import tk.glucodata.R
 
 enum class GlucoseStatus(
-    val label: String,
     @get:StringRes val labelRes: Int,
     val symbol: String = ""
 ) {
-    VERY_LOW("Urgent Low", R.string.status_very_low, "↓↓"),
-    LOW("Low", R.string.status_low, "↓"),
-    IN_RANGE("In Range", R.string.status_in_range, "✓"),
-    HIGH("High", R.string.status_high, "↑"),
-    VERY_HIGH("Very High", R.string.status_very_high, "↑↑");
+    VERY_LOW(R.string.status_very_low, "↓↓"),
+    LOW(R.string.status_low, "↓"),
+    IN_RANGE(R.string.status_in_range, "✓"),
+    HIGH(R.string.status_high, "↑"),
+    VERY_HIGH(R.string.status_very_high, "↑↑");
 
     companion object {
         fun fromValue(valueMgDl: Float, targetLow: Float = 70f, targetHigh: Float = 180f): GlucoseStatus {

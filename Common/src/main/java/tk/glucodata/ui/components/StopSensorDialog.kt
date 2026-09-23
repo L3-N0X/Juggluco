@@ -36,9 +36,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import tk.glucodata.R
 import tk.glucodata.ui.model.SensorDetail
 import tk.glucodata.ui.theme.LocalClinicalColors
 
@@ -64,11 +66,11 @@ fun StopSensorDialog(
                 )
             },
             title = {
-                Text(text = "End Sensor Session?", fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.sensor_end_session_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 Text(
-                    text = "Are you sure you want to end ${sensor.name} (Serial: ${sensor.id})?\n\nFreeStyle Libre and CGM sensors cannot be restarted once permanently ended.",
+                    text = stringResource(R.string.sensor_end_session_confirm, sensor.name, sensor.id),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -82,12 +84,12 @@ fun StopSensorDialog(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = clinicalColors.veryLow)
                 ) {
-                    Text("Yes, End Sensor")
+                    Text(stringResource(R.string.sensor_yes_end))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showConfirmEnd = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -95,7 +97,7 @@ fun StopSensorDialog(
         AlertDialog(
             onDismissRequest = onDismiss,
             title = {
-                Text(text = "Sensor Options", fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.sensor_options_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(
@@ -111,13 +113,13 @@ fun StopSensorDialog(
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
-                                text = sensor.sensorTypeName,
+                                text = sensor.sensorTypeName ?: stringResource(R.string.cgm_sensor),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Serial: ${sensor.id} • Status: ${sensor.status.label}",
+                                text = stringResource(R.string.sensor_serial_status, sensor.id, stringResource(sensor.status.labelRes)),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -150,13 +152,13 @@ fun StopSensorDialog(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "Pause / Disconnect Bluetooth",
+                                    text = stringResource(R.string.sensor_pause_disconnect),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Pauses Bluetooth connection without ending the sensor. You can reconnect anytime.",
+                                    text = stringResource(R.string.sensor_pause_disconnect_desc),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -187,13 +189,13 @@ fun StopSensorDialog(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "End & Replace Sensor",
+                                    text = stringResource(R.string.sensor_end_replace),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = clinicalColors.veryLow
                                 )
                                 Text(
-                                    text = "Ends current wear session and prepares Juggluco for a new sensor.",
+                                    text = stringResource(R.string.sensor_end_replace_desc),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -204,7 +206,7 @@ fun StopSensorDialog(
             },
             confirmButton = {
                 TextButton(onClick = onDismiss) {
-                    Text("Close")
+                    Text(stringResource(R.string.closename))
                 }
             }
         )

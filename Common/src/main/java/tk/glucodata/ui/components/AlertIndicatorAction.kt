@@ -25,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
+import tk.glucodata.R
 import tk.glucodata.alerts.AlertPlayer
 import tk.glucodata.alerts.AlertStatus
 import tk.glucodata.alerts.AlertStore
@@ -56,26 +58,29 @@ fun AlertIndicatorAction(onOpenAlertSettings: () -> Unit, showWhenIdle: Boolean 
                 IconButton(onClick = { AlertPlayer.dismiss() }) {
                     Icon(
                         imageVector = Icons.Default.NotificationsActive,
-                        contentDescription = "Dismiss ${state.ringingName ?: "alert"}",
+                        contentDescription = stringResource(
+                            R.string.alert_dismiss_named,
+                            state.ringingName ?: stringResource(R.string.alarm)
+                        ),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.graphicsLayer { rotationZ = swing }
                     )
                 }
             }
             AlertStatus.ACTIVE -> IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Outlined.Notifications, contentDescription = "Alerts on")
+                Icon(Icons.Outlined.Notifications, contentDescription = stringResource(R.string.alerts_on))
             }
             AlertStatus.SNOOZED -> IconButton(onClick = { menuOpen = true }) {
                 Icon(
                     Icons.Default.NotificationsPaused,
-                    contentDescription = "Alerts snoozed",
+                    contentDescription = stringResource(R.string.alerts_snoozed),
                     tint = MaterialTheme.colorScheme.tertiary
                 )
             }
             AlertStatus.OFF -> IconButton(onClick = { menuOpen = true }) {
                 Icon(
                     Icons.Default.NotificationsOff,
-                    contentDescription = "Alerts off",
+                    contentDescription = stringResource(R.string.alerts_off),
                     tint = MaterialTheme.colorScheme.outline
                 )
             }
@@ -88,30 +93,33 @@ fun AlertIndicatorAction(onOpenAlertSettings: () -> Unit, showWhenIdle: Boolean 
             }
             when (state.status) {
                 AlertStatus.ACTIVE -> {
-                    listOf(30 to "Snooze 30 min", 60 to "Snooze 1 h", 120 to "Snooze 2 h", 480 to "Snooze 8 h").forEach { (minutes, label) ->
-                        DropdownMenuItem(text = { Text(label) }, onClick = { act { AlertStore.snoozeAll(minutes) } })
+                    listOf(30, 60, 120, 480).forEach { minutes ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.snooze_minutes_short, minutes)) },
+                            onClick = { act { AlertStore.snoozeAll(minutes) } }
+                        )
                     }
                     DropdownMenuItem(
-                        text = { Text("Turn alerts off") },
+                        text = { Text(stringResource(R.string.alerts_turn_off)) },
                         onClick = { act { AlertStore.updateSettings { it.copy(enabled = false) } } }
                     )
                 }
                 AlertStatus.SNOOZED -> {
                     DropdownMenuItem(
-                        text = { Text("Snoozed until ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(state.snoozedUntil))}") },
+                        text = { Text(stringResource(R.string.alerts_snoozed_until, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(state.snoozedUntil)))) },
                         onClick = {},
                         enabled = false
                     )
-                    DropdownMenuItem(text = { Text("Resume alerts") }, onClick = { act { AlertStore.snoozeAll(0) } })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.alerts_resume)) }, onClick = { act { AlertStore.snoozeAll(0) } })
                 }
                 AlertStatus.OFF -> DropdownMenuItem(
-                    text = { Text("Turn alerts on") },
+                    text = { Text(stringResource(R.string.alerts_turn_on)) },
                     onClick = { act { AlertStore.updateSettings { it.copy(enabled = true) } } }
                 )
                 AlertStatus.RINGING -> {}
             }
             HorizontalDivider()
-            DropdownMenuItem(text = { Text("Alert settings") }, onClick = { act(onOpenAlertSettings) })
+            DropdownMenuItem(text = { Text(stringResource(R.string.alerts_settings)) }, onClick = { act(onOpenAlertSettings) })
         }
     }
 }

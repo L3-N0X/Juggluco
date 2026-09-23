@@ -89,10 +89,14 @@ fun CurrentGlucoseHeroCard(
         val sign = if (deltaMgDl >= 0) "+" else ""
         val numStr = when (unit) {
             GlucoseUnit.MG_DL -> "$sign${deltaMgDl.toInt()}"
-            GlucoseUnit.MMOL_L -> "$sign${String.format(java.util.Locale.US, "%.1f", deltaMgDl * unit.factor)}"
+            GlucoseUnit.MMOL_L -> "$sign${String.format(java.util.Locale.getDefault(), "%.1f", deltaMgDl * unit.factor)}"
         }
-        val intervalSuffix = if (deltaCalculation == DeltaCalculation.FIVE_MINUTES) " (5m)" else ""
-        if (!minimalistUnits) "$numStr ${unit.label}$intervalSuffix" else "$numStr$intervalSuffix"
+        val intervalSuffix = if (deltaCalculation == DeltaCalculation.FIVE_MINUTES) {
+            stringResource(R.string.delta_five_minutes_suffix)
+        } else {
+            ""
+        }
+        if (!minimalistUnits) "$numStr ${stringResource(unit.labelRes)}$intervalSuffix" else "$numStr$intervalSuffix"
     } else null
 
     Column(
@@ -118,7 +122,7 @@ fun CurrentGlucoseHeroCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Sensors,
-                        contentDescription = "Sensor",
+                        contentDescription = stringResource(R.string.sensor_content_description),
                         tint = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp)
                     )
@@ -178,7 +182,7 @@ fun CurrentGlucoseHeroCard(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = unit.label,
+                    text = stringResource(unit.labelRes),
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = if (minimalistUnits) 11.sp else 14.sp,
                     fontWeight = if (minimalistUnits) FontWeight.Normal else FontWeight.Medium,
@@ -197,7 +201,7 @@ fun CurrentGlucoseHeroCard(
                     if (isConnected && trendArrow != TrendArrow.UNKNOWN) {
                         Icon(
                             imageVector = Icons.Default.ArrowForward,
-                            contentDescription = trendArrow.label,
+                            contentDescription = stringResource(trendArrow.labelRes),
                             tint = statusColor,
                             modifier = Modifier
                                 .size(30.dp)

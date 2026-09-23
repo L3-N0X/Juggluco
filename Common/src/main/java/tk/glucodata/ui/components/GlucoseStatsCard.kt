@@ -50,7 +50,7 @@ fun GlucoseStatsCard(
 ) {
     val clinicalColors = LocalClinicalColors.current
     val hasData = stats.readingsCount > 0 && stats.averageMgDl > 0f
-    val glucoseUnitLabel = if (!minimalistUnits) unit.label else ""
+    val glucoseUnitLabel = if (!minimalistUnits) stringResource(unit.labelRes) else ""
 
     Column(
         modifier = modifier.fillMaxWidth()
@@ -150,7 +150,7 @@ fun GlucoseStatsCard(
                 )
                 StatTile(
                     title = stringResource(R.string.stat_gmi),
-                    value = if (stats.estimatedA1c > 0) String.format(java.util.Locale.US, "%.1f", stats.estimatedA1c) else "—",
+                    value = if (stats.estimatedA1c > 0) String.format(java.util.Locale.getDefault(), "%.1f", stats.estimatedA1c) else "—",
                     unit = if (stats.estimatedA1c > 0) "%" else "",
                     modifier = Modifier.weight(1f)
                 )

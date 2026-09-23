@@ -60,7 +60,7 @@ fun GlucoseTargetsSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // UNIT SELECTION
-        SettingsSection(title = "Unit") {
+        SettingsSection(title = stringResource(R.string.loc_common_unit)) {
             var expanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
                 expanded = expanded,
@@ -75,14 +75,14 @@ fun GlucoseTargetsSettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = unit.label,
+                            text = stringResource(unit.labelRes),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = if (unit == GlucoseUnit.MG_DL) "e.g. 100" else "e.g. 5.5",
+                            text = stringResource(R.string.loc_example_value, if (unit == GlucoseUnit.MG_DL) GlucoseUnit.MG_DL.format(100f) else GlucoseUnit.MMOL_L.format(5.5f)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -98,13 +98,13 @@ fun GlucoseTargetsSettingsScreen(
                         text = {
                             Column {
                                 Text(
-                                    text = "mg/dL",
+                                    text = stringResource(R.string.mgdL),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "e.g. 100",
+                                    text = stringResource(R.string.loc_example_value, GlucoseUnit.MG_DL.format(100f)),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -128,13 +128,13 @@ fun GlucoseTargetsSettingsScreen(
                         text = {
                             Column {
                                 Text(
-                                    text = "mmol/L",
+                                    text = stringResource(R.string.mmolL),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "e.g. 5.5",
+                                    text = stringResource(R.string.loc_example_value, GlucoseUnit.MMOL_L.format(5.5f)),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -159,7 +159,7 @@ fun GlucoseTargetsSettingsScreen(
         }
 
         // TARGET THRESHOLDS
-        SettingsSection(title = "Target range") {
+        SettingsSection(title = stringResource(R.string.loc_target_range)) {
             // Target Low Slider
             Column(
                 modifier = Modifier
@@ -168,14 +168,14 @@ fun GlucoseTargetsSettingsScreen(
             ) {
                 Column {
                     Text(
-                        text = "Low target",
+                        text = stringResource(R.string.loc_low_target),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Default: ${unit.format(70f)}",
+                        text = stringResource(R.string.loc_default_value, unit.format(70f)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -241,14 +241,14 @@ fun GlucoseTargetsSettingsScreen(
             ) {
                 Column {
                     Text(
-                        text = "High target",
+                        text = stringResource(R.string.loc_high_target),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Default: ${unit.format(180f)}",
+                        text = stringResource(R.string.loc_default_value, unit.format(180f)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -304,7 +304,12 @@ fun GlucoseTargetsSettingsScreen(
 
         // CLINICAL GUIDANCE
         SettingsInfoCard(
-            text = "Consensus target range is ${unit.format(70f)}–${unit.format(180f)} ${unit.label} with a goal of >70% time in range.",
+            text = stringResource(
+                R.string.target_range_consensus,
+                unit.format(70f),
+                unit.format(180f),
+                stringResource(unit.labelRes)
+            ),
             icon = Icons.Default.Info
         )
     }

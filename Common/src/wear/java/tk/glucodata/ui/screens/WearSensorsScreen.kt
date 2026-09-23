@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -30,6 +31,7 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.material3.TitleCard
+import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.SensorState
 import tk.glucodata.ui.theme.LocalClinicalColors
@@ -122,7 +124,7 @@ fun WearSensorsScreen(
                                     style = MaterialTheme.typography.titleSmall
                                 )
                                 Text(
-                                    text = sensor.state.label,
+                                    text = stringResource(sensor.state.labelRes),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (sensor.state == SensorState.ACTIVE) clinical.inRange else clinical.low
                                 )

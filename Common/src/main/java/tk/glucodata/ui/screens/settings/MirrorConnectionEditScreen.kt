@@ -60,9 +60,10 @@ fun MirrorConnectionEditScreen(
     val existingConn = connections.find { it.index == connectionIndex }
 
     val isEditing = existingConn != null
+    val localProductionLabel = stringResource(R.string.loc_local_production_app)
 
-    var label by remember(existingConn) {
-        mutableStateOf(existingConn?.label ?: if (connectionIndex < 0) "Local Production App" else "")
+    var label by remember(existingConn, localProductionLabel) {
+        mutableStateOf(existingConn?.label ?: if (connectionIndex < 0) localProductionLabel else "")
     }
     var hostIp by remember(existingConn) {
         mutableStateOf(existingConn?.ips?.firstOrNull() ?: "127.0.0.1")
@@ -85,14 +86,14 @@ fun MirrorConnectionEditScreen(
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val screenTitle = if (isEditing) "Edit mirror connection" else "Add mirror connection"
+    val screenTitle = stringResource(if (isEditing) R.string.loc_mirror_edit_title else R.string.loc_mirror_edit_add)
 
     SettingsDetailScaffold(
         title = screenTitle,
         onNavigateBack = onNavigateBack
     ) {
         // IDENTIFICATION & HOST
-        SettingsSection(title = "Target host & network address") {
+        SettingsSection(title = stringResource(R.string.loc_target_host_network)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -101,8 +102,8 @@ fun MirrorConnectionEditScreen(
                 OutlinedTextField(
                     value = label,
                     onValueChange = { label = it },
-                    label = { Text("Connection Label") },
-                    placeholder = { Text("e.g. Local Production App or Caregiver Phone") },
+                    label = { Text(stringResource(R.string.loc_connection_label)) },
+                    placeholder = { Text(stringResource(R.string.loc_connection_label_example)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -116,7 +117,7 @@ fun MirrorConnectionEditScreen(
                     OutlinedTextField(
                         value = hostIp,
                         onValueChange = { hostIp = it },
-                        label = { Text("Target IP / Hostname") },
+                        label = { Text(stringResource(R.string.loc_target_ip_hostname)) },
                         singleLine = true,
                         modifier = Modifier.weight(1.4f)
                     )
@@ -124,7 +125,7 @@ fun MirrorConnectionEditScreen(
                     OutlinedTextField(
                         value = port,
                         onValueChange = { port = it },
-                        label = { Text("Port") },
+                        label = { Text(stringResource(R.string.port)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(0.9f)
@@ -152,7 +153,7 @@ fun MirrorConnectionEditScreen(
         }
 
         // ROLE & PROTOCOL
-        SettingsSection(title = "Device role & synchronized data") {
+        SettingsSection(title = stringResource(R.string.loc_device_role_data)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -167,46 +168,43 @@ fun MirrorConnectionEditScreen(
                     FilterChip(
                         selected = isReceiver,
                         onClick = { isReceiver = true },
-                        label = { Text("Receiver (Dev Mode / Secondary)", fontSize = 12.sp) }
+                        label = { Text(stringResource(R.string.loc_receiver_role), fontSize = 12.sp) }
                     )
                     FilterChip(
                         selected = !isReceiver,
                         onClick = { isReceiver = false },
-                        label = { Text("Sender (Production / Paired)", fontSize = 12.sp) }
+                        label = { Text(stringResource(R.string.loc_sender_role), fontSize = 12.sp) }
                     )
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = if (isReceiver)
-                        "Receiver connects to production to receive live glucose streams without touching Bluetooth."
-                    else
-                        "Sender pushes live CGM readings, scans, and amounts to secondary peers or dev builds.",
+                    text = stringResource(if (isReceiver) R.string.loc_receiver_role_desc else R.string.loc_sender_role_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             SettingsSwitchRow(
-                title = "Continuous glucose stream",
-                subtitle = "Sync minute-by-minute sensor curve points",
+                title = stringResource(R.string.loc_continuous_stream),
+                subtitle = stringResource(R.string.loc_continuous_stream_desc),
                 icon = Icons.Default.Timeline,
                 checked = sendStream,
                 onCheckedChange = { sendStream = it }
             )
 
             SettingsSwitchRow(
-                title = "Manual NFC scans",
-                subtitle = "Sync NFC scan events and fingerstick tests",
+                title = stringResource(R.string.loc_manual_nfc_scans),
+                subtitle = stringResource(R.string.loc_manual_nfc_scans_desc),
                 icon = Icons.Default.Nfc,
                 checked = sendScans,
                 onCheckedChange = { sendScans = it }
             )
 
             SettingsSwitchRow(
-                title = "Insulin & carb amounts",
-                subtitle = "Sync logged boluses, basal doses, and meals",
+                title = stringResource(R.string.loc_insulin_carb_amounts),
+                subtitle = stringResource(R.string.loc_insulin_carb_amounts_desc),
                 icon = Icons.Default.Sync,
                 checked = sendAmounts,
                 onCheckedChange = { sendAmounts = it }
@@ -215,7 +213,7 @@ fun MirrorConnectionEditScreen(
 
         // DIAGNOSTICS
         if (existingConn != null && existingConn.status.isNotBlank()) {
-            SettingsSection(title = "Connection status & diagnostics") {
+            SettingsSection(title = stringResource(R.string.loc_connection_diagnostics)) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -235,7 +233,7 @@ fun MirrorConnectionEditScreen(
         }
 
         // ACTIONS
-        SettingsSection(title = "Actions") {
+        SettingsSection(title = stringResource(R.string.loc_common_actions)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -249,7 +247,7 @@ fun MirrorConnectionEditScreen(
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
-                                text = "Are you sure you want to delete this connection?",
+                                text = stringResource(R.string.loc_delete_connection_confirm),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onErrorContainer
@@ -269,7 +267,7 @@ fun MirrorConnectionEditScreen(
                                         if (connectionIndex >= 0) {
                                             repository.deleteMirrorConnection(connectionIndex)
                                         }
-                                        Toast.makeText(context, "Connection deleted", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.loc_connection_deleted), Toast.LENGTH_SHORT).show()
                                         onNavigateBack()
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -301,7 +299,7 @@ fun MirrorConnectionEditScreen(
                                 val cleanPort = port.trim()
                                 val portNum = cleanPort.toIntOrNull()
                                 if (portNum == null || portNum !in 1024..65535) {
-                                    Toast.makeText(context, "Invalid port (must be between 1024 and 65535)", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.loc_invalid_mirror_port), Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
 
@@ -317,10 +315,10 @@ fun MirrorConnectionEditScreen(
                                 )
 
                                 if (ok) {
-                                    Toast.makeText(context, "Connection saved successfully", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.loc_connection_saved), Toast.LENGTH_SHORT).show()
                                     onNavigateBack()
                                 } else {
-                                    Toast.makeText(context, "Failed to save connection", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.loc_failed_save_connection), Toast.LENGTH_SHORT).show()
                                 }
                             },
                             modifier = Modifier.weight(1.2f),
@@ -337,7 +335,7 @@ fun MirrorConnectionEditScreen(
 
         // HELP
         SettingsInfoCard(
-            text = "For side-by-side local relay testing, set the target IP to 127.0.0.1 and target port to your production app's listen port (default 17580). This dev build will receive all live glucose data without needing a physical sensor connection.",
+            text = stringResource(R.string.loc_mirror_testing_info),
             icon = Icons.Default.Info
         )
     }

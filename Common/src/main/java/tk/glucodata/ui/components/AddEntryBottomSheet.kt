@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogType
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,11 +85,11 @@ fun AddEntryBottomSheet(
                         label = {
                             Text(
                                 text = when (type) {
-                                    LogType.RAPID_INSULIN -> "Bolus"
-                                    LogType.CARBS -> "Carbs"
-                                    LogType.BLOOD_GLUCOSE -> "Finger Prick"
-                                    LogType.BASAL_INSULIN -> "Basal"
-                                    else -> type.label
+                                    LogType.RAPID_INSULIN -> stringResource(R.string.log_short_bolus)
+                                    LogType.CARBS -> stringResource(R.string.log_short_carbs)
+                                    LogType.BLOOD_GLUCOSE -> stringResource(R.string.log_type_finger_prick)
+                                    LogType.BASAL_INSULIN -> stringResource(R.string.log_short_basal)
+                                    else -> stringResource(type.labelRes)
                                 }
                             )
                         }
@@ -100,10 +101,10 @@ fun AddEntryBottomSheet(
 
             // Value Input Field
             val valueLabel = when (selectedType) {
-                LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> "Insulin Units (U)"
-                LogType.CARBS, LogType.MEAL -> "Carbohydrates (grams)"
-                LogType.BLOOD_GLUCOSE -> "Blood Glucose (${unit.label})"
-                LogType.NOTE -> "Amount"
+                LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> stringResource(R.string.log_value_insulin_units)
+                LogType.CARBS, LogType.MEAL -> stringResource(R.string.log_value_carbohydrates_grams)
+                LogType.BLOOD_GLUCOSE -> stringResource(R.string.log_value_blood_glucose, stringResource(unit.labelRes))
+                LogType.NOTE -> stringResource(R.string.log_value_amount)
             }
 
             OutlinedTextField(
@@ -135,13 +136,13 @@ fun AddEntryBottomSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     presets.forEach { presetVal ->
-                        val presetLabel = if (selectedType == LogType.CARBS) "${presetVal.toInt()}g"
-                        else if (selectedType == LogType.RAPID_INSULIN || selectedType == LogType.BASAL_INSULIN) "${presetVal.toInt()} U"
-                        else presetVal.toString()
+                        val presetLabel = if (selectedType == LogType.CARBS) stringResource(R.string.log_value_carbs, presetVal.toInt().toString())
+                        else if (selectedType == LogType.RAPID_INSULIN || selectedType == LogType.BASAL_INSULIN) stringResource(R.string.log_value_insulin, presetVal.toInt().toString())
+                        else String.format(Locale.getDefault(), "%.1f", presetVal)
 
                         OutlinedButton(
                             onClick = {
-                                valueText = if (presetVal % 1 == 0f) presetVal.toInt().toString() else presetVal.toString()
+                                valueText = if (presetVal % 1 == 0f) presetVal.toInt().toString() else String.format(Locale.getDefault(), "%.1f", presetVal)
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             shape = RoundedCornerShape(8.dp)
@@ -183,7 +184,7 @@ fun AddEntryBottomSheet(
             OutlinedTextField(
                 value = noteText,
                 onValueChange = { noteText = it },
-                label = { Text("Note (e.g. Oatmeal, Salad, Workout)") },
+                label = { Text(stringResource(R.string.log_note_example)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)

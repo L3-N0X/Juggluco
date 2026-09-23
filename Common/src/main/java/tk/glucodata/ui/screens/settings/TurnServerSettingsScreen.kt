@@ -78,7 +78,7 @@ fun TurnServerSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // TURN SERVER ENDPOINT
-        SettingsSection(title = "Relay server endpoint") {
+        SettingsSection(title = stringResource(R.string.loc_turn_endpoint)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -87,8 +87,8 @@ fun TurnServerSettingsScreen(
                 OutlinedTextField(
                     value = hostname,
                     onValueChange = { hostname = it },
-                    label = { Text("Server Hostname / IP") },
-                    placeholder = { Text("e.g. turn.example.com") },
+                    label = { Text(stringResource(R.string.loc_server_hostname)) },
+                    placeholder = { Text(stringResource(R.string.loc_hostname_example)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -98,7 +98,7 @@ fun TurnServerSettingsScreen(
                 OutlinedTextField(
                     value = port,
                     onValueChange = { port = it },
-                    label = { Text("TURN Port") },
+                    label = { Text(stringResource(R.string.loc_turn_port)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -107,7 +107,7 @@ fun TurnServerSettingsScreen(
         }
 
         // TURN CREDENTIALS
-        SettingsSection(title = "Authentication credentials") {
+        SettingsSection(title = stringResource(R.string.loc_authentication_credentials)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -116,7 +116,7 @@ fun TurnServerSettingsScreen(
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Username") },
+                    label = { Text(stringResource(R.string.loc_username)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -126,14 +126,14 @@ fun TurnServerSettingsScreen(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Password") },
+                    label = { Text(stringResource(R.string.password)) },
                     singleLine = true,
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showPassword = !showPassword }) {
                             Icon(
                                 imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = "Toggle password"
+                                contentDescription = stringResource(R.string.loc_action_toggle_password)
                             )
                         }
                     },
@@ -150,7 +150,7 @@ fun TurnServerSettingsScreen(
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
-                                text = "Delete configured TURN server?",
+                                text = stringResource(R.string.loc_delete_turn_title),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onErrorContainer
@@ -169,10 +169,10 @@ fun TurnServerSettingsScreen(
                                     onClick = {
                                         try {
                                             Natives.deleteTurnServer(0)
-                                            Toast.makeText(context, "TURN server removed", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.loc_turn_removed), Toast.LENGTH_SHORT).show()
                                             onNavigateBack()
                                         } catch (e: Throwable) {
-                                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.loc_error_with_detail, e.message), Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -193,11 +193,11 @@ fun TurnServerSettingsScreen(
                         onClick = {
                             val p = port.toIntOrNull()
                             if (hostname.isBlank()) {
-                                Toast.makeText(context, "Please enter a valid hostname", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_valid_hostname), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             if (p == null || p !in 1..65535) {
-                                Toast.makeText(context, "Port must be between 1 and 65535", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_turn_port_range), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
 
@@ -206,10 +206,10 @@ fun TurnServerSettingsScreen(
                                 Natives.setTurnPort(0, p)
                                 Natives.setTurnUser(0, username.trim())
                                 Natives.setTurnPassword(0, password)
-                                Toast.makeText(context, "TURN server configuration saved", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_turn_saved), Toast.LENGTH_SHORT).show()
                                 onNavigateBack()
                             } catch (e: Throwable) {
-                                Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.loc_error_saving, e.message), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -227,7 +227,7 @@ fun TurnServerSettingsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete",
+                                contentDescription = stringResource(R.string.loc_action_delete),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -239,7 +239,7 @@ fun TurnServerSettingsScreen(
 
         // INFO
         SettingsInfoCard(
-            text = "A Traversal Using Relays around NAT (TURN) server allows two Juggluco devices to synchronize when direct TCP connection is prevented by symmetric NAT, corporate firewalls, or cellular carrier isolation.",
+            text = stringResource(R.string.loc_turn_info),
             icon = Icons.Default.Info
         )
     }

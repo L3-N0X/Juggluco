@@ -1,13 +1,17 @@
 package tk.glucodata.ui.model
 
-enum class GlucoseUnit(val label: String, val factor: Double) {
-    MG_DL("mg/dL", 1.0),
-    MMOL_L("mmol/L", 1.0 / 18.0182);
+import androidx.annotation.StringRes
+import tk.glucodata.R
+import java.util.Locale
 
-    fun format(valueMgDl: Float): String {
+enum class GlucoseUnit(@StringRes val labelRes: Int, val symbol: String, val factor: Double) {
+    MG_DL(R.string.mgdL, "mg/dL", 1.0),
+    MMOL_L(R.string.mmolL, "mmol/L", 1.0 / 18.0182);
+
+    fun format(valueMgDl: Float, locale: Locale = Locale.getDefault()): String {
         return when (this) {
-            MG_DL -> valueMgDl.toInt().toString()
-            MMOL_L -> String.format(java.util.Locale.US, "%.1f", valueMgDl * factor)
+            MG_DL -> String.format(locale, "%.0f", valueMgDl)
+            MMOL_L -> String.format(locale, "%.1f", valueMgDl * factor)
         }
     }
 
@@ -20,10 +24,10 @@ enum class GlucoseUnit(val label: String, val factor: Double) {
         }
     }
 
-    fun formatRate(rateMgDlPerMin: Float): String {
+    fun formatRate(rateMgDlPerMin: Float, locale: Locale = Locale.getDefault()): String {
         return when (this) {
-            MG_DL -> String.format(java.util.Locale.US, "%.1f", rateMgDlPerMin)
-            MMOL_L -> String.format(java.util.Locale.US, "%.2f", rateMgDlPerMin * factor)
+            MG_DL -> String.format(locale, "%.1f", rateMgDlPerMin)
+            MMOL_L -> String.format(locale, "%.2f", rateMgDlPerMin * factor)
         }
     }
 

@@ -126,7 +126,7 @@ fun WearGlucoseHero(
             horizontalArrangement = Arrangement.Center
         ) {
             Text(
-                text = unit.label,
+                text = unit.symbol,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

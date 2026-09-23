@@ -53,7 +53,7 @@ fun VoiceSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // SPOKEN ANNOUNCEMENTS
-        SettingsSection(title = "Spoken announcements") {
+        SettingsSection(title = stringResource(R.string.loc_spoken_announcements)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.dialog_speak_new_readings),
                 subtitle = stringResource(R.string.dialog_speak_new_readings_desc),
@@ -78,10 +78,10 @@ fun VoiceSettingsScreen(
         }
 
         // VOICE TUNING
-        SettingsSection(title = "Voice modulation") {
+        SettingsSection(title = stringResource(R.string.loc_voice_modulation)) {
             SettingsSliderRow(
                 title = stringResource(R.string.dialog_speech_rate),
-                valueText = String.format("%.1fx", speechSpeed),
+                valueText = String.format(java.util.Locale.getDefault(), "%.1f×", speechSpeed),
                 icon = Icons.Default.Speed,
                 value = speechSpeed,
                 onValueChange = {
@@ -93,7 +93,7 @@ fun VoiceSettingsScreen(
 
             SettingsSliderRow(
                 title = stringResource(R.string.dialog_voice_pitch),
-                valueText = String.format("%.1fx", speechPitch),
+                valueText = String.format(java.util.Locale.getDefault(), "%.1f×", speechPitch),
                 icon = Icons.Default.MusicNote,
                 value = speechPitch,
                 onValueChange = {
@@ -105,10 +105,10 @@ fun VoiceSettingsScreen(
         }
 
         // ACTIONS
-        SettingsSection(title = "Actions") {
+        SettingsSection(title = stringResource(R.string.loc_common_actions)) {
             SettingsActionRow(
-                title = "Test voice synthesis",
-                subtitle = "Speak a test phrase using current rate and pitch",
+                title = stringResource(R.string.loc_test_voice),
+                subtitle = stringResource(R.string.loc_test_voice_desc),
                 icon = Icons.Default.PlayArrow,
                 onClick = {
                     try {
@@ -117,31 +117,31 @@ fun VoiceSettingsScreen(
                             if (status == android.speech.tts.TextToSpeech.SUCCESS) {
                                 tts?.setSpeechRate(speechSpeed)
                                 tts?.setPitch(speechPitch)
-                                tts?.speak("Glucose 105, trending stable", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "test_speech")
+                                tts?.speak(context.getString(R.string.loc_test_phrase), android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "test_speech")
                             }
                         }
                     } catch (_: Throwable) {
-                        Toast.makeText(context, "Voice test triggered", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.loc_voice_test_triggered), Toast.LENGTH_SHORT).show()
                     }
                 }
             )
 
             SettingsActionRow(
-                title = "Reset default voice settings",
-                subtitle = "Reset speech speed (1.0x) and pitch (1.0x) to normal",
+                title = stringResource(R.string.loc_reset_voice),
+                subtitle = stringResource(R.string.loc_reset_voice_desc),
                 icon = Icons.Default.Refresh,
                 onClick = {
                     speechSpeed = 1.0f
                     speechPitch = 1.0f
                     saveVoiceSettings()
-                    Toast.makeText(context, "Voice reset to defaults", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.loc_voice_reset), Toast.LENGTH_SHORT).show()
                 }
             )
         }
 
         // INFO
         SettingsInfoCard(
-            text = "Juggluco uses Android's built-in Text-to-Speech (TTS) engine. Readings are pronounced whenever a new glucose point arrives via Bluetooth stream or NFC scan.",
+            text = stringResource(R.string.loc_voice_info),
             icon = Icons.Default.Info
         )
     }

@@ -77,16 +77,16 @@ private fun adjustThreshold(current: Float, delta: Float, spec: ThresholdSpec): 
 
 internal fun formatThreshold(value: Float, spec: ThresholdSpec, unit: GlucoseUnit): String {
     val number = if (spec.decimals == 1) {
-        String.format(java.util.Locale.US, "%.1f", value)
+        String.format(java.util.Locale.getDefault(), "%.1f", value)
     } else {
         value.roundToInt().toString()
     }
-    return "$number ${unit.label}"
+    return "$number ${unit.symbol}"
 }
 
 private fun formatStep(step: Float, spec: ThresholdSpec): String {
     return if (spec.decimals == 1) {
-        String.format(java.util.Locale.US, "%.1f", step).trimEnd('0').trimEnd('.')
+        String.format(java.util.Locale.getDefault(), "%.1f", step).trimEnd('0').trimEnd('.')
             .let { if (it.startsWith(".")) "0$it" else it }
     } else {
         step.roundToInt().toString()

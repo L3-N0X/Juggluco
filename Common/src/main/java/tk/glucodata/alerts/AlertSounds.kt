@@ -3,22 +3,23 @@ package tk.glucodata.alerts
 import android.content.Context
 import android.media.RingtoneManager
 import android.net.Uri
+import androidx.annotation.StringRes
 import tk.glucodata.R
 
 /** Sounds shipped with the app, addressed as `android.resource://` URIs. */
 object AlertSounds {
-    data class BuiltIn(val key: String, val label: String, val resId: Int)
+    data class BuiltIn(val key: String, @StringRes val labelRes: Int, val resId: Int)
 
     val builtIns: List<BuiltIn> = listOf(
-        BuiltIn("verylow", "Very low", R.raw.verylow),
-        BuiltIn("siren", "Siren", R.raw.siren),
-        BuiltIn("lowsoon", "Low soon", R.raw.lowsoon),
-        BuiltIn("classic", "Classic", R.raw.classic),
-        BuiltIn("highsoon", "High soon", R.raw.highsoon),
-        BuiltIn("veryhigh", "Very high", R.raw.veryhigh),
-        BuiltIn("elves", "Elves", R.raw.elves),
-        BuiltIn("ghost", "Ghost", R.raw.ghost),
-        BuiltIn("nudge", "Nudge", R.raw.nudge)
+        BuiltIn("verylow", R.string.loc_sound_very_low, R.raw.verylow),
+        BuiltIn("siren", R.string.loc_sound_siren, R.raw.siren),
+        BuiltIn("lowsoon", R.string.loc_sound_low_soon, R.raw.lowsoon),
+        BuiltIn("classic", R.string.loc_sound_classic, R.raw.classic),
+        BuiltIn("highsoon", R.string.loc_sound_high_soon, R.raw.highsoon),
+        BuiltIn("veryhigh", R.string.loc_sound_very_high, R.raw.veryhigh),
+        BuiltIn("elves", R.string.loc_sound_elves, R.raw.elves),
+        BuiltIn("ghost", R.string.loc_sound_ghost, R.raw.ghost),
+        BuiltIn("nudge", R.string.loc_sound_nudge, R.raw.nudge)
     )
 
     fun uriFor(context: Context, builtIn: BuiltIn): Uri =
@@ -51,10 +52,11 @@ object AlertSounds {
 
     /** Human readable name of the sound an alert plays. */
     fun label(context: Context, rule: AlertRule): String {
-        val uri = rule.soundUri ?: return "${defaultFor(rule).label} (default)"
-        builtIns.firstOrNull { uriFor(context, it).toString() == uri }?.let { return it.label }
+        val default = defaultFor(rule)
+        val uri = rule.soundUri ?: return context.getString(R.string.loc_default_suffix, context.getString(default.labelRes))
+        builtIns.firstOrNull { uriFor(context, it).toString() == uri }?.let { return context.getString(it.labelRes) }
         return runCatching {
             RingtoneManager.getRingtone(context, Uri.parse(uri))?.getTitle(context)
-        }.getOrNull() ?: "Custom sound"
+        }.getOrNull() ?: context.getString(R.string.loc_sound_custom)
     }
 }

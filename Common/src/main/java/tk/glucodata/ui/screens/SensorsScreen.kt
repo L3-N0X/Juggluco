@@ -63,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -76,6 +77,7 @@ import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.model.SensorDetail
 import tk.glucodata.ui.model.SensorStatus
 import tk.glucodata.ui.theme.LocalClinicalColors
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -110,11 +112,15 @@ fun SensorsScreen(
                 onHideToggled = { hidden -> repository.setSensorHidden(activeSensor.sensorPtr, hidden) },
                 onUseAgain = {
                     repository.useSensorAgain(activeSensor.sensorPtr, context as? Activity)
-                    Toast.makeText(context, "Reconnecting to ${activeSensor.name}...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.sensor_reconnecting, activeSensor.name),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 },
                 onForgetAndRescan = {
                     repository.forgetAndRescan(activeSensor.id)
-                    Toast.makeText(context, "Scanning for Bluetooth CGM devices...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.sensor_scanning_cgm), Toast.LENGTH_SHORT).show()
                 },
                 onOpenCalibration = { showCalibrationDialog = true },
                 onOpenStopSensor = { showStopSensorDialog = true }
@@ -134,7 +140,7 @@ fun SensorsScreen(
         if (previousSensors.isNotEmpty()) {
             Spacer(modifier = Modifier.height(6.dp))
 
-            SectionTitle(text = "Previous Sensors")
+            SectionTitle(text = stringResource(R.string.sensor_previous_sensors))
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 previousSensors.forEach { prev ->
@@ -150,7 +156,11 @@ fun SensorsScreen(
             onDismiss = { showStartSensorDialog = false },
             onTriggerNfcScan = onTriggerNfcScan,
             onSensorActivated = { sensorType ->
-                Toast.makeText(context, "${sensorType.title} activation initiated!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.sensor_activation_initiated, context.getString(sensorType.titleRes)),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         )
     }
@@ -160,11 +170,11 @@ fun SensorsScreen(
             sensor = activeSensor,
             onDismiss = { showStopSensorDialog = false },
             onTemporaryDisconnect = {
-                Toast.makeText(context, "Sensor connection paused", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.sensor_connection_paused), Toast.LENGTH_SHORT).show()
             },
             onEndSensorPermanently = {
                 repository.forgetAndRescan(activeSensor.id)
-                Toast.makeText(context, "Sensor session ended. Ready to start new sensor.", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.sensor_session_ended), Toast.LENGTH_LONG).show()
             }
         )
     }
@@ -176,8 +186,16 @@ fun SensorsScreen(
             calibrationEnabled = displayConfig.calibrationEnabled,
             onDismiss = { showCalibrationDialog = false },
             onSaveCalibration = { mgdl ->
-                repository.addLogEntry(LogType.BLOOD_GLUCOSE, mgdl, "Calibration reference")
-                Toast.makeText(context, "Calibration reference saved: ${unit.format(mgdl)} ${unit.label}", Toast.LENGTH_SHORT).show()
+                repository.addLogEntry(LogType.BLOOD_GLUCOSE, mgdl, context.getString(R.string.calibration_reference_input))
+                Toast.makeText(
+                    context,
+                    context.getString(
+                        R.string.sensor_calibration_reference_saved,
+                        unit.format(mgdl),
+                        context.getString(unit.labelRes)
+                    ),
+                    Toast.LENGTH_SHORT
+                ).show()
                 showCalibrationDialog = false
                 if (repository.shouldPromptCalibrationEnable()) {
                     showEnableCalibrationPrompt = true
@@ -235,13 +253,13 @@ private fun NfcScanBanner(onScanClick: () -> Unit) {
             Spacer(modifier = Modifier.width(14.dp))
             Column {
                 Text(
-                    text = "Scan or Pair New Sensor",
+                    text = stringResource(R.string.sensor_scan_pair_title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Hold phone directly to sensor or pair via Bluetooth",
+                    text = stringResource(R.string.sensor_scan_pair_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -261,7 +279,7 @@ private fun NfcScanBanner(onScanClick: () -> Unit) {
         ) {
             Icon(imageVector = Icons.Default.Sensors, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text(text = "Scan / Start Sensor", fontWeight = FontWeight.SemiBold)
+            Text(text = stringResource(R.string.sensor_scan_start), fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -277,6 +295,7 @@ private fun OverhauledSensorCard(
     onOpenStopSensor: () -> Unit
 ) {
     val clinicalColors = LocalClinicalColors.current
+    val context = LocalContext.current
     var showDiagnostics by remember { mutableStateOf(false) }
     var warmupSliderValue by remember(sensor.warmupMinutes) { mutableFloatStateOf(sensor.warmupMinutes.toFloat()) }
 
@@ -293,13 +312,13 @@ private fun OverhauledSensorCard(
     Column(modifier = Modifier.fillMaxWidth()) {
         // Sensor model & ID
         Text(
-            text = sensor.sensorTypeName,
+            text = sensor.sensorTypeName ?: stringResource(R.string.cgm_sensor),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "ID: ${sensor.id}",
+            text = stringResource(R.string.sensor_id, sensor.id),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -315,16 +334,16 @@ private fun OverhauledSensorCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.Bluetooth,
-                    contentDescription = "Bluetooth Status",
+                    contentDescription = stringResource(R.string.bluetooth_status),
                     tint = statusColor,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = when {
-                        !sensor.isConnected -> sensor.status.label
-                        sensor.isStreaming -> "Connected & Streaming"
-                        else -> "Bluetooth Connected"
+                        !sensor.isConnected -> stringResource(sensor.status.labelRes)
+                        sensor.isStreaming -> stringResource(R.string.sensor_connected_streaming)
+                        else -> stringResource(R.string.sensor_bluetooth_connected)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium,
@@ -337,10 +356,10 @@ private fun OverhauledSensorCard(
                 val lastReadingStr = when {
                     elapsedMin <= 1 -> stringResource(R.string.just_now)
                     elapsedMin < 60 -> stringResource(R.string.min_ago, elapsedMin)
-                    else -> SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(sensor.lastReadingTime))
+                    else -> DateFormat.getTimeInstance(DateFormat.SHORT, Locale.getDefault()).format(Date(sensor.lastReadingTime))
                 }
                 Text(
-                    text = "Reading: $lastReadingStr",
+                    text = stringResource(R.string.sensor_reading_at, lastReadingStr),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -364,7 +383,11 @@ private fun OverhauledSensorCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "${stringResource(R.string.sensor_warmup_gauge)}: ${sensor.warmupRemainingMinutes} min",
+                    text = pluralStringResource(
+                        R.plurals.sensor_warmup_minutes_remaining,
+                        sensor.warmupRemainingMinutes,
+                        sensor.warmupRemainingMinutes
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.tertiary
@@ -403,7 +426,7 @@ private fun OverhauledSensorCard(
                 }
 
                 Text(
-                    text = formatTimeRemaining(sensor.daysRemaining),
+                    text = formatTimeRemaining(context, sensor.daysRemaining),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = if (sensor.daysRemaining > 0f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
@@ -424,7 +447,7 @@ private fun OverhauledSensorCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = getDisplayExpectedEnd(sensor),
+                    text = getDisplayExpectedEnd(context, sensor),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -485,13 +508,13 @@ private fun OverhauledSensorCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "Hide from Glucose Graph",
+                        text = stringResource(R.string.sensor_hide_graph),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Exclude readings from the active graph view",
+                        text = stringResource(R.string.sensor_hide_graph_desc),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -547,7 +570,7 @@ private fun OverhauledSensorCard(
             ) {
                 Icon(imageVector = Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Stop Sensor", fontSize = 14.sp)
+                Text(stringResource(R.string.sensor_stop), fontSize = 14.sp)
             }
         }
 
@@ -566,7 +589,7 @@ private fun OverhauledSensorCard(
                 Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Technical Details & Diagnostics",
+                    text = stringResource(R.string.sensor_technical_details),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -588,9 +611,17 @@ private fun OverhauledSensorCard(
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                DiagField(label = "MAC Address", value = sensor.macAddress ?: "Not paired")
-                DiagField(label = "Sensor Generation", value = "${sensor.sensorGen}")
-                DiagField(label = "Calibration Status", value = if (sensor.hasCalibration) "User Calibrated" else "Factory Calibration")
+                DiagField(
+                    label = stringResource(R.string.sensor_mac_address),
+                    value = sensor.macAddress ?: stringResource(R.string.sensor_not_paired)
+                )
+                DiagField(label = stringResource(R.string.sensor_generation), value = sensor.sensorGen.toString())
+                DiagField(
+                    label = stringResource(R.string.sensor_calibration_status),
+                    value = stringResource(
+                        if (sensor.hasCalibration) R.string.sensor_user_calibrated else R.string.sensor_factory_calibration
+                    )
+                )
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -602,13 +633,17 @@ private fun OverhauledSensorCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Warmup Stabilization Time",
+                            text = stringResource(R.string.sensor_warmup_stabilization),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "${warmupSliderValue.toInt()} min",
+                            text = pluralStringResource(
+                                R.plurals.sensor_minutes_short,
+                                warmupSliderValue.toInt(),
+                                warmupSliderValue.toInt()
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -622,7 +657,7 @@ private fun OverhauledSensorCard(
                         steps = 11
                     )
                     Text(
-                        text = "Default for Libre is 60 min. Adjust only if using specialized sensor configurations.",
+                        text = stringResource(R.string.sensor_warmup_adjustment_help),
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.outline
@@ -742,7 +777,7 @@ fun parseDiagnosticLog(rawText: String): List<DiagnosticItem> {
     return items
 }
 
-private fun getDisplayExpectedEnd(sensor: SensorDetail): String {
+private fun getDisplayExpectedEnd(context: android.content.Context, sensor: SensorDetail): String {
     if (sensor.formattedExpectedEnd.isNotEmpty()) {
         return sensor.formattedExpectedEnd
     }
@@ -753,7 +788,7 @@ private fun getDisplayExpectedEnd(sensor: SensorDetail): String {
         it.label.contains("fin", ignoreCase = true) ||
         it.label.contains("ende", ignoreCase = true)
     }
-    return endItem?.value ?: "14 Days"
+    return endItem?.value ?: context.resources.getQuantityString(R.plurals.day_count, 14, 14)
 }
 
 private fun getDisplayStartTime(sensor: SensorDetail): String? {
@@ -771,7 +806,7 @@ private fun getDisplayStartTime(sensor: SensorDetail): String? {
     return try {
         val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(rawValue.take(10))
         if (parsed != null) {
-            SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()).format(parsed)
+            SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "yEEEMMMd"), Locale.getDefault()).format(parsed)
         } else {
             rawValue.substringBefore(" ")
         }
@@ -780,15 +815,19 @@ private fun getDisplayStartTime(sensor: SensorDetail): String? {
     }
 }
 
-private fun formatTimeRemaining(daysRemaining: Float): String {
-    if (daysRemaining <= 0f) return "Expired"
+private fun formatTimeRemaining(context: android.content.Context, daysRemaining: Float): String {
+    if (daysRemaining <= 0f) return context.getString(R.string.sensor_status_expired)
     val days = daysRemaining.toInt()
     val hours = ((daysRemaining - days) * 24).toInt()
     return when {
-        days > 1 -> "$days days remaining"
-        days == 1 -> if (hours > 0) "1 day, $hours hr remaining" else "1 day remaining"
-        hours > 0 -> "$hours hours remaining"
-        else -> "Less than 1 hour remaining"
+        days > 1 -> context.resources.getQuantityString(R.plurals.sensor_days_remaining, days, days)
+        days == 1 -> if (hours > 0) {
+            context.getString(R.string.sensor_day_hour_remaining, 1, hours)
+        } else {
+            context.resources.getQuantityString(R.plurals.sensor_days_remaining, 1, 1)
+        }
+        hours > 0 -> context.resources.getQuantityString(R.plurals.sensor_hours_remaining, hours, hours)
+        else -> context.getString(R.string.sensor_less_than_hour_remaining)
     }
 }
 
@@ -837,14 +876,14 @@ private fun NoSensorPairedCard(onScanClick: () -> Unit) {
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "No Active CGM Sensor",
+            text = stringResource(R.string.sensor_no_active_cgm),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Hold phone directly to your sensor to scan via NFC, or pair a compatible Bluetooth transmitter to begin streaming continuous readings.",
+            text = stringResource(R.string.sensor_no_active_cgm_desc),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -859,7 +898,7 @@ private fun NoSensorPairedCard(onScanClick: () -> Unit) {
         ) {
             Icon(imageVector = Icons.Default.Nfc, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Scan / Start Sensor", fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.sensor_scan_start), fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -874,24 +913,24 @@ private fun NoSensorPairedCard(onScanClick: () -> Unit) {
         // Guidance on compatible hardware for new users
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "Supported CGM Hardware",
+                text = stringResource(R.string.sensor_supported_hardware),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Juggluco supports direct Bluetooth streaming & NFC scanning with:",
+                text = stringResource(R.string.sensor_supported_hardware_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            DeviceSupportRow(name = "FreeStyle Libre 2 & 3", note = "Direct BLE streaming & NFC scan")
-            DeviceSupportRow(name = "Dexcom G7 / ONE+", note = "Direct Bluetooth transmitter")
-            DeviceSupportRow(name = "SiBionics (GS1 / GS3)", note = "Direct Bluetooth streaming")
-            DeviceSupportRow(name = "Accu-Chek SmartGuide", note = "Direct Bluetooth streaming")
-            DeviceSupportRow(name = "Contour / Accu-Chek Meters", note = "Bluetooth blood glucose check sync")
+            DeviceSupportRow(name = "FreeStyle Libre 2 & 3", note = stringResource(R.string.sensor_support_direct_ble))
+            DeviceSupportRow(name = "Dexcom G7 / ONE+", note = stringResource(R.string.sensor_support_bluetooth_transmitter))
+            DeviceSupportRow(name = "SiBionics (GS1 / GS3)", note = stringResource(R.string.sensor_support_bluetooth_streaming))
+            DeviceSupportRow(name = "Accu-Chek SmartGuide", note = stringResource(R.string.sensor_support_bluetooth_streaming))
+            DeviceSupportRow(name = "Contour / Accu-Chek Meters", note = stringResource(R.string.sensor_support_meter_sync))
         }
     }
 }
@@ -926,7 +965,16 @@ private fun PreviousSensorItem(sensor: SensorDetail) {
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "ID: ${sensor.id} • ${if (sensor.startTime > 0) SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(sensor.startTime)) else "Past wear"}",
+                        text = stringResource(
+                            R.string.sensor_id,
+                            sensor.id
+                        ) + " • ${
+                            if (sensor.startTime > 0) {
+                                SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "MMMd"), Locale.getDefault()).format(Date(sensor.startTime))
+                            } else {
+                                stringResource(R.string.sensor_past_wear)
+                            }
+                        }",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -934,7 +982,7 @@ private fun PreviousSensorItem(sensor: SensorDetail) {
             }
 
             Text(
-                text = sensor.status.label,
+                text = stringResource(sensor.status.labelRes),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -174,7 +175,10 @@ fun ExportScreen(
     ) {
         // Header Info Card
         SettingsInfoCard(
-            text = "${stringResource(R.string.export_glucose_data)}: ${stringResource(R.string.export_screen_desc)}",
+            text = stringResource(
+                R.string.export_glucose_data_description,
+                stringResource(R.string.export_screen_desc)
+            ),
             icon = Icons.Default.Assessment
         )
 
@@ -201,7 +205,7 @@ fun ExportScreen(
                                 selectedPresetDays = days
                                 customDaysText = days.toString()
                             },
-                            label = { Text("$days ${stringResource(R.string.days)}", fontSize = 12.sp) },
+                            label = { Text(pluralStringResource(R.plurals.day_count, days, days), fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -230,7 +234,12 @@ fun ExportScreen(
                         onClick = { isCustomRangeActive = true },
                         label = {
                             Text(
-                                if (isCustomRangeActive) "$customDaysText ${stringResource(R.string.days)}" else stringResource(R.string.timerange_custom),
+                                if (isCustomRangeActive) {
+                                    val days = customDaysText.toFloatOrNull()?.toInt() ?: 0
+                                    pluralStringResource(R.plurals.day_count, days, days)
+                                } else {
+                                    stringResource(R.string.timerange_custom)
+                                },
                                 fontSize = 12.sp,
                                 fontWeight = if (isCustomRangeActive) FontWeight.Bold else FontWeight.Normal
                             )
@@ -338,15 +347,25 @@ fun ExportScreen(
         }
 
         // 4. Summary & Action Button
-        SettingsSection(title = "Summary & export") {
+        SettingsSection(title = stringResource(R.string.export_summary_section)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
+                val dayCount = effectiveDays.toInt()
+                val baseSummary = stringResource(
+                    R.string.export_summary,
+                    stringResource(activeOption.titleRes),
+                    activeOption.fileExtension,
+                    pluralStringResource(R.plurals.day_count, dayCount, dayCount)
+                )
                 Text(
-                    text = "Summary: ${stringResource(activeOption.titleRes)} (${activeOption.fileExtension}) • ${effectiveDays.toInt()} ${stringResource(R.string.days)}" +
-                        if (activeOption.supportsCalibration && isCalibrated) " • ${stringResource(R.string.calibrated)}" else "",
+                    text = if (activeOption.supportsCalibration && isCalibrated) {
+                        stringResource(R.string.export_summary_calibrated, baseSummary, stringResource(R.string.calibrated))
+                    } else {
+                        baseSummary
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
@@ -360,10 +379,22 @@ fun ExportScreen(
                             try {
                                 Dialogs.runExport(activity, selectedTypeIndex, isCalibrated, effectiveDays)
                             } catch (e: Throwable) {
-                                Applic.argToaster(activity, "Export error: ${e.message}", Toast.LENGTH_SHORT)
+                                Applic.argToaster(
+                                    activity,
+                                    context.getString(R.string.export_error, e.message),
+                                    Toast.LENGTH_SHORT
+                                )
                             }
                         } else {
-                            Toast.makeText(context, "Export initialized for ${effectiveDays.toInt()} days", Toast.LENGTH_SHORT).show()
+                            val dayCount = effectiveDays.toInt()
+                            Toast.makeText(
+                                context,
+                                context.getString(
+                                    R.string.export_initialized_days,
+                                    context.resources.getQuantityString(R.plurals.day_count, dayCount, dayCount)
+                                ),
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

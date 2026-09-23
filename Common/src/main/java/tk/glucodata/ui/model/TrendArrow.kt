@@ -1,14 +1,17 @@
 package tk.glucodata.ui.model
 
-enum class TrendArrow(val symbol: String, val angleDegrees: Float, val label: String) {
-    RAPIDLY_RISING("↑↑", -90f, "Rising rapidly"),
-    RISING("↑", -60f, "Rising"),
-    SLIGHTLY_RISING("↗", -30f, "Rising slowly"),
-    STABLE("→", 0f, "Steady"),
-    SLIGHTLY_FALLING("↘", 30f, "Falling slowly"),
-    FALLING("↓", 60f, "Falling"),
-    RAPIDLY_FALLING("↓↓", 90f, "Falling rapidly"),
-    UNKNOWN("—", 0f, "No trend available");
+import androidx.annotation.StringRes
+import tk.glucodata.R
+
+enum class TrendArrow(val symbol: String, val angleDegrees: Float, @StringRes val labelRes: Int) {
+    RAPIDLY_RISING("↑↑", -90f, R.string.trend_rising_rapidly),
+    RISING("↑", -60f, R.string.trend_rising),
+    SLIGHTLY_RISING("↗", -30f, R.string.trend_rising_slowly),
+    STABLE("→", 0f, R.string.trend_steady),
+    SLIGHTLY_FALLING("↘", 30f, R.string.trend_falling_slowly),
+    FALLING("↓", 60f, R.string.trend_falling),
+    RAPIDLY_FALLING("↓↓", 90f, R.string.trend_falling_rapidly),
+    UNKNOWN("—", 0f, R.string.trend_unknown);
 
     companion object {
         fun fromRate(rate: Float): TrendArrow {

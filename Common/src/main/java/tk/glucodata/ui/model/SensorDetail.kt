@@ -1,22 +1,25 @@
 package tk.glucodata.ui.model
 
-enum class SensorStatus(val label: String) {
-    CONNECTED_STREAMING("Connected & Streaming"),
-    CONNECTED_IDLE("Connected"),
-    CONNECTING("Connecting..."),
-    WARMING_UP("Warming Up"),
-    DISCONNECTED("Disconnected"),
-    EXPIRED("Expired"),
-    ENDED("Ended"),
-    HIDDEN("Hidden");
+import androidx.annotation.StringRes
+import tk.glucodata.R
+
+enum class SensorStatus(@StringRes val labelRes: Int) {
+    CONNECTED_STREAMING(R.string.sensor_status_connected_streaming),
+    CONNECTED_IDLE(R.string.sensor_status_connected),
+    CONNECTING(R.string.sensor_status_connecting),
+    WARMING_UP(R.string.sensor_status_warming_up),
+    DISCONNECTED(R.string.sensor_status_disconnected),
+    EXPIRED(R.string.sensor_status_expired),
+    ENDED(R.string.sensor_status_ended),
+    HIDDEN(R.string.sensor_status_hidden);
 }
 
-enum class SignalQuality(val label: String, val bars: Int) {
-    EXCELLENT("Excellent", 4),
-    GOOD("Good", 3),
-    FAIR("Fair", 2),
-    POOR("Poor", 1),
-    LOST("No Signal", 0);
+enum class SignalQuality(@StringRes val labelRes: Int, val bars: Int) {
+    EXCELLENT(R.string.signal_excellent, 4),
+    GOOD(R.string.signal_good, 3),
+    FAIR(R.string.signal_fair, 2),
+    POOR(R.string.signal_poor, 1),
+    LOST(R.string.signal_lost, 0);
 
     companion object {
         fun fromRssi(rssi: Int?): SignalQuality {
@@ -33,11 +36,13 @@ enum class SignalQuality(val label: String, val bars: Int) {
 }
 
 data class ConnectionStep(
-    val title: String,
-    val description: String,
+    @StringRes val titleRes: Int,
+    @StringRes val descriptionRes: Int,
+    val dynamicDescription: String? = null,
     val isCompleted: Boolean,
     val timestamp: Long? = null,
-    val details: String? = null
+    @StringRes val detailsRes: Int,
+    val dynamicDetails: String? = null
 )
 
 data class SensorDetail(
@@ -46,7 +51,7 @@ data class SensorDetail(
     val sensorPtr: Long = 0L,
     val status: SensorStatus = SensorStatus.DISCONNECTED,
     val sensorGen: Int = 3,
-    val sensorTypeName: String = "CGM Sensor",
+    val sensorTypeName: String? = null,
     val macAddress: String? = null,
     val rssi: Int? = null,
     val signalQuality: SignalQuality = SignalQuality.LOST,
@@ -87,7 +92,10 @@ data class SensorDetail(
         get() {
             if (endTime <= 0L) return ""
             return try {
-                java.text.SimpleDateFormat("EEE, MMM d, yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(endTime))
+                java.text.SimpleDateFormat(
+                    android.text.format.DateFormat.getBestDateTimePattern(java.util.Locale.getDefault(), "yEEEMMMdHm"),
+                    java.util.Locale.getDefault()
+                ).format(java.util.Date(endTime))
             } catch (_: Throwable) {
                 ""
             }
@@ -97,7 +105,10 @@ data class SensorDetail(
         get() {
             if (startTime <= 0L) return ""
             return try {
-                java.text.SimpleDateFormat("EEE, MMM d, yyyy", java.util.Locale.getDefault()).format(java.util.Date(startTime))
+                java.text.SimpleDateFormat(
+                    android.text.format.DateFormat.getBestDateTimePattern(java.util.Locale.getDefault(), "yEEEMMMd"),
+                    java.util.Locale.getDefault()
+                ).format(java.util.Date(startTime))
             } catch (_: Throwable) {
                 ""
             }
@@ -117,25 +128,27 @@ data class SensorDetail(
     val connectionPipeline: List<ConnectionStep>
         get() = listOf(
             ConnectionStep(
-                title = "Bluetooth Link",
-                description = if (isConnected) "Connected to device" else "Disconnected",
+                titleRes = R.string.connection_bluetooth_link,
+                descriptionRes = if (isConnected) R.string.connection_connected_device else R.string.sensor_status_disconnected,
                 isCompleted = isConnected,
                 timestamp = if (lastConnectTime > 0) lastConnectTime else null,
-                details = macAddress ?: "Address pending"
+                detailsRes = if (macAddress != null) R.string.sensor_mac_address else R.string.connection_address_pending,
+                dynamicDetails = macAddress
             ),
             ConnectionStep(
-                title = "Security Handshake",
-                description = if (handshakeStatusStr.isNotEmpty()) handshakeStatusStr else "Keys exchanged",
+                titleRes = R.string.connection_security_handshake,
+                descriptionRes = R.string.connection_keys_exchanged,
+                dynamicDescription = handshakeStatusStr.takeIf { it.isNotEmpty() },
                 isCompleted = isConnected && handshakeStatusStr.contains("Fail", ignoreCase = true).not(),
                 timestamp = if (lastHandshakeTime > 0) lastHandshakeTime else null,
-                details = if (sensorGen == 3) "AES-128 Session Established" else "BLE Security Handshake"
+                detailsRes = if (sensorGen == 3) R.string.connection_aes_session else R.string.connection_ble_handshake
             ),
             ConnectionStep(
-                title = "Glucose Data Stream",
-                description = if (isStreaming) "Real-time stream active" else "Stream idle",
+                titleRes = R.string.connection_glucose_stream,
+                descriptionRes = if (isStreaming) R.string.connection_realtime_active else R.string.connection_stream_idle,
                 isCompleted = isStreaming,
                 timestamp = if (lastReadingTime > 0) lastReadingTime else null,
-                details = "Readings delivered every 60s"
+                detailsRes = R.string.connection_readings_interval
             )
         )
 }

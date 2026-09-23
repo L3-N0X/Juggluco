@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,8 +35,8 @@ private fun logSize(read: () -> Long): Long = try {
     -1L
 }
 
-private fun formatLogSize(bytes: Long): String = when {
-    bytes < 0L -> "unavailable"
+private fun formatLogSize(context: android.content.Context, bytes: Long): String = when {
+    bytes < 0L -> context.getString(R.string.dialog_ip_unavailable)
     bytes < 1024L -> "$bytes B"
     bytes < 1024L * 1024L -> String.format(Locale.getDefault(), "%.1f KB", bytes / 1024.0)
     bytes < 1024L * 1024L * 1024L -> String.format(Locale.getDefault(), "%.1f MB", bytes / (1024.0 * 1024.0))
@@ -49,18 +50,20 @@ fun DataSettingsScreen(
     onExportData: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val dateRangeInfo = remember {
         try {
             val oldest = Natives.oldestdatatime()
             val newest = Natives.getendtime()
             if (oldest > 0L && newest > 0L) {
-                val fmt = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+                val pattern = android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "yMMMd")
+                val fmt = SimpleDateFormat(pattern, Locale.getDefault())
                 "${fmt.format(Date(oldest))} — ${fmt.format(Date(newest))}"
             } else {
-                "Active sensor sessions recorded"
+                context.getString(R.string.loc_active_sessions_recorded)
             }
         } catch (_: Throwable) {
-            "Active sensor sessions recorded"
+            context.getString(R.string.loc_active_sessions_recorded)
         }
     }
 
@@ -75,7 +78,7 @@ fun DataSettingsScreen(
         onNavigateBack = onNavigateBack
     ) {
         // EXPORT GLUCOSE DATA
-        SettingsSection(title = "Records & backup") {
+        SettingsSection(title = stringResource(R.string.loc_data_records_backup)) {
             SettingsActionRow(
                 title = stringResource(R.string.settings_export_sensor_data),
                 subtitle = stringResource(R.string.settings_export_sensor_data_desc),
@@ -86,14 +89,14 @@ fun DataSettingsScreen(
                         onClick = onExportData,
                         modifier = Modifier.padding(start = 4.dp)
                     ) {
-                        Text("Export", fontSize = 12.sp)
+                        Text(stringResource(R.string.btn_export_data), fontSize = 12.sp)
                     }
                 }
             )
         }
 
         // LEGACY OPENGL CANVAS
-        SettingsSection(title = "Classic interface") {
+        SettingsSection(title = stringResource(R.string.loc_classic_interface)) {
             SettingsActionRow(
                 title = stringResource(R.string.settings_legacy_canvas),
                 subtitle = stringResource(R.string.settings_legacy_canvas_desc),
@@ -111,9 +114,9 @@ fun DataSettingsScreen(
         }
 
         // STORAGE STATUS
-        SettingsSection(title = "Local database storage") {
+        SettingsSection(title = stringResource(R.string.loc_local_database_storage)) {
             SettingsActionRow(
-                title = "Recorded data span",
+                title = stringResource(R.string.loc_recorded_data_span),
                 subtitle = dateRangeInfo,
                 icon = Icons.Default.Storage
             )
@@ -121,10 +124,10 @@ fun DataSettingsScreen(
 
         // DIAGNOSTIC LOGS
         if (loggingBuild) {
-            SettingsSection(title = "Diagnostic logs") {
+            SettingsSection(title = stringResource(R.string.loc_diagnostic_logs)) {
                 SettingsSwitchRow(
-                    title = "Write debug log",
-                    subtitle = "Juggluco's own trace log, kept to ${formatLogSize(4L * 1024L * 1024L)} plus one rotated copy",
+                    title = stringResource(R.string.loc_write_debug_log),
+                    subtitle = stringResource(R.string.loc_write_debug_log_desc, formatLogSize(context, 4L * 1024L * 1024L)),
                     icon = Icons.Default.BugReport,
                     checked = traceEnabled,
                     onCheckedChange = { enabled ->
@@ -135,7 +138,7 @@ fun DataSettingsScreen(
                 )
                 SettingsActionRow(
                     title = "trace.log",
-                    subtitle = formatLogSize(traceBytes),
+                    subtitle = formatLogSize(context, traceBytes),
                     icon = Icons.Default.Description,
                     trailingContent = {
                         OutlinedButton(
@@ -150,8 +153,8 @@ fun DataSettingsScreen(
                     }
                 )
                 SettingsSwitchRow(
-                    title = "Capture system log",
-                    subtitle = "Runs logcat in the background and rotates it at ${formatLogSize(8L * 1024L * 1024L)}",
+                    title = stringResource(R.string.loc_capture_system_log),
+                    subtitle = stringResource(R.string.loc_capture_system_log_desc, formatLogSize(context, 8L * 1024L * 1024L)),
                     icon = Icons.Default.BugReport,
                     checked = logcatEnabled,
                     onCheckedChange = { enabled ->
@@ -162,7 +165,7 @@ fun DataSettingsScreen(
                 )
                 SettingsActionRow(
                     title = "logcat.txt",
-                    subtitle = formatLogSize(logcatBytes),
+                    subtitle = formatLogSize(context, logcatBytes),
                     icon = Icons.Default.Description,
                     trailingContent = {
                         OutlinedButton(
@@ -181,7 +184,7 @@ fun DataSettingsScreen(
 
         // INFO
         SettingsInfoCard(
-            text = "Juggluco stores all sensor data locally in high-performance binary database files on your internal storage. Your health records never leave your phone without your explicit configuration.",
+            text = stringResource(R.string.loc_data_privacy_info),
             icon = Icons.Default.Info
         )
     }

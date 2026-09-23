@@ -1576,7 +1576,8 @@ class GlucoseRepository(
         label: Int = -1,
         under: Float = 0f,
         above: Float = 0f,
-        keyword: String = ""
+        keyword: String = "",
+        typeLabels: Map<LogType, String> = emptyMap()
     ): List<Long> {
         val matches = mutableListOf<Long>()
 
@@ -1602,7 +1603,7 @@ class GlucoseRepository(
             }
             val keywordMatches = if (keyword.isNotEmpty()) {
                 (log.note?.contains(keyword, ignoreCase = true) == true) ||
-                    log.type.label.contains(keyword, ignoreCase = true)
+                    typeLabels[log.type]?.contains(keyword, ignoreCase = true) == true
             } else true
 
             if (categoryMatches && keywordMatches) {

@@ -68,14 +68,14 @@ object AppLanguageManager {
             }
             val systemName = match?.nativeName ?: systemLocale.displayLanguage
             val defaultStr = context.getString(R.string.settings_language_system_default)
-            return if (!systemName.isNullOrEmpty()) "$defaultStr ($systemName)" else defaultStr
+            return if (!systemName.isNullOrEmpty()) context.getString(R.string.loc_system_language_with_name, defaultStr, systemName) else defaultStr
         }
         val lang = rawLanguages.find { it.code.equals(code, ignoreCase = true) }
         return if (lang != null) {
             if (lang.nativeName.equals(lang.englishName, ignoreCase = true)) {
                 lang.nativeName
             } else {
-                "${lang.nativeName} (${lang.englishName})"
+                context.getString(R.string.loc_language_with_english, lang.nativeName, lang.englishName)
             }
         } else {
             code
@@ -83,7 +83,7 @@ object AppLanguageManager {
     }
 
     fun getLanguageBadge(code: String): String {
-        if (code.isEmpty()) return "Auto"
+        if (code.isEmpty()) return Applic.getContext().getString(R.string.loc_auto)
         return code.uppercase(Locale.US)
     }
 
