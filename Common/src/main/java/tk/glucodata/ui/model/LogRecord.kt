@@ -15,6 +15,16 @@ enum class LogType(@StringRes val labelRes: Int, val unitLabel: String) {
     NOTE(R.string.log_type_note, "");
 }
 
+enum class NumberStore(val nativeIndex: Int) {
+    WATCH(0),
+    HERE(1)
+}
+
+data class NumberStoreSource(
+    val store: NumberStore,
+    val position: Int
+)
+
 private val idGenerator = AtomicLong(System.currentTimeMillis())
 
 data class LogRecord(
@@ -22,7 +32,9 @@ data class LogRecord(
     val timestamp: Long,
     val type: LogType,
     val value: Float,
-    val note: String = ""
+    val note: String = "",
+    val nativeSource: NumberStoreSource? = null,
+    val mealPointer: Int = 0
 ) {
     fun formattedValue(context: Context, unit: GlucoseUnit): String {
         val locale = Locale.getDefault()

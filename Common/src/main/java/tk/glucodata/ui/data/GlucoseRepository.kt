@@ -46,6 +46,8 @@ import tk.glucodata.ui.model.HardwareConfig
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.model.MirrorConnection
+import tk.glucodata.ui.model.NumberStore
+import tk.glucodata.ui.model.NumberStoreSource
 import tk.glucodata.ui.model.SensorDetail
 import tk.glucodata.ui.model.SensorInfo
 import tk.glucodata.ui.model.SensorState
@@ -656,43 +658,89 @@ class GlucoseRepository(
             normalized.contains("Messages (Wear OS MessageClient)=true", ignoreCase = true)
     }
 
+    private fun numberStorePointer(store: NumberStore): Long? {
+        val index = store.nativeIndex
+        if (index < 0 || index >= numio.numptrs.size) return null
+        return numio.numptrs[index].takeIf { it != 0L }
+    }
+
+    private fun nativeType(label: Int): LogType = when (label) {
+        0 -> LogType.RAPID_INSULIN
+        1 -> LogType.CARBS
+        2 -> LogType.BASAL_INSULIN
+        3 -> LogType.BLOOD_GLUCOSE
+        else -> LogType.NOTE
+    }
+
+    private fun nativeLabel(type: LogType): Int = when (type) {
+        LogType.RAPID_INSULIN -> 0
+        LogType.CARBS, LogType.MEAL -> 1
+        LogType.BASAL_INSULIN -> 2
+        LogType.BLOOD_GLUCOSE -> 3
+        LogType.NOTE -> 4
+    }
+
+    private fun sameSource(first: LogRecord, second: LogRecord): Boolean {
+        val firstSource = first.nativeSource
+        val secondSource = second.nativeSource
+        return firstSource != null && firstSource == secondSource
+    }
+
+    private fun matchesNativeEntry(
+        item: tk.glucodata.nums.item,
+        entry: LogRecord
+    ): Boolean {
+        return item.time == entry.timestamp / 1000L &&
+            item.value == entry.value &&
+            item.label == nativeLabel(entry.type)
+    }
+
+    private fun syncNumberStore(store: NumberStore) {
+        if (!Applic.isWearable) {
+            try {
+                Applic.app?.numdata?.changedback(store.nativeIndex)
+            } catch (_: Throwable) {}
+        }
+    }
+
     private fun loadLogsFromNative() {
-        var logList = ArrayList<LogRecord>()
-        try {
-            if (Applic.Nativesloaded && numio.numptrs.isNotEmpty() && numio.numptrs[0] != 0L) {
-                val ptr = numio.numptrs[0]
-                val first = Natives.getfirstNum(ptr)
-                val last = Natives.getlastNum(ptr)
-                for (pos in first..last) {
-                    val itm = Natives.getNumitem(ptr, pos)
-                    if (itm != null && itm.time > 0) {
-                        val type = when (itm.label) {
-                            0 -> LogType.RAPID_INSULIN
-                            1 -> LogType.CARBS
-                            2 -> LogType.BASAL_INSULIN
-                            3 -> LogType.BLOOD_GLUCOSE
-                            else -> LogType.NOTE
-                        }
+        val logList = ArrayList<LogRecord>()
+        if (Applic.Nativesloaded) {
+            for (store in NumberStore.values()) {
+                try {
+                    val ptr = numberStorePointer(store) ?: continue
+                    val resolvedStore = NumberStore.values().firstOrNull {
+                        it.nativeIndex == Natives.getNumindex(ptr)
+                    } ?: continue
+                    val first = Natives.getfirstNum(ptr)
+                    val last = Natives.getlastNum(ptr)
+                    for (pos in first until last) {
+                        val itm = Natives.getNumitem(ptr, pos) ?: continue
+                        if (itm.time <= 0) continue
                         logList.add(
                             LogRecord(
-                                id = itm.time * 1000L + pos,
                                 timestamp = itm.time * 1000L,
-                                type = type,
-                                value = itm.value
+                                type = nativeType(itm.label),
+                                value = itm.value,
+                                nativeSource = NumberStoreSource(resolvedStore, pos),
+                                mealPointer = itm.mealptr
                             )
                         )
                     }
-                }
+                } catch (_: Throwable) {}
             }
-        } catch (_: Throwable) {}
+        }
 
-        logList.sortByDescending { it.timestamp }
+        logList.sortWith(
+            compareByDescending<LogRecord> { it.timestamp }
+                .thenByDescending { it.nativeSource?.store?.nativeIndex ?: -1 }
+                .thenByDescending { it.nativeSource?.position ?: -1 }
+        )
         _logs.value = logList
     }
 
     fun addLogEntry(type: LogType, value: Float, note: String, timestamp: Long = System.currentTimeMillis()) {
         val entry = LogRecord(
-            id = System.nanoTime(),
             timestamp = timestamp,
             type = type,
             value = value,
@@ -702,37 +750,82 @@ class GlucoseRepository(
 
         scope.launch(Dispatchers.IO) {
             try {
-                if (Applic.Nativesloaded && numio.numptrs.isNotEmpty() && numio.numptrs[0] != 0L) {
-                    val labelCode = when (type) {
-                        LogType.RAPID_INSULIN -> 0
-                        LogType.CARBS -> 1
-                        LogType.BASAL_INSULIN -> 2
-                        LogType.BLOOD_GLUCOSE -> 3
-                        LogType.MEAL -> 1
-                        LogType.NOTE -> 4
+                if (Applic.Nativesloaded) {
+                    val store = NumberStore.HERE
+                    val ptr = numberStorePointer(store)
+                    if (ptr != null) {
+                        Natives.saveNum(ptr, timestamp / 1000L, value, nativeLabel(type), 0)
+                        syncNumberStore(store)
+                        loadLogsFromNative()
                     }
-                    Natives.saveNum(numio.numptrs[0], timestamp / 1000L, value, labelCode, 0)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun updateLogEntry(
+        entry: LogRecord,
+        type: LogType,
+        value: Float,
+        timestamp: Long = entry.timestamp
+    ) {
+        val source = entry.nativeSource
+        if (source == null) {
+            _logs.value = _logs.value.map {
+                if (it.id == entry.id) it.copy(type = type, value = value, timestamp = timestamp) else it
+            }
+            return
+        }
+
+        _logs.value = _logs.value.map {
+            if (sameSource(it, entry)) it.copy(type = type, value = value, timestamp = timestamp) else it
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    val ptr = numberStorePointer(source.store)
+                    val itm = ptr?.let { Natives.getNumitem(it, source.position) }
+                    if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
+                        val hitPtr = Natives.mkhitptr(ptr, source.position)
+                        if (hitPtr != 0L) {
+                            try {
+                                Natives.hitchange(
+                                    hitPtr,
+                                    timestamp / 1000L,
+                                    value,
+                                    nativeLabel(type),
+                                    entry.mealPointer
+                                )
+                            } finally {
+                                Natives.freehitptr(hitPtr)
+                            }
+                            syncNumberStore(source.store)
+                        }
+                    }
+                    loadLogsFromNative()
                 }
             } catch (_: Throwable) {}
         }
     }
 
     fun deleteLogEntry(entry: LogRecord) {
-        _logs.value = _logs.value.filterNot { it.id == entry.id }
+        val source = entry.nativeSource
+        if (source == null) {
+            _logs.value = _logs.value.filterNot { it.id == entry.id }
+            return
+        }
+
+        _logs.value = _logs.value.filterNot { sameSource(it, entry) }
         scope.launch(Dispatchers.IO) {
             try {
-                if (Applic.Nativesloaded && numio.numptrs.isNotEmpty() && numio.numptrs[0] != 0L) {
-                    val ptr = numio.numptrs[0]
-                    val first = Natives.getfirstNum(ptr)
-                    val last = Natives.getlastNum(ptr)
-                    val targetSec = entry.timestamp / 1000L
-                    for (pos in first..last) {
-                        val itm = Natives.getNumitem(ptr, pos)
-                        if (itm != null && itm.time == targetSec) {
-                            Natives.removeNum(ptr, pos)
-                            break
-                        }
+                if (Applic.Nativesloaded) {
+                    val ptr = numberStorePointer(source.store)
+                    val itm = ptr?.let { Natives.getNumitem(it, source.position) }
+                    if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
+                        Natives.removeNum(ptr, source.position)
+                        syncNumberStore(source.store)
                     }
+                    loadLogsFromNative()
                 }
             } catch (_: Throwable) {}
         }
