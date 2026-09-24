@@ -30,6 +30,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import tk.glucodata.BleMirror
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.WearWatchDevice
@@ -118,6 +122,9 @@ fun WatchSettingsScreen(
                         },
                         onEnterNumsChanged = { watchNums ->
                             repository.setWatchEnterNums(device.id, watchNums, device.isDirectSensor, device.isGalaxy)
+                        },
+                        onTransportChanged = { transport ->
+                            repository.setWatchTransport(device.id, device.mirrorIndex, transport)
                         },
                         onInitWatch = {
                             repository.initWatchApp(device.id, device.isGalaxy)
@@ -304,6 +311,7 @@ private fun WearDeviceCard(
     device: WearWatchDevice,
     onDirectSensorChanged: (Boolean) -> Unit,
     onEnterNumsChanged: (Boolean) -> Unit,
+    onTransportChanged: (Int) -> Unit,
     onInitWatch: () -> Unit,
     onSync: () -> Unit,
     onResetDefaults: () -> Unit,
@@ -384,6 +392,14 @@ private fun WearDeviceCard(
                 modifier = Modifier.padding(vertical = 0.dp)
             )
 
+            if (device.transport >= 0) {
+                Spacer(modifier = Modifier.height(6.dp))
+                WatchTransportRow(
+                    transport = device.transport,
+                    onTransportChanged = onTransportChanged
+                )
+            }
+
             Spacer(modifier = Modifier.height(14.dp))
 
             // Action buttons
@@ -420,6 +436,47 @@ private fun WearDeviceCard(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(stringResource(R.string.loc_defaults), fontSize = 12.sp)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WatchTransportRow(
+    transport: Int,
+    onTransportChanged: (Int) -> Unit
+) {
+    val options = buildList {
+        add(BleMirror.TRANSPORT_MESSAGES to stringResource(R.string.loc_transport_wear_os))
+        add(BleMirror.TRANSPORT_AUTOMATIC to stringResource(R.string.transport_automatic))
+        add(BleMirror.TRANSPORT_TCP to stringResource(R.string.transport_tcp))
+        // Direct Bluetooth is configured in the mirror editor; only show it when already in use.
+        if (transport == BleMirror.TRANSPORT_BLUETOOTH)
+            add(BleMirror.TRANSPORT_BLUETOOTH to stringResource(R.string.transport_bluetooth))
+    }
+    val description = when (transport) {
+        BleMirror.TRANSPORT_MESSAGES -> R.string.loc_transport_wear_os_desc
+        BleMirror.TRANSPORT_TCP -> R.string.loc_transport_tcp_desc
+        BleMirror.TRANSPORT_BLUETOOTH -> R.string.loc_transport_bluetooth_desc
+        else -> R.string.loc_transport_automatic_desc
+    }
+    SettingsSegmentedRow(
+        title = stringResource(R.string.loc_watch_connection),
+        subtitle = stringResource(description),
+        icon = Icons.Default.Sync
+    ) {
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            options.forEachIndexed { index, (value, label) ->
+                SegmentedButton(
+                    selected = transport == value,
+                    onClick = { if (transport != value) onTransportChanged(value) },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                    label = { Text(label, maxLines = 1) }
+                )
             }
         }
     }

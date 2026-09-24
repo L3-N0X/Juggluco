@@ -1280,7 +1280,8 @@ class GlucoseRepository(
                             mirrorIndex = mirrorIndex,
                             mirrorStatus = status,
                             mirrorIps = ips,
-                            isConnected = isConnected
+                            isConnected = isConnected,
+                            transport = if (mirrorIndex >= 0) WatchBridge.getWatchTransport(mirrorIndex) else -1
                         )
                     )
                 }
@@ -1340,6 +1341,17 @@ class GlucoseRepository(
     fun setWatchEnterNums(watchId: String, watchNums: Boolean, direct: Boolean, isGalaxy: Boolean) {
         scope.launch(Dispatchers.IO) {
             WatchBridge.setWatchEnterNums(watchId, watchNums, direct, isGalaxy)
+            delay(500L)
+            refreshWearDevices()
+        }
+    }
+
+    fun setWatchTransport(watchId: String, mirrorIndex: Int, transport: Int) {
+        _wearDevices.value = _wearDevices.value.map {
+            if (it.id == watchId) it.copy(transport = transport) else it
+        }
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWatchTransport(watchId, mirrorIndex, transport)
             delay(500L)
             refreshWearDevices()
         }

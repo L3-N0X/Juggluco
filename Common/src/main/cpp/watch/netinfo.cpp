@@ -199,7 +199,11 @@ passhost_t * getwearoshost(const bool create,const char *label,bool galaxy,bool 
             }
         }
         
-        int ret=backup->changehost(nrhost,nullptr,nullptr,0,false,defaultport,sendnums, sendstream, sendscans,false, receive,activeonly ,newhost?std::string_view(nullptr,0):backup->getpass(nrhost).data(),0,passiveonly,label,false,true);
+        // New watch rows use the Wear data layer only. Play Services picks
+        // Bluetooth, Wi-Fi or its cloud relay itself, so the link keeps
+        // working away from the home LAN. Remade rows keep their carrier.
+        const int transport=newhost&&!phonepeer?passhost_t::transport_messages:-1;
+        int ret=backup->changehost(nrhost,nullptr,nullptr,0,false,defaultport,sendnums, sendstream, sendscans,false, receive,activeonly ,newhost?std::string_view(nullptr,0):backup->getpass(nrhost).data(),0,passiveonly,label,false,true,false,transport);
     if(ret<0&&ret!=-2) { 
         LOGARTAG("changehost<0");
         return nullptr;

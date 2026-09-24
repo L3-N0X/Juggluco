@@ -1358,6 +1358,12 @@
     <string name="loc_state_active">Aktiv</string>
     <string name="loc_state_inactive">Inaktiv</string>
     <string name="loc_app_id_matching_rule">Regel für übereinstimmende App-IDs:\nDie Wearable DataLayer-Bibliothek von Google Play Services kommuniziert nur zwischen Apps mit identischen Paketnamen und Signaturzertifikaten.\n\nWenn du die Watch-Debug-APK seitlich installiert hast, installiere auch die Debug-APK des Telefons – oder umgekehrt.</string>
+    <string name="loc_watch_connection">Verbindung</string>
+    <string name="loc_transport_wear_os">Wear OS</string>
+    <string name="loc_transport_wear_os_desc">Synchronisiert über Wear OS per Bluetooth, WLAN oder Cloud. Funktioniert auch unterwegs.</string>
+    <string name="loc_transport_automatic_desc">Versucht zuerst das lokale Netzwerk und wechselt zu Wear OS, wenn es nicht erreichbar ist.</string>
+    <string name="loc_transport_tcp_desc">Nur lokales Netzwerk. Die Synchronisierung stoppt, wenn Telefon und Uhr in verschiedenen Netzwerken sind.</string>
+    <string name="loc_transport_bluetooth_desc">Direkte Bluetooth-Verbindung, eingerichtet in den Mirror-Einstellungen.</string>
     <string name="loc_manual_wifi_fallback">Manuelle WLAN-Verbindung als Fallback</string>
     <string name="loc_manual_wifi_desc">Uhr und Telefon über lokalen TCP Mirror per WLAN verbinden, wenn die Wear OS-Suche fehlschlägt</string>
     <string name="loc_connected">Verbunden</string>

@@ -124,7 +124,9 @@ data class WearWatchDevice(
     val mirrorIndex: Int = -1,
     val mirrorStatus: String = "",
     val mirrorIps: List<String> = emptyList(),
-    val isConnected: Boolean = false
+    val isConnected: Boolean = false,
+    /** Mirror carrier (BleMirror.TRANSPORT_*), or -1 while no mirror row exists yet. */
+    val transport: Int = -1
 )
 
 data class WearDiagnosticInfo(

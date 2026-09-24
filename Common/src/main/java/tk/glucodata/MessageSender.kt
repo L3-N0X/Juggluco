@@ -1351,6 +1351,7 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
         if(doLog) {Log.i(LOG_ID, "before new MessageSender");}
         messagesender = MessageSender(app)
         BleMirror.init(app)
+        WatchBridge.migrateWatchesToMessages(app)
         if(retryJob==null) {
             retryJob=scope.launch {
                 while(isActive) {

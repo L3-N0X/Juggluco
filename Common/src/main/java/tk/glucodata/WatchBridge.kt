@@ -37,6 +37,56 @@ object WatchBridge {
         }
     }
 
+    private const val TRANSPORT_PREFS = "wear_transport"
+    private const val MESSAGES_MIGRATED = "messages_default_v1"
+
+    fun getWatchTransport(mirrorIndex: Int): Int {
+        if (mirrorIndex < 0) return BleMirror.TRANSPORT_MESSAGES
+        return try {
+            Natives.getbackuptransport(mirrorIndex)
+        } catch (_: Throwable) {
+            BleMirror.TRANSPORT_AUTOMATIC
+        }
+    }
+
+    /** Saves the carrier locally and sends it to the watch over the existing link. */
+    fun setWatchTransport(label: String, mirrorIndex: Int, transport: Int): Boolean {
+        if (mirrorIndex < 0) return false
+        return try {
+            val bleClient = Natives.getbackupbleclient(mirrorIndex)
+            val applied = Natives.setMirrorTransport(label, transport, bleClient)
+            if (applied)
+                BleMirror.configurationChanged(mirrorIndex, true)
+            applied
+        } catch (th: Throwable) {
+            Log.stack(LOG_ID, th)
+            false
+        }
+    }
+
+    /**
+     * One-time switch of existing Automatic watch rows to Messages. Automatic
+     * prefers TCP to the peer's last LAN address and stalls or flaps when away
+     * from home; Messages always uses the Wear data layer. Runs on phone and
+     * watch so both sides converge even if one was unreachable.
+     */
+    fun migrateWatchesToMessages(context: Context) {
+        val prefs = context.getSharedPreferences(TRANSPORT_PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(MESSAGES_MIGRATED, false)) return
+        try {
+            for (i in 0 until Natives.backuphostNr()) {
+                if (!Natives.isWearOS(i) || Natives.getHostDeactivated(i)) continue
+                if (Natives.getbackuptransport(i) != BleMirror.TRANSPORT_AUTOMATIC) continue
+                val label = Natives.getbackuplabel(i) ?: continue
+                val applied = setWatchTransport(label, i, BleMirror.TRANSPORT_MESSAGES)
+                Log.i(LOG_ID, "Watch mirror $label($i) Automatic -> Messages: $applied")
+            }
+            prefs.edit().putBoolean(MESSAGES_MIGRATED, true).apply()
+        } catch (th: Throwable) {
+            Log.stack(LOG_ID, th)
+        }
+    }
+
     fun getWearNodes(): List<Node> {
         val sender = MessageSender.getMessageSender() ?: return emptyList()
         return sender.nodes?.toList() ?: emptyList()
