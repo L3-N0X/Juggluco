@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
+import tk.glucodata.alerts.AlertEvent
 import tk.glucodata.ui.model.DisplayConfig
 import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.LogRecord
@@ -96,6 +97,25 @@ class GraphEvents(val times: LongArray, val records: List<LogRecord>) {
     }
 }
 
+@Immutable
+class GraphAlertEvents(val times: LongArray, val events: List<AlertEvent>) {
+    val size: Int get() = times.size
+
+    fun firstIndexAtOrAfter(time: Long): Int {
+        var low = 0
+        var high = times.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (times[mid] < time) low = mid + 1 else high = mid
+        }
+        return low
+    }
+
+    companion object {
+        val Empty = GraphAlertEvents(LongArray(0), emptyList())
+    }
+}
+
 /** Everything the canvas needs, precomputed once per data change instead of once per frame. */
 @Immutable
 class GraphRenderData(
@@ -106,6 +126,7 @@ class GraphRenderData(
     val scans: GraphSeries,
     val calibratedScans: GraphSeries,
     val events: GraphEvents,
+    val alertEvents: GraphAlertEvents,
     val oldestTime: Long,
     val newestTime: Long
 ) {
@@ -129,11 +150,15 @@ class GraphRenderData(
         val Empty = GraphRenderData(
             GraphSeries.Empty, GraphSeries.Empty, GraphSeries.Empty,
             GraphSeries.Empty, GraphSeries.Empty, GraphSeries.Empty,
-            GraphEvents.Empty, 0L, 0L
+            GraphEvents.Empty, GraphAlertEvents.Empty, 0L, 0L
         )
 
-        fun build(readings: List<GlucosePoint>, logs: List<LogRecord>): GraphRenderData {
-            if (readings.isEmpty() && logs.isEmpty()) return Empty
+        fun build(
+            readings: List<GlucosePoint>,
+            logs: List<LogRecord>,
+            alertEvents: List<AlertEvent>
+        ): GraphRenderData {
+            if (readings.isEmpty() && logs.isEmpty() && alertEvents.isEmpty()) return Empty
 
             val stream = ArrayList<GlucosePoint>(readings.size)
             val calibratedStream = ArrayList<GlucosePoint>()
@@ -156,14 +181,18 @@ class GraphRenderData(
 
             val sortedLogs = logs.sortedBy { it.timestamp }
             val eventTimes = LongArray(sortedLogs.size) { sortedLogs[it].timestamp }
+            val sortedAlerts = alertEvents.sortedBy { it.timestamp }
+            val alertTimes = LongArray(sortedAlerts.size) { sortedAlerts[it].timestamp }
 
             val oldest = minOf(
                 readings.firstOrNull()?.timestamp ?: Long.MAX_VALUE,
-                sortedLogs.firstOrNull()?.timestamp ?: Long.MAX_VALUE
+                sortedLogs.firstOrNull()?.timestamp ?: Long.MAX_VALUE,
+                sortedAlerts.firstOrNull()?.timestamp ?: Long.MAX_VALUE
             ).takeIf { it != Long.MAX_VALUE } ?: 0L
             val newest = maxOf(
                 readings.lastOrNull()?.timestamp ?: 0L,
-                sortedLogs.lastOrNull()?.timestamp ?: 0L
+                sortedLogs.lastOrNull()?.timestamp ?: 0L,
+                sortedAlerts.lastOrNull()?.timestamp ?: 0L
             )
 
             return GraphRenderData(
@@ -174,6 +203,7 @@ class GraphRenderData(
                 scans = toSeries(scans),
                 calibratedScans = toSeries(calibratedScans),
                 events = GraphEvents(eventTimes, sortedLogs),
+                alertEvents = GraphAlertEvents(alertTimes, sortedAlerts),
                 oldestTime = oldest,
                 newestTime = newest
             )
@@ -211,13 +241,15 @@ class GraphRenderData(
 @Composable
 fun rememberGraphRenderData(
     readings: List<GlucosePoint>,
-    logs: List<LogRecord>
+    logs: List<LogRecord>,
+    alertEvents: List<AlertEvent>
 ): State<GraphRenderData> = produceState(
     initialValue = GraphRenderData.Empty,
     key1 = readings,
-    key2 = logs
+    key2 = logs,
+    key3 = alertEvents
 ) {
-    value = withContext(Dispatchers.Default) { GraphRenderData.build(readings, logs) }
+    value = withContext(Dispatchers.Default) { GraphRenderData.build(readings, logs, alertEvents) }
 }
 
 /** An immutable snapshot of the visible window, safe to use as a key for expensive work. */

@@ -365,3 +365,46 @@ data class AlertRuntime(
         )
     }
 }
+
+data class AlertEvent(
+    val id: String = UUID.randomUUID().toString(),
+    val timestamp: Long,
+    val ruleId: String,
+    val ruleName: String,
+    val kind: AlertKind
+) {
+    fun toJson(): JSONObject = JSONObject()
+        .put("id", id)
+        .put("timestamp", timestamp)
+        .put("ruleId", ruleId)
+        .put("ruleName", ruleName)
+        .put("kind", kind.name)
+
+    companion object {
+        fun fromJson(json: JSONObject): AlertEvent? {
+            val kind = runCatching { AlertKind.valueOf(json.getString("kind")) }.getOrNull() ?: return null
+            val timestamp = json.optLong("timestamp", 0L)
+            if (timestamp <= 0L) return null
+            return AlertEvent(
+                id = json.optString("id").ifEmpty { UUID.randomUUID().toString() },
+                timestamp = timestamp,
+                ruleId = json.optString("ruleId"),
+                ruleName = json.optString("ruleName"),
+                kind = kind
+            )
+        }
+
+        fun listToJson(events: List<AlertEvent>): String =
+            JSONArray().apply { events.forEach { put(it.toJson()) } }.toString()
+
+        fun listFromJson(text: String?): List<AlertEvent> {
+            if (text.isNullOrEmpty()) return emptyList()
+            return runCatching {
+                val array = JSONArray(text)
+                (0 until array.length()).mapNotNull { fromJson(array.getJSONObject(it)) }
+                    .distinctBy { it.id }
+                    .sortedBy { it.timestamp }
+            }.getOrDefault(emptyList())
+        }
+    }
+}

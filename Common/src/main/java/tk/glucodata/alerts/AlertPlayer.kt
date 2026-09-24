@@ -57,6 +57,7 @@ object AlertPlayer {
         val isTest: Boolean,
         /** Raised by the connected phone or watch rather than by this device. */
         val remote: Boolean = false,
+        val eventId: String? = null,
         /** False once sound and vibration ended while the notification stays up. */
         val ringing: Boolean = true
     )
@@ -119,9 +120,11 @@ object AlertPlayer {
         reading: AlertEngine.Reading?,
         lostMinutes: Int = 0,
         isTest: Boolean = false,
-        remote: Boolean = false
+        remote: Boolean = false,
+        eventId: String? = null,
+        eventTime: Long = System.currentTimeMillis()
     ) {
-        val alert = ActiveAlert(rule, reading, lostMinutes, System.currentTimeMillis(), isTest, remote)
+        val alert = ActiveAlert(rule, reading, lostMinutes, eventTime, isTest, remote, eventId)
         _active.value = alert
         handler.post { start(alert) }
     }

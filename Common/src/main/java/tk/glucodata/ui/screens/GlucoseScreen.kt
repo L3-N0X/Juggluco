@@ -72,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.R
+import tk.glucodata.alerts.AlertStore
 import tk.glucodata.ui.components.CurrentGlucoseHeroCard
 import tk.glucodata.ui.components.GlucoseStatsCard
 import tk.glucodata.ui.components.SearchGlucoseDialog
@@ -118,6 +119,8 @@ fun GlucoseScreen(
     val screenStats by repository.screenStats.collectAsState()
     val sensorDetails by repository.sensorDetails.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
+    remember { AlertStore.ensureLoaded() }
+    val alertEvents by AlertStore.events.collectAsState()
     val context = LocalContext.current
 
     val sensorName = sensorDetails.firstOrNull()?.name
@@ -314,6 +317,7 @@ fun GlucoseScreen(
                     targetLow = targetLow,
                     targetHigh = targetHigh,
                     displayConfig = displayConfig,
+                    alertEvents = alertEvents,
                     onLogEntryClicked = { selectedLogForDetail = it },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -434,6 +438,7 @@ fun GlucoseScreen(
                         targetLow = targetLow,
                         targetHigh = targetHigh,
                         displayConfig = displayConfig,
+                        alertEvents = alertEvents,
                         onLogEntryClicked = { selectedLogForDetail = it },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -536,6 +541,7 @@ fun GlucoseScreen(
                     targetLow = targetLow,
                     targetHigh = targetHigh,
                     displayConfig = displayConfig,
+                    alertEvents = alertEvents,
                     onLogEntryClicked = { selectedLogForDetail = it },
                     modifier = Modifier
                         .fillMaxWidth()

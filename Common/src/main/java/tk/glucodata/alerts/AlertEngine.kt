@@ -179,6 +179,13 @@ object AlertEngine {
         (covered + rule).forEach { other ->
             AlertStore.updateRuntime(other.id) { it.copy(lastFired = now, inEpisode = true) }
         }
-        AlertPlayer.play(rule, reading, lostMinutes = lostMinutes)
+        val event = AlertEvent(
+            timestamp = now,
+            ruleId = rule.id,
+            ruleName = rule.name,
+            kind = rule.kind
+        )
+        AlertStore.recordEvent(event)
+        AlertPlayer.play(rule, reading, lostMinutes = lostMinutes, eventId = event.id, eventTime = now)
     }
 }

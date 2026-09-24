@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.UUID
 import tk.glucodata.Applic
 import tk.glucodata.Log
 import tk.glucodata.MessageSender
@@ -50,6 +51,8 @@ object AlertSync {
             .put("rule", alert.rule.toJson())
             .put("lost", alert.lostMinutes)
             .put("test", alert.isTest)
+            .put("eventId", alert.eventId ?: JSONObject.NULL)
+            .put("eventTime", alert.startedAt)
         alert.reading?.let { reading ->
             json.put(
                 "reading", JSONObject()
@@ -125,6 +128,19 @@ object AlertSync {
         val isTest = json.optBoolean("test", false)
         val settings = AlertStore.settings.value
         val now = System.currentTimeMillis()
+        val eventId = json.optString("eventId").ifEmpty { UUID.randomUUID().toString() }
+        val eventTime = json.optLong("eventTime", now)
+        if (!isTest) {
+            AlertStore.recordEvent(
+                AlertEvent(
+                    id = eventId,
+                    timestamp = eventTime,
+                    ruleId = remoteRule.id,
+                    ruleName = remoteRule.name,
+                    kind = remoteRule.kind
+                )
+            )
+        }
         if (!settings.mirrorAlerts || !settings.enabled || (!isTest && settings.isSnoozed(now))) return
 
         // The same alert when the lists are synced; otherwise the local alerts of that kind.
@@ -148,7 +164,15 @@ object AlertSync {
                 displayValue = r.optString("display")
             )
         }
-        AlertPlayer.play(rule, reading, lostMinutes = json.optInt("lost", 0), isTest = isTest, remote = true)
+        AlertPlayer.play(
+            rule,
+            reading,
+            lostMinutes = json.optInt("lost", 0),
+            isTest = isTest,
+            remote = true,
+            eventId = if (isTest) null else eventId,
+            eventTime = eventTime
+        )
     }
 
     private fun receiveSnooze(json: JSONObject) {

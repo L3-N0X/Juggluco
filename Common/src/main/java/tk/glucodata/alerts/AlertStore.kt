@@ -23,6 +23,9 @@ object AlertStore {
     private const val KEY_RULES = "rules"
     private const val KEY_SETTINGS = "settings"
     private const val KEY_RUNTIME = "runtime"
+    private const val KEY_EVENTS = "events"
+    private const val MAX_EVENTS = 2_000
+    private const val MAX_EVENT_AGE_MILLIS = 90L * 24L * 60L * 60L * 1_000L
 
     private val _rules = MutableStateFlow<List<AlertRule>>(emptyList())
     val rules: StateFlow<List<AlertRule>> = _rules.asStateFlow()
@@ -32,6 +35,9 @@ object AlertStore {
 
     private val _runtime = MutableStateFlow<Map<String, AlertRuntime>>(emptyMap())
     val runtime: StateFlow<Map<String, AlertRuntime>> = _runtime.asStateFlow()
+
+    private val _events = MutableStateFlow<List<AlertEvent>>(emptyList())
+    val events: StateFlow<List<AlertEvent>> = _events.asStateFlow()
 
     /** Called after the user changed rules or shared settings on this device. */
     @Volatile
@@ -60,6 +66,7 @@ object AlertStore {
             _rules.value = initial.sortedBy { it.priority }
             _settings.value = AlertSettings.fromJson(prefs.getString(KEY_SETTINGS, null), deviceDefaults)
             _runtime.value = readRuntime()
+            _events.value = readEvents()
             loaded = true
         }
         AlertSync.install()
@@ -160,6 +167,20 @@ object AlertStore {
         updateRuntime(id) { it.copy(snoozedUntil = until) }
     }
 
+    fun recordEvent(event: AlertEvent) {
+        ensureLoaded()
+        synchronized(this) {
+            if (_events.value.any { it.id == event.id }) return
+            val oldestAllowed = System.currentTimeMillis() - MAX_EVENT_AGE_MILLIS
+            val updated = (_events.value + event)
+                .filter { it.timestamp >= oldestAllowed }
+                .sortedBy { it.timestamp }
+                .takeLast(MAX_EVENTS)
+            _events.value = updated
+            runtimePrefs.edit().putString(KEY_EVENTS, AlertEvent.listToJson(updated)).apply()
+        }
+    }
+
     /** Snoozes every alert here and on connected devices; 0 minutes resumes them. */
     fun snoozeAll(minutes: Int) {
         val until = if (minutes > 0) System.currentTimeMillis() + minutes * 60_000L else 0L
@@ -185,6 +206,13 @@ object AlertStore {
             val json = JSONObject(text)
             json.keys().asSequence().associateWith { AlertRuntime.fromJson(json.getJSONObject(it)) }
         }.getOrDefault(emptyMap())
+    }
+
+    private fun readEvents(): List<AlertEvent> {
+        val oldestAllowed = System.currentTimeMillis() - MAX_EVENT_AGE_MILLIS
+        return AlertEvent.listFromJson(runtimePrefs.getString(KEY_EVENTS, null))
+            .filter { it.timestamp >= oldestAllowed }
+            .takeLast(MAX_EVENTS)
     }
 
     /** The starter set for new users: the safety-critical alerts on, the noisy ones off. */
