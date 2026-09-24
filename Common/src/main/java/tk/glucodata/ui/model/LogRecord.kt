@@ -34,6 +34,7 @@ data class LogRecord(
     val value: Float,
     val note: String = "",
     val nativeSource: NumberStoreSource? = null,
+    val nativeLabel: Int? = null,
     val mealPointer: Int = 0
 ) {
     fun formattedValue(context: Context, unit: GlucoseUnit): String {

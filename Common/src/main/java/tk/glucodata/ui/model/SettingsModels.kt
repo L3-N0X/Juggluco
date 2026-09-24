@@ -101,6 +101,7 @@ data class DisplayConfig(
     val minimalistUnits: Boolean = true,
     val deltaCalculation: DeltaCalculation = DeltaCalculation.ONE_MINUTE,
     val calibrationEnabled: Boolean = false,
+    val bloodLabelIndex: Int = -1,
     val calibratePastReadings: Boolean = false,
     val calibrateAllValues: Boolean = false,
     val use24Hour: Boolean = true

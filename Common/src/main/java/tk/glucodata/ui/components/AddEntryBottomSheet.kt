@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -23,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
+import tk.glucodata.ui.model.toStoredLogValue
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -207,7 +211,7 @@ fun AddEntryBottomSheet(
                 Button(
                     onClick = {
                         val rawValue = valueText.replace(',', '.').toFloatOrNull() ?: 0f
-                        val value = if (selectedType == LogType.BLOOD_GLUCOSE) unit.toMgDl(rawValue) else rawValue
+                        val value = toStoredLogValue(selectedType, rawValue, unit)
                         onSave(selectedType, value, noteText)
                         onDismiss()
                     },
@@ -218,4 +222,69 @@ fun AddEntryBottomSheet(
             }
         }
     }
+}
+
+@Composable
+fun EditEntryDialog(
+    entry: LogRecord,
+    unit: GlucoseUnit,
+    onDismiss: () -> Unit,
+    onSave: (Float, String) -> Unit
+) {
+    val displayValue = if (entry.type == LogType.BLOOD_GLUCOSE) unit.toDisplay(entry.value) else entry.value
+    var valueText by remember(entry.id, unit) {
+        mutableStateOf(
+            if (displayValue % 1f == 0f) displayValue.toInt().toString()
+            else String.format(Locale.getDefault(), "%.1f", displayValue)
+        )
+    }
+    var noteText by remember(entry.id) { mutableStateOf(entry.note) }
+    val parsedValue = valueText.replace(',', '.').toFloatOrNull()
+    val valueLabel = when (entry.type) {
+        LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> stringResource(R.string.log_value_insulin_units)
+        LogType.CARBS, LogType.MEAL -> stringResource(R.string.log_value_carbohydrates_grams)
+        LogType.BLOOD_GLUCOSE -> stringResource(R.string.log_value_blood_glucose, stringResource(unit.labelRes))
+        LogType.NOTE -> stringResource(R.string.log_value_amount)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.edit)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = valueText,
+                    onValueChange = { valueText = it },
+                    label = { Text(valueLabel) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    label = { Text(stringResource(R.string.log_note_example)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val displayValue = parsedValue ?: return@Button
+                    onSave(toStoredLogValue(entry.type, displayValue, unit), noteText)
+                    onDismiss()
+                },
+                enabled = parsedValue != null && parsedValue > 0f
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
 }

@@ -74,7 +74,6 @@ import tk.glucodata.ui.components.CalibrationDialog
 import tk.glucodata.ui.components.StartSensorDialog
 import tk.glucodata.ui.components.StopSensorDialog
 import tk.glucodata.ui.data.GlucoseRepository
-import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.model.SensorDetail
 import tk.glucodata.ui.model.SensorStatus
 import tk.glucodata.ui.theme.LocalClinicalColors
@@ -185,21 +184,25 @@ fun SensorsScreen(
             sensorPtr = activeSensor.sensorPtr,
             unit = unit,
             calibrationEnabled = displayConfig.calibrationEnabled,
+            bloodLabelConfigured = displayConfig.bloodLabelIndex >= 0,
             onDismiss = { showCalibrationDialog = false },
             onSaveCalibration = { mgdl ->
-                repository.addLogEntry(LogType.BLOOD_GLUCOSE, mgdl, context.getString(R.string.calibration_reference_input))
-                Toast.makeText(
-                    context,
-                    context.getString(
-                        R.string.sensor_calibration_reference_saved,
-                        unit.format(mgdl),
-                        context.getString(unit.labelRes)
-                    ),
-                    Toast.LENGTH_SHORT
-                ).show()
-                showCalibrationDialog = false
-                if (repository.shouldPromptCalibrationEnable()) {
-                    showEnableCalibrationPrompt = true
+                if (repository.addCalibrationReference(mgdl, context.getString(R.string.calibration_reference_input))) {
+                    Toast.makeText(
+                        context,
+                        context.getString(
+                            R.string.sensor_calibration_reference_saved,
+                            unit.format(mgdl),
+                            context.getString(unit.labelRes)
+                        ),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    showCalibrationDialog = false
+                    if (repository.shouldPromptCalibrationEnable()) {
+                        showEnableCalibrationPrompt = true
+                    }
+                } else {
+                    Toast.makeText(context, R.string.savefailed, Toast.LENGTH_SHORT).show()
                 }
             }
         )

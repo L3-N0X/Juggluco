@@ -45,6 +45,7 @@ fun CalibrationDialog(
     sensorPtr: Long,
     unit: GlucoseUnit,
     calibrationEnabled: Boolean,
+    bloodLabelConfigured: Boolean,
     onDismiss: () -> Unit,
     onSaveCalibration: (Float) -> Unit
 ) {
@@ -103,6 +104,14 @@ fun CalibrationDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                if (!bloodLabelConfigured) {
+                    Text(
+                        text = stringResource(R.string.specifyblood),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
                 if (!calibrationEnabled) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
@@ -124,6 +133,7 @@ fun CalibrationDialog(
                 if (!showAddPoint) {
                     Button(
                         onClick = { showAddPoint = true },
+                        enabled = bloodLabelConfigured,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {

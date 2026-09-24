@@ -87,6 +87,7 @@ fun JugglucoApp(
 
     val systemDark = isSystemInDarkTheme()
     val displayConfig by repository.displayConfig.collectAsState()
+    val unit by repository.unit.collectAsState()
     var isDarkThemeOverride by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val darkTheme = isDarkThemeOverride ?: if (displayConfig.invertColors) true else systemDark
 
@@ -289,25 +290,25 @@ fun JugglucoApp(
                 }
 
                 if (showAddEntrySheet) {
-                    val currentUnit = repository.unit.value
                     AddEntryBottomSheet(
                         sheetState = sheetState,
-                        unit = currentUnit,
+                        unit = unit,
                         onDismiss = { showAddEntrySheet = false },
                         onSave = { type, value, note ->
-                            repository.addLogEntry(type, value, note)
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar(
-                                    context.getString(
-                                        R.string.app_log_saved,
-                                        context.getString(type.labelRes),
-                                         if (type == tk.glucodata.ui.model.LogType.BLOOD_GLUCOSE) {
-                                             currentUnit.format(value)
-                                         } else {
-                                             String.format(Locale.getDefault(), "%.1f", value)
-                                         }
+                            if (repository.addLogEntry(type, value, note)) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        context.getString(
+                                            R.string.app_log_saved,
+                                            context.getString(type.labelRes),
+                                             if (type == tk.glucodata.ui.model.LogType.BLOOD_GLUCOSE) {
+                                                 unit.format(value)
+                                             } else {
+                                                 String.format(Locale.getDefault(), "%.1f", value)
+                                             }
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     )

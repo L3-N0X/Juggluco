@@ -4,6 +4,10 @@ import androidx.annotation.StringRes
 import tk.glucodata.R
 import java.util.Locale
 
+fun toStoredLogValue(type: LogType, displayValue: Float, unit: GlucoseUnit): Float {
+    return if (type == LogType.BLOOD_GLUCOSE) unit.toMgDl(displayValue) else displayValue
+}
+
 enum class GlucoseUnit(@StringRes val labelRes: Int, val symbol: String, val factor: Double) {
     MG_DL(R.string.mgdL, "mg/dL", 1.0),
     MMOL_L(R.string.mmolL, "mmol/L", 1.0 / 18.0182);

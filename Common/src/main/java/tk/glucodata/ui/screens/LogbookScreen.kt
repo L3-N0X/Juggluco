@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Tune
@@ -61,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.R
+import tk.glucodata.ui.components.EditEntryDialog
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogRecord
@@ -95,6 +97,7 @@ fun LogbookScreen(
     var selectedTimeFilter by remember { mutableStateOf(LogbookTimeFilter.TODAY) }
     var customDays by remember { mutableStateOf<Int?>(null) }
     var showCustomRangeDialog by remember { mutableStateOf(false) }
+    var editingEntry by remember { mutableStateOf<LogRecord?>(null) }
 
     val logbookColors = LocalLogbookColors.current
 
@@ -337,6 +340,7 @@ fun LogbookScreen(
                             record = item,
                             unit = unit,
                             minimalistUnits = displayConfig.minimalistUnits,
+                            onEdit = if (item.nativeSource != null) ({ editingEntry = item }) else null,
                             onDelete = {
                                 repository.deleteLogEntry(item)
                                 Toast.makeText(context, context.getString(R.string.log_entry_deleted), Toast.LENGTH_SHORT).show()
@@ -369,6 +373,17 @@ fun LogbookScreen(
             }
         )
     }
+
+    editingEntry?.let { entry ->
+        EditEntryDialog(
+            entry = entry,
+            unit = unit,
+            onDismiss = { editingEntry = null },
+            onSave = { value, note ->
+                repository.updateLogEntry(entry, entry.type, value, note = note)
+            }
+        )
+    }
 }
 
 @Composable
@@ -385,6 +400,7 @@ fun LogItemCard(
     record: LogRecord,
     unit: GlucoseUnit,
     minimalistUnits: Boolean = true,
+    onEdit: (() -> Unit)? = null,
     onDelete: () -> Unit
 ) {
     val locale = Locale.getDefault()
@@ -490,6 +506,17 @@ fun LogItemCard(
         }
 
         Spacer(modifier = Modifier.width(6.dp))
+
+        if (onEdit != null) {
+            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.edit),
+                    tint = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
 
         IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
             Icon(

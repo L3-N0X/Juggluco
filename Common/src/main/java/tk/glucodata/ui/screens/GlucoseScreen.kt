@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.alerts.AlertStore
 import tk.glucodata.ui.components.CurrentGlucoseHeroCard
+import tk.glucodata.ui.components.EditEntryDialog
 import tk.glucodata.ui.components.GlucoseStatsCard
 import tk.glucodata.ui.components.SearchGlucoseDialog
 import tk.glucodata.ui.data.GlucoseRepository
@@ -1118,6 +1119,7 @@ fun LogbookSection(
     val logs by repository.logs.collectAsState()
     val context = LocalContext.current
     var selectedTypeFilter by remember { mutableStateOf<LogType?>(null) }
+    var editingEntry by remember { mutableStateOf<LogRecord?>(null) }
 
     val now = System.currentTimeMillis()
     val isViewingPast = viewStartTime > 0L && viewEndTime > 0L && abs(now - viewEndTime) >= 60_000L
@@ -1294,6 +1296,7 @@ fun LogbookSection(
                         record = logItem,
                         unit = unit,
                         minimalistUnits = minimalistUnits,
+                        onEdit = if (logItem.nativeSource != null) ({ editingEntry = logItem }) else null,
                         onDelete = {
                             repository.deleteLogEntry(logItem)
                             Toast.makeText(context, context.getString(R.string.log_entry_deleted), Toast.LENGTH_SHORT).show()
@@ -1302,6 +1305,17 @@ fun LogbookSection(
                 }
             }
         }
+    }
+
+    editingEntry?.let { entry ->
+        EditEntryDialog(
+            entry = entry,
+            unit = unit,
+            onDismiss = { editingEntry = null },
+            onSave = { value, note ->
+                repository.updateLogEntry(entry, entry.type, value, note = note)
+            }
+        )
     }
 }
 
