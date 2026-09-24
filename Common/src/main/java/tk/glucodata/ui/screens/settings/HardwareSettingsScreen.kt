@@ -40,8 +40,8 @@ fun HardwareSettingsScreen(
                 subtitle = stringResource(R.string.settings_nfc_sound_desc),
                 icon = Icons.Default.Nfc,
                 checked = hardwareConfig.nfcSound,
-                onCheckedChange = {
-                    // Update NFC sound
+                onCheckedChange = { enabled ->
+                    repository.setNfcSound(enabled)
                 }
             )
 
@@ -50,8 +50,8 @@ fun HardwareSettingsScreen(
                 subtitle = stringResource(R.string.settings_nfc_launch_desc),
                 icon = Icons.Default.TouchApp,
                 checked = hardwareConfig.globalScanStartsApp,
-                onCheckedChange = {
-                    // Update global scan
+                onCheckedChange = { enabled ->
+                    repository.setNfcLaunchEnabled(enabled)
                 }
             )
         }

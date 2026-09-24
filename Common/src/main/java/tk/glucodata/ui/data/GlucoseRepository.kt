@@ -1,8 +1,10 @@
 package tk.glucodata.ui.data
 
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -264,6 +266,7 @@ class GlucoseRepository(
                 // Read Hardware
                 _hardwareConfig.value = HardwareConfig(
                     nfcSound = Natives.nfcsound(),
+                    globalScanStartsApp = isNfcLaunchEnabled(),
                     googleScan = try { Natives.getGoogleScan() } catch (_: Throwable) { false },
                     hasNfc = MainActivity.hasnfc
                 )
@@ -851,7 +854,29 @@ class GlucoseRepository(
             try {
                 if (Applic.Nativesloaded) {
                     Natives.setnfcsound(enabled)
+                    Applic.RunOnUiThread {
+                        Applic.getActivity()?.setnfc()
+                    }
                 }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setNfcLaunchEnabled(enabled: Boolean) {
+        _hardwareConfig.value = _hardwareConfig.value.copy(globalScanStartsApp = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                val component = ComponentName(Applic.app, NFC_LAUNCH_COMPONENT)
+                val state = if (enabled) {
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                } else {
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                }
+                Applic.app.packageManager.setComponentEnabledSetting(
+                    component,
+                    state,
+                    PackageManager.DONT_KILL_APP
+                )
             } catch (_: Throwable) {}
         }
     }
@@ -1763,7 +1788,18 @@ class GlucoseRepository(
         }
     }
 
+    private fun isNfcLaunchEnabled(): Boolean {
+        return try {
+            val component = ComponentName(Applic.app, NFC_LAUNCH_COMPONENT)
+            Applic.app.packageManager.getComponentEnabledSetting(component) !=
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        } catch (_: Throwable) {
+            true
+        }
+    }
+
     private companion object {
+        const val NFC_LAUNCH_COMPONENT = "tk.glucodata.glucodata"
         const val CALIBRATION_PREFS = "calibration_prefs"
         const val KEY_CALIBRATION_PROMPT_SHOWN = "calibration_prompt_shown"
         const val UI_PREFS = "ui_prefs"
