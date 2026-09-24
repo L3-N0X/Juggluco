@@ -56,8 +56,8 @@ fun SearchGlucoseDialog(
     var keywordText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableIntStateOf(-1) } // -1: Any, 0: Bolus, 1: Carbs, 2: Basal, 3: BG
 
-    val defaultLow = if (unit == GlucoseUnit.MMOL_L) GlucoseUnit.MMOL_L.format(3.9f) else GlucoseUnit.MG_DL.format(70f)
-    val defaultHigh = if (unit == GlucoseUnit.MMOL_L) GlucoseUnit.MMOL_L.format(10f) else GlucoseUnit.MG_DL.format(180f)
+    val defaultLow = unit.format(70f)
+    val defaultHigh = unit.format(180f)
 
     Dialog(
         onDismissRequest = onDismiss,

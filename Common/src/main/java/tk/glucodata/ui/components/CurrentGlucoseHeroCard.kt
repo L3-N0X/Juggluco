@@ -91,7 +91,7 @@ fun CurrentGlucoseHeroCard(
         val sign = if (deltaMgDl >= 0) "+" else ""
         val numStr = when (unit) {
             GlucoseUnit.MG_DL -> "$sign${deltaMgDl.toInt()}"
-            GlucoseUnit.MMOL_L -> "$sign${String.format(java.util.Locale.getDefault(), "%.1f", deltaMgDl * unit.factor)}"
+            GlucoseUnit.MMOL_L -> "$sign${String.format(java.util.Locale.getDefault(), "%.1f", unit.toDisplay(deltaMgDl))}"
         }
         val intervalSuffix = if (deltaCalculation == DeltaCalculation.FIVE_MINUTES) {
             stringResource(R.string.delta_five_minutes_suffix)

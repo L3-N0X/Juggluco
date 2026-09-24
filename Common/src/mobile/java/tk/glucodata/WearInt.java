@@ -33,6 +33,8 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import tk.glucodata.ui.model.GlucoseUnit;
+
 import static tk.glucodata.Natives.getxDripTrendName;
 import static tk.glucodata.Notify.glucosetimeout;
 
@@ -149,8 +151,8 @@ static private void addgraph(Settings settings,Bundle bundle,long now) {
     bundle.putInt("fuzzer", FUZZER);
     bundle.putLong("start", start);
     bundle.putLong("end", end);
-    float targetlow= Natives.targetlow();
-    float targethigh= Natives.targethigh();
+    float targetlow= Applic.unit == 1 ? GlucoseUnit.MMOL_L.toMgDl(Natives.targetlow()) : Natives.targetlow();
+    float targethigh= Applic.unit == 1 ? GlucoseUnit.MMOL_L.toMgDl(Natives.targethigh()) : Natives.targethigh();
     bundle.putDouble("lowMark", targetlow); 
     bundle.putDouble("highMark", targethigh);
 

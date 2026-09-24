@@ -301,7 +301,11 @@ fun JugglucoApp(
                                     context.getString(
                                         R.string.app_log_saved,
                                         context.getString(type.labelRes),
-                                        String.format(Locale.getDefault(), "%.1f", value)
+                                         if (type == tk.glucodata.ui.model.LogType.BLOOD_GLUCOSE) {
+                                             currentUnit.format(value)
+                                         } else {
+                                             String.format(Locale.getDefault(), "%.1f", value)
+                                         }
                                     )
                                 )
                             }

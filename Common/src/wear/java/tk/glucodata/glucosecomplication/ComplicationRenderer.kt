@@ -32,6 +32,7 @@ import tk.glucodata.R
 import tk.glucodata.Natives
 import tk.glucodata.Notify
 import tk.glucodata.ui.model.GlucoseStatus
+import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.TrendArrow
 import kotlin.math.cos
 import kotlin.math.sin
@@ -120,6 +121,7 @@ object ComplicationRenderer {
         val strGl = Natives.lastglucose()
         val now = System.currentTimeMillis()
         val isMmol = Applic.unit == 1
+        val unit = if (isMmol) GlucoseUnit.MMOL_L else GlucoseUnit.MG_DL
         val defaultVal = if (isMmol) "5.6" else "108"
 
         if (strGl == null || strGl.time <= 0) {
@@ -140,10 +142,10 @@ object ComplicationRenderer {
         } catch (_: Throwable) {
             0f
         }
-        val valMgDl = if (isMmol) rawVal * 18.0182f else rawVal
+        val valMgDl = unit.toMgDl(rawVal)
 
-        val targetLow = Natives.targetlow().let { if (it > 0f) it else 70f }
-        val targetHigh = Natives.targethigh().let { if (it > 0f) it else 180f }
+        val targetLow = unit.toMgDl(Natives.targetlow()).takeIf { it > 0f } ?: 70f
+        val targetHigh = unit.toMgDl(Natives.targethigh()).takeIf { it > 0f } ?: 180f
         val status = GlucoseStatus.fromValue(valMgDl, targetLow, targetHigh)
 
         return ComplicationGlucose(

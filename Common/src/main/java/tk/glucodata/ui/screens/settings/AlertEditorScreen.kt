@@ -482,7 +482,7 @@ private fun LevelRow(
 ) {
     val stepMgdl = if (unit == GlucoseUnit.MMOL_L) unit.toMgDl(0.1f) else 1f
     fun snap(value: Float): Float = if (unit == GlucoseUnit.MMOL_L) {
-        unit.toMgDl(((value * unit.factor) * 10).roundToInt() / 10f)
+        unit.toMgDl((value * 10).roundToInt() / 10f)
     } else {
         value.roundToInt().toFloat()
     }.coerceIn(range.start, range.endInclusive)

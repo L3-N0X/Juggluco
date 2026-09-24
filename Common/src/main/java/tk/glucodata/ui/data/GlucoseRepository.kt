@@ -56,6 +56,7 @@ import tk.glucodata.ui.model.TimeRange
 import tk.glucodata.ui.model.WatchConfig
 import tk.glucodata.ui.model.WearDiagnosticInfo
 import tk.glucodata.ui.model.WearWatchDevice
+import kotlin.math.roundToInt
 
 class GlucoseRepository(
     private val scope: CoroutineScope
@@ -179,11 +180,22 @@ class GlucoseRepository(
 
     fun setUnit(newUnit: GlucoseUnit) {
         _unit.value = newUnit
+        val nativeUnit = if (newUnit == GlucoseUnit.MMOL_L) 1 else 2
         try {
             if (Applic.Nativesloaded) {
-                Natives.setunit(if (newUnit == GlucoseUnit.MMOL_L) 1 else 2)
+                if (Applic.app != null) {
+                    Applic.app.setunit(nativeUnit)
+                } else {
+                    Natives.setunit(nativeUnit)
+                    Applic.unit = nativeUnit
+                }
             }
-        } catch (_: Throwable) {}
+        } catch (_: Throwable) {
+            try {
+                if (Applic.Nativesloaded) Natives.setunit(nativeUnit)
+            } catch (_: Throwable) {}
+            Applic.unit = nativeUnit
+        }
     }
 
     fun setTargetRange(low: Float, high: Float) {
@@ -191,7 +203,8 @@ class GlucoseRepository(
         _targetHigh.value = high
         try {
             if (Applic.Nativesloaded) {
-                Natives.setTargetRange(low, high)
+                val unit = _unit.value
+                Natives.setTargetRange(unit.toDisplay(low), unit.toDisplay(high))
             }
         } catch (_: Throwable) {}
         recalculateStats()
@@ -201,11 +214,17 @@ class GlucoseRepository(
         try {
             if (Applic.Nativesloaded) {
                 val nativeUnit = Natives.getunit()
-                _unit.value = GlucoseUnit.fromNative(nativeUnit)
-                val tLow = Natives.targetlow()
-                val tHigh = Natives.targethigh()
-                if (tLow > 0f) _targetLow.value = tLow
-                if (tHigh > 0f) _targetHigh.value = tHigh
+                val unit = GlucoseUnit.fromNative(nativeUnit)
+                _unit.value = unit
+                if (Applic.app != null && Applic.unit != nativeUnit) {
+                    Applic.app.setunit(nativeUnit)
+                } else {
+                    Applic.unit = nativeUnit
+                }
+                val tLow = unit.toMgDl(Natives.targetlow())
+                val tHigh = unit.toMgDl(Natives.targethigh())
+                if (tLow > 0f) _targetLow.value = tLow.roundToInt().toFloat()
+                if (tHigh > 0f) _targetHigh.value = tHigh.roundToInt().toFloat()
 
                 // Read Alarms (native getters return display-unit values, see
                 // settings.hpp gconvert/tomgperL, so fallbacks are unit-aware)

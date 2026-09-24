@@ -82,7 +82,7 @@ fun GlucoseTargetsSettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = stringResource(R.string.loc_example_value, if (unit == GlucoseUnit.MG_DL) GlucoseUnit.MG_DL.format(100f) else GlucoseUnit.MMOL_L.format(5.5f)),
+                            text = stringResource(R.string.loc_example_value, unit.format(100f)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -134,7 +134,7 @@ fun GlucoseTargetsSettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = stringResource(R.string.loc_example_value, GlucoseUnit.MMOL_L.format(5.5f)),
+                                    text = stringResource(R.string.loc_example_value, GlucoseUnit.MMOL_L.format(100f)),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

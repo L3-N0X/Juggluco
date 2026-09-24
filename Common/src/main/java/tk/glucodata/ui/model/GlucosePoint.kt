@@ -9,10 +9,7 @@ data class GlucosePoint(
     val isCalibrated: Boolean = false,
     val status: GlucoseStatus = GlucoseStatus.fromValue(valueMgDl)
 ) {
-    fun valueIn(unit: GlucoseUnit): Float = when (unit) {
-        GlucoseUnit.MG_DL -> valueMgDl
-        GlucoseUnit.MMOL_L -> (valueMgDl * unit.factor).toFloat()
-    }
+    fun valueIn(unit: GlucoseUnit): Float = unit.toDisplay(valueMgDl)
 
     fun formatted(unit: GlucoseUnit): String = unit.format(valueMgDl)
 }

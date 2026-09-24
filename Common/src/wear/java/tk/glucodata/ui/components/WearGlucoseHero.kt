@@ -65,7 +65,7 @@ fun WearGlucoseHero(
             val prefix = if (diff > 0) "+" else ""
             when (unit) {
                 GlucoseUnit.MG_DL -> "$prefix${diff.toInt()}"
-                GlucoseUnit.MMOL_L -> "$prefix${String.format(java.util.Locale.US, "%.1f", diff * unit.factor)}"
+                GlucoseUnit.MMOL_L -> "$prefix${String.format(java.util.Locale.US, "%.1f", unit.toDisplay(diff))}"
             }
         } else null
     }

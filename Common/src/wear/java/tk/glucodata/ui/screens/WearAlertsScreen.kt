@@ -402,5 +402,4 @@ fun WearAlertEditScreen(
     }
 }
 
-private fun toDisplay(mgdl: Float, unit: GlucoseUnit): Float =
-    if (unit == GlucoseUnit.MMOL_L) (mgdl * unit.factor).toFloat() else mgdl
+private fun toDisplay(mgdl: Float, unit: GlucoseUnit): Float = unit.toDisplay(mgdl)

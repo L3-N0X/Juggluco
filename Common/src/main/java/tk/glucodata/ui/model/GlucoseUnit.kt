@@ -11,7 +11,7 @@ enum class GlucoseUnit(@StringRes val labelRes: Int, val symbol: String, val fac
     fun format(valueMgDl: Float, locale: Locale = Locale.getDefault()): String {
         return when (this) {
             MG_DL -> String.format(locale, "%.0f", valueMgDl)
-            MMOL_L -> String.format(locale, "%.1f", valueMgDl * factor)
+            MMOL_L -> String.format(locale, "%.1f", toDisplay(valueMgDl))
         }
     }
 
@@ -24,10 +24,17 @@ enum class GlucoseUnit(@StringRes val labelRes: Int, val symbol: String, val fac
         }
     }
 
+    fun toDisplay(valueMgDl: Float): Float {
+        return when (this) {
+            MG_DL -> valueMgDl
+            MMOL_L -> (valueMgDl * factor).toFloat()
+        }
+    }
+
     fun formatRate(rateMgDlPerMin: Float, locale: Locale = Locale.getDefault()): String {
         return when (this) {
             MG_DL -> String.format(locale, "%.1f", rateMgDlPerMin)
-            MMOL_L -> String.format(locale, "%.2f", rateMgDlPerMin * factor)
+            MMOL_L -> String.format(locale, "%.2f", toDisplay(rateMgDlPerMin))
         }
     }
 

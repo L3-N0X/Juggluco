@@ -502,7 +502,7 @@ object AlertPlayer {
         Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
 
     fun title(alert: ActiveAlert): String {
-        val value = alert.reading?.displayValue
+        val value = alert.reading?.let { currentUnit().format(it.mgdl) }
         return when {
             alert.rule.kind == AlertKind.SIGNAL_LOSS -> alert.rule.name
             value != null -> context.getString(R.string.loc_alarm_title_value, alert.rule.name, value, unitLabel(), arrow(alert.reading.rate)).trim()
@@ -573,7 +573,7 @@ object AlertPlayer {
                 @Suppress("DEPRECATION")
                 Notification.Builder(context).setPriority(Notification.PRIORITY_MAX)
             }
-            val displayValue = alert.reading?.let { if (Applic.unit == 1) it.mgdl / 18f else it.mgdl }
+            val displayValue = alert.reading?.let { currentUnit().toDisplay(it.mgdl) }
             val iconSet = alert.rule.kind != AlertKind.SIGNAL_LOSS && !alert.isTest &&
                 displayValue != null && AlertBridge.setGlucoseIcon(builder, displayValue)
             if (!iconSet) builder.setSmallIcon(if (alert.rule.kind == AlertKind.SIGNAL_LOSS) R.drawable.loss else R.drawable.novalue)

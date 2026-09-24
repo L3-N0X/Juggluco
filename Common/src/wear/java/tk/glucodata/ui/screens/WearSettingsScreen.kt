@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -372,7 +373,7 @@ fun WearSettingsScreen(
                     selected = unit == GlucoseUnit.MG_DL,
                     onSelect = { repository.setUnit(GlucoseUnit.MG_DL) },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("mg/dL") }
+                    label = { Text(stringResource(GlucoseUnit.MG_DL.labelRes)) }
                 )
             }
             item {
@@ -380,7 +381,7 @@ fun WearSettingsScreen(
                     selected = unit == GlucoseUnit.MMOL_L,
                     onSelect = { repository.setUnit(GlucoseUnit.MMOL_L) },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("mmol/L") }
+                    label = { Text(stringResource(GlucoseUnit.MMOL_L.labelRes)) }
                 )
             }
 
@@ -413,11 +414,11 @@ fun WearSettingsScreen(
                     Text("Target Range")
                 }
             }
-            wearThresholdStepper(targetLow, targetLowSpec, unit, haptic, "Low target") { value ->
-                tap { repository.setTargetRange(value, targetHigh) }
+            wearThresholdStepper(unit.toDisplay(targetLow), targetLowSpec, unit, haptic, "Low target") { value ->
+                tap { repository.setTargetRange(unit.toMgDl(value), targetHigh) }
             }
-            wearThresholdStepper(targetHigh, targetHighSpec, unit, haptic, "High target") { value ->
-                tap { repository.setTargetRange(targetLow, value) }
+            wearThresholdStepper(unit.toDisplay(targetHigh), targetHighSpec, unit, haptic, "High target") { value ->
+                tap { repository.setTargetRange(targetLow, unit.toMgDl(value)) }
             }
 
             // Complications Section

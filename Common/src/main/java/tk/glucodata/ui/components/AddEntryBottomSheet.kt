@@ -206,8 +206,9 @@ fun AddEntryBottomSheet(
                 Spacer(modifier = Modifier.width(12.dp))
                 Button(
                     onClick = {
-                        val num = valueText.replace(',', '.').toFloatOrNull() ?: 0f
-                        onSave(selectedType, num, noteText)
+                        val rawValue = valueText.replace(',', '.').toFloatOrNull() ?: 0f
+                        val value = if (selectedType == LogType.BLOOD_GLUCOSE) unit.toMgDl(rawValue) else rawValue
+                        onSave(selectedType, value, noteText)
                         onDismiss()
                     },
                     shape = RoundedCornerShape(12.dp)
