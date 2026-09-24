@@ -109,9 +109,9 @@ extern "C" JNIEXPORT void JNICALL fromjava(removeNum)(JNIEnv *env, jclass thiz,j
 	Numdata *numdata=reinterpret_cast<Numdata *>(ptr);
 	 numdata->numremove(pos) ;
 	 }
-extern "C" JNIEXPORT void JNICALL fromjava(saveNum)(JNIEnv *env, jclass thiz,jlong ptr,jlong time,jfloat value,jint type,jint mealptr) {
+extern "C" JNIEXPORT jint JNICALL fromjava(saveNum)(JNIEnv *env, jclass thiz,jlong ptr,jlong time,jfloat value,jint type,jint mealptr) {
 	Numdata *numdata=reinterpret_cast<Numdata *>(ptr);
-	numdata->numsave(time,value,type,mealptr);
+	return numdata->numsave(time,value,type,mealptr);
 
 	}
 extern "C" JNIEXPORT jobject JNICALL fromjava(getNumitem)(JNIEnv *env, jclass thiz,jlong ptr,jint pos) {

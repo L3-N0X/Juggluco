@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 import tk.glucodata.Applic
 import tk.glucodata.Backup
 import tk.glucodata.BleMirror
@@ -63,6 +65,23 @@ import kotlin.math.roundToInt
 class GlucoseRepository(
     private val scope: CoroutineScope
 ) {
+    private data class NativeEntryIdentity(
+        val store: NumberStore,
+        val timeSeconds: Long,
+        val valueBits: Long,
+        val label: Int,
+        val mealPointer: Int
+    )
+
+    private data class PersistedLogNote(
+        val id: Long,
+        val store: NumberStore,
+        val position: Int,
+        val identity: NativeEntryIdentity,
+        val note: String
+    )
+
+    private val logNoteLock = Any()
     private val _currentReading = MutableStateFlow<GlucosePoint?>(null)
     val currentReading: StateFlow<GlucosePoint?> = _currentReading.asStateFlow()
 
@@ -703,40 +722,193 @@ class GlucoseRepository(
         }
     }
 
-    private fun loadLogsFromNative() {
-        val logList = ArrayList<LogRecord>()
-        if (Applic.Nativesloaded) {
-            for (store in NumberStore.values()) {
-                try {
-                    val ptr = numberStorePointer(store) ?: continue
-                    val resolvedStore = NumberStore.values().firstOrNull {
-                        it.nativeIndex == Natives.getNumindex(ptr)
-                    } ?: continue
-                    val first = Natives.getfirstNum(ptr)
-                    val last = Natives.getlastNum(ptr)
-                    for (pos in first until last) {
-                        val itm = Natives.getNumitem(ptr, pos) ?: continue
-                        if (itm.time <= 0) continue
-                        logList.add(
-                            LogRecord(
-                                timestamp = itm.time * 1000L,
-                                type = nativeType(itm.label),
-                                value = itm.value,
-                                nativeSource = NumberStoreSource(resolvedStore, pos),
-                                mealPointer = itm.mealptr
-                            )
-                        )
-                    }
-                } catch (_: Throwable) {}
-            }
-        }
+    private fun logNotePreferences() = Applic.app?.getSharedPreferences(LOG_NOTES_PREFS, Context.MODE_PRIVATE)
 
-        logList.sortWith(
-            compareByDescending<LogRecord> { it.timestamp }
-                .thenByDescending { it.nativeSource?.store?.nativeIndex ?: -1 }
-                .thenByDescending { it.nativeSource?.position ?: -1 }
+    private fun readPersistedLogNotes(): MutableList<PersistedLogNote> {
+        val serialized = logNotePreferences()?.getString(LOG_NOTES_KEY, null) ?: return mutableListOf()
+        val notes = mutableListOf<PersistedLogNote>()
+        try {
+            val array = JSONArray(serialized)
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val store = NumberStore.entries.firstOrNull { it.nativeIndex == item.optInt("store") } ?: continue
+                notes += PersistedLogNote(
+                    id = item.optLong("id"),
+                    store = store,
+                    position = item.optInt("position"),
+                    identity = NativeEntryIdentity(
+                        store = store,
+                        timeSeconds = item.optLong("timeSeconds"),
+                        valueBits = item.optLong("valueBits") and 0xffffffffL,
+                        label = item.optInt("label"),
+                        mealPointer = item.optInt("mealPointer")
+                    ),
+                    note = item.optString("note")
+                )
+            }
+        } catch (_: Throwable) {}
+        return notes
+    }
+
+    private fun writePersistedLogNotes(notes: List<PersistedLogNote>) {
+        try {
+            val array = JSONArray()
+            notes.forEach { item ->
+                array.put(JSONObject().apply {
+                    put("id", item.id)
+                    put("store", item.store.nativeIndex)
+                    put("position", item.position)
+                    put("timeSeconds", item.identity.timeSeconds)
+                    put("valueBits", item.identity.valueBits)
+                    put("label", item.identity.label)
+                    put("mealPointer", item.identity.mealPointer)
+                    put("note", item.note)
+                })
+            }
+            logNotePreferences()?.edit()?.putString(LOG_NOTES_KEY, array.toString())?.commit()
+        } catch (_: Throwable) {}
+    }
+
+    private fun nativeIdentity(item: tk.glucodata.nums.item, store: NumberStore): NativeEntryIdentity {
+        return NativeEntryIdentity(
+            store = store,
+            timeSeconds = item.time,
+            valueBits = java.lang.Float.floatToRawIntBits(item.value).toLong() and 0xffffffffL,
+            label = item.label,
+            mealPointer = item.mealptr
         )
-        _logs.value = logList
+    }
+
+    private fun nativeIdentity(record: LogRecord): NativeEntryIdentity {
+        return NativeEntryIdentity(
+            store = record.nativeSource?.store ?: NumberStore.HERE,
+            timeSeconds = record.timestamp / 1000L,
+            valueBits = java.lang.Float.floatToRawIntBits(record.value).toLong() and 0xffffffffL,
+            label = nativeLabel(record.type),
+            mealPointer = record.mealPointer
+        )
+    }
+
+    private fun sourceKey(source: NumberStoreSource): String = "${source.store.nativeIndex}:${source.position}"
+
+    private fun findNativeSource(
+        store: NumberStore,
+        identity: NativeEntryIdentity,
+        preferredPosition: Int
+    ): NumberStoreSource? {
+        val ptr = numberStorePointer(store) ?: return null
+        return try {
+            var found: NumberStoreSource? = null
+            for (position in Natives.getfirstNum(ptr) until Natives.getlastNum(ptr)) {
+                val item = Natives.getNumitem(ptr, position) ?: continue
+                if (nativeIdentity(item, store) != identity) continue
+                val candidate = NumberStoreSource(store, position)
+                if (position == preferredPosition) return candidate
+                if (found == null) found = candidate
+            }
+            found
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun upsertPersistedLogNote(note: PersistedLogNote) {
+        synchronized(logNoteLock) {
+            val notes = readPersistedLogNotes().toMutableList()
+            notes.removeAll { it.id == note.id }
+            if (note.note.isNotBlank()) notes += note
+            writePersistedLogNotes(notes)
+        }
+    }
+
+    private fun removePersistedLogNote(id: Long) {
+        synchronized(logNoteLock) {
+            val notes = readPersistedLogNotes()
+            if (notes.removeAll { it.id == id }) writePersistedLogNotes(notes)
+        }
+    }
+
+    private fun reconcilePersistedLogNotes(
+        records: List<LogRecord>,
+        availableStores: Set<NumberStore>
+    ): Map<String, PersistedLogNote> {
+        synchronized(logNoteLock) {
+            val stored = readPersistedLogNotes()
+            val retained = stored.filter { it.store !in availableStores }
+            val candidates = records.filter { it.nativeSource?.store in availableStores }
+            val usedSources = mutableSetOf<String>()
+            val resolved = retained.toMutableList()
+
+            stored.filter { it.store in availableStores }.forEach { persisted ->
+                val matches = candidates.filter { record ->
+                    val source = record.nativeSource ?: return@filter false
+                    source.store == persisted.store &&
+                        nativeIdentity(record) == persisted.identity &&
+                        sourceKey(source) !in usedSources
+                }
+                val match = matches.firstOrNull { it.nativeSource?.position == persisted.position } ?: matches.firstOrNull()
+                val source = match?.nativeSource ?: return@forEach
+                usedSources += sourceKey(source)
+                resolved += persisted.copy(
+                    store = source.store,
+                    position = source.position,
+                    identity = persisted.identity
+                )
+            }
+
+            if (resolved != stored) writePersistedLogNotes(resolved)
+            return resolved.mapNotNull { note ->
+                note.position.takeIf { it >= 0 }?.let { position ->
+                    sourceKey(NumberStoreSource(note.store, position)) to note
+                }
+            }.toMap()
+        }
+    }
+
+    private fun loadLogsFromNative() {
+        synchronized(logNoteLock) {
+            val logList = ArrayList<LogRecord>()
+            val availableStores = mutableSetOf<NumberStore>()
+            if (Applic.Nativesloaded) {
+                for (store in NumberStore.values()) {
+                    try {
+                        val ptr = numberStorePointer(store) ?: continue
+                        val resolvedStore = NumberStore.values().firstOrNull {
+                            it.nativeIndex == Natives.getNumindex(ptr)
+                        } ?: continue
+                        val first = Natives.getfirstNum(ptr)
+                        val last = Natives.getlastNum(ptr)
+                        availableStores += resolvedStore
+                        for (pos in first until last) {
+                            val itm = Natives.getNumitem(ptr, pos) ?: continue
+                            if (itm.time <= 0) continue
+                            logList.add(
+                                LogRecord(
+                                    timestamp = itm.time * 1000L,
+                                    type = nativeType(itm.label),
+                                    value = itm.value,
+                                    nativeSource = NumberStoreSource(resolvedStore, pos),
+                                    mealPointer = itm.mealptr
+                                )
+                            )
+                        }
+                    } catch (_: Throwable) {}
+                }
+            }
+
+            val persistedNotes = reconcilePersistedLogNotes(logList, availableStores)
+            val hydratedLogs = logList.map { record ->
+                val source = record.nativeSource ?: return@map record
+                val persisted = persistedNotes[sourceKey(source)] ?: return@map record
+                record.copy(id = persisted.id, note = persisted.note)
+            }.toMutableList()
+            hydratedLogs.sortWith(
+                compareByDescending<LogRecord> { it.timestamp }
+                    .thenByDescending { it.nativeSource?.store?.nativeIndex ?: -1 }
+                    .thenByDescending { it.nativeSource?.position ?: -1 }
+            )
+            _logs.value = hydratedLogs
+        }
     }
 
     fun addLogEntry(type: LogType, value: Float, note: String, timestamp: Long = System.currentTimeMillis()) {
@@ -754,9 +926,33 @@ class GlucoseRepository(
                     val store = NumberStore.HERE
                     val ptr = numberStorePointer(store)
                     if (ptr != null) {
-                        Natives.saveNum(ptr, timestamp / 1000L, value, nativeLabel(type), 0)
-                        syncNumberStore(store)
-                        loadLogsFromNative()
+                        synchronized(logNoteLock) {
+                            val persistedNote = note.trim()
+                            val identity = NativeEntryIdentity(
+                                store = store,
+                                timeSeconds = timestamp / 1000L,
+                                valueBits = java.lang.Float.floatToRawIntBits(value).toLong() and 0xffffffffL,
+                                label = nativeLabel(type),
+                                mealPointer = 0
+                            )
+                            if (persistedNote.isNotEmpty()) {
+                                upsertPersistedLogNote(
+                                    PersistedLogNote(entry.id, store, -1, identity, persistedNote)
+                                )
+                            }
+                            val position = Natives.saveNum(ptr, timestamp / 1000L, value, nativeLabel(type), 0)
+                            if (position >= 0 && persistedNote.isNotEmpty()) {
+                                val notes = readPersistedLogNotes().toMutableList()
+                                notes.replaceAll {
+                                    if (it.store == store && it.position >= position) it.copy(position = it.position + 1) else it
+                                }
+                                notes.removeAll { it.id == entry.id }
+                                notes += PersistedLogNote(entry.id, store, position, identity, persistedNote)
+                                writePersistedLogNotes(notes)
+                            }
+                            syncNumberStore(store)
+                            loadLogsFromNative()
+                        }
                     }
                 }
             } catch (_: Throwable) {}
@@ -767,44 +963,64 @@ class GlucoseRepository(
         entry: LogRecord,
         type: LogType,
         value: Float,
-        timestamp: Long = entry.timestamp
+        timestamp: Long = entry.timestamp,
+        note: String = entry.note
     ) {
         val source = entry.nativeSource
         if (source == null) {
             _logs.value = _logs.value.map {
-                if (it.id == entry.id) it.copy(type = type, value = value, timestamp = timestamp) else it
+                if (it.id == entry.id) it.copy(type = type, value = value, timestamp = timestamp, note = note) else it
             }
             return
         }
 
         _logs.value = _logs.value.map {
-            if (sameSource(it, entry)) it.copy(type = type, value = value, timestamp = timestamp) else it
+            if (sameSource(it, entry)) it.copy(type = type, value = value, timestamp = timestamp, note = note) else it
         }
         scope.launch(Dispatchers.IO) {
-            try {
-                if (Applic.Nativesloaded) {
-                    val ptr = numberStorePointer(source.store)
-                    val itm = ptr?.let { Natives.getNumitem(it, source.position) }
-                    if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
-                        val hitPtr = Natives.mkhitptr(ptr, source.position)
-                        if (hitPtr != 0L) {
-                            try {
-                                Natives.hitchange(
-                                    hitPtr,
-                                    timestamp / 1000L,
-                                    value,
-                                    nativeLabel(type),
-                                    entry.mealPointer
+            synchronized(logNoteLock) {
+                try {
+                    if (Applic.Nativesloaded) {
+                        val ptr = numberStorePointer(source.store)
+                        val itm = ptr?.let { Natives.getNumitem(it, source.position) }
+                        if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
+                            val hitPtr = Natives.mkhitptr(ptr, source.position)
+                            if (hitPtr != 0L) {
+                                try {
+                                    Natives.hitchange(
+                                        hitPtr,
+                                        timestamp / 1000L,
+                                        value,
+                                        nativeLabel(type),
+                                        entry.mealPointer
+                                    )
+                                } finally {
+                                    Natives.freehitptr(hitPtr)
+                                }
+                                val newIdentity = NativeEntryIdentity(
+                                    store = source.store,
+                                    timeSeconds = timestamp / 1000L,
+                                    valueBits = java.lang.Float.floatToRawIntBits(value).toLong() and 0xffffffffL,
+                                    label = nativeLabel(type),
+                                    mealPointer = entry.mealPointer
                                 )
-                            } finally {
-                                Natives.freehitptr(hitPtr)
+                                val newSource = findNativeSource(source.store, newIdentity, source.position)
+                                if (newSource != null) {
+                                    if (note.isNotBlank()) {
+                                        upsertPersistedLogNote(
+                                            PersistedLogNote(entry.id, source.store, newSource.position, newIdentity, note.trim())
+                                        )
+                                    } else {
+                                        removePersistedLogNote(entry.id)
+                                    }
+                                }
+                                syncNumberStore(source.store)
                             }
-                            syncNumberStore(source.store)
                         }
+                        loadLogsFromNative()
                     }
-                    loadLogsFromNative()
-                }
-            } catch (_: Throwable) {}
+                } catch (_: Throwable) {}
+            }
         }
     }
 
@@ -817,17 +1033,20 @@ class GlucoseRepository(
 
         _logs.value = _logs.value.filterNot { sameSource(it, entry) }
         scope.launch(Dispatchers.IO) {
-            try {
-                if (Applic.Nativesloaded) {
-                    val ptr = numberStorePointer(source.store)
-                    val itm = ptr?.let { Natives.getNumitem(it, source.position) }
-                    if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
-                        Natives.removeNum(ptr, source.position)
-                        syncNumberStore(source.store)
+            synchronized(logNoteLock) {
+                try {
+                    if (Applic.Nativesloaded) {
+                        val ptr = numberStorePointer(source.store)
+                        val itm = ptr?.let { Natives.getNumitem(it, source.position) }
+                        if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
+                            Natives.removeNum(ptr, source.position)
+                            removePersistedLogNote(entry.id)
+                            syncNumberStore(source.store)
+                        }
+                        loadLogsFromNative()
                     }
-                    loadLogsFromNative()
-                }
-            } catch (_: Throwable) {}
+                } catch (_: Throwable) {}
+            }
         }
     }
 
@@ -2034,6 +2253,8 @@ class GlucoseRepository(
         const val UI_PREFS = "ui_prefs"
         const val KEY_DELTA_CALCULATION = "delta_calculation_minutes"
         const val KEY_MINIMALIST_UNITS = "minimalist_units"
+        const val LOG_NOTES_PREFS = "log_notes"
+        const val LOG_NOTES_KEY = "notes"
         /** Native alarm kinds with user-facing sound behavior, in UI order. */
         val behaviorKinds = listOf(0, 5, 1, 6, 7, 8, 4, 2)
     }

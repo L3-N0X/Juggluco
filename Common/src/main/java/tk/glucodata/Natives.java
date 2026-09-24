@@ -146,7 +146,7 @@ public static native String getDeviceAddress(long dataptr,boolean getnew);
 
     public static native void setident(long numptr, long ident);
     public static native void closeNums(long ptr);
-    public static native void saveNum(long ptr,long time,float value,int type,int mealptr);
+    public static native int saveNum(long ptr,long time,float value,int type,int mealptr);
     public static native void saveNumpos(long ptr,int pos,long time,float value,int type,int mealptr);
     public static native void removeNum(long ptr,int pos);
     public static native item getNumitem(long ptr, int pos);
