@@ -656,6 +656,9 @@
     <string name="sensor_started">Sensor Started</string>
     <string name="sensor_start_new">Start New Sensor</string>
     <string name="sensor_current_state">Current Sensor State</string>
+    <string name="sensor_mirrored_status">Mirror stream</string>
+    <string name="sensor_mirrored_title">Sensor streamed from another app</string>
+    <string name="sensor_mirrored_desc">Live data for this sensor is coming from another Juggluco app. Sensor pairing and connection controls are managed there.</string>
     <string name="sensor_diagnostic_details">Sensor Diagnostic Details</string>
     <string name="status_in_range">In Range</string>
     <string name="status_low">Low</string>

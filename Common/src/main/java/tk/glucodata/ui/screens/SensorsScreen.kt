@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
@@ -300,7 +301,7 @@ private fun OverhauledSensorCard(
     var warmupSliderValue by remember(sensor.warmupMinutes) { mutableFloatStateOf(sensor.warmupMinutes.toFloat()) }
 
     val statusColor = when (sensor.status) {
-        SensorStatus.CONNECTED_STREAMING -> clinicalColors.inRange
+        SensorStatus.CONNECTED_STREAMING -> if (sensor.isMirrored) MaterialTheme.colorScheme.secondary else clinicalColors.inRange
         SensorStatus.CONNECTED_IDLE -> MaterialTheme.colorScheme.primary
         SensorStatus.CONNECTING -> Color(0xFFD97706)
         SensorStatus.WARMING_UP -> Color(0xFFEA580C)
@@ -323,6 +324,35 @@ private fun OverhauledSensorCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
+        if (sensor.isMirrored) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Sync,
+                    contentDescription = stringResource(R.string.sensor_mirrored_status),
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.sensor_mirrored_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        text = stringResource(R.string.sensor_mirrored_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(14.dp))
 
         // Connection state & last reading (the status label lives here instead of a badge)
@@ -333,8 +363,8 @@ private fun OverhauledSensorCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = Icons.Default.Bluetooth,
-                    contentDescription = stringResource(R.string.bluetooth_status),
+                    imageVector = if (sensor.isMirrored) Icons.Default.Sync else Icons.Default.Bluetooth,
+                    contentDescription = stringResource(if (sensor.isMirrored) R.string.sensor_mirrored_status else R.string.bluetooth_status),
                     tint = statusColor,
                     modifier = Modifier.size(18.dp)
                 )
@@ -342,6 +372,7 @@ private fun OverhauledSensorCard(
                 Text(
                     text = when {
                         !sensor.isConnected -> stringResource(sensor.status.labelRes)
+                        sensor.isMirrored -> stringResource(R.string.sensor_mirrored_status)
                         sensor.isStreaming -> stringResource(R.string.sensor_connected_streaming)
                         else -> stringResource(R.string.sensor_bluetooth_connected)
                     },

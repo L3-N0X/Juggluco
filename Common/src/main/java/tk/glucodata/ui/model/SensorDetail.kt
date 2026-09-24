@@ -70,7 +70,8 @@ data class SensorDetail(
     val lastDisconnectTime: Long = 0L,
     val handshakeStatusStr: String = "",
     val lastHandshakeTime: Long = 0L,
-    val rawDiagnosticText: String = ""
+    val rawDiagnosticText: String = "",
+    val isMirrored: Boolean = false
 ) {
     val daysRemaining: Float
         get() {

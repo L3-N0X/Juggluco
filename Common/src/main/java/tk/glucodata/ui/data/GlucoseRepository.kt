@@ -422,6 +422,7 @@ class GlucoseRepository(
     private fun loadSensorsFromNative() {
         val detailsList = ArrayList<SensorDetail>()
         val legacyList = ArrayList<SensorInfo>()
+        val mirroredSensorSource = hasLiveReceiverMirror()
 
         try {
             if (Applic.Nativesloaded) {
@@ -548,6 +549,7 @@ class GlucoseRepository(
                                     minWarmupMinutes = minWarmup,
                                     isConnected = true,
                                     isStreaming = true,
+                                    isMirrored = mirroredSensorSource,
                                     isHidden = isHidden,
                                     hasCalibration = hasCali,
                                     batteryPercent = null,
@@ -578,6 +580,31 @@ class GlucoseRepository(
         _sensorDetails.value = detailsList
         _sensors.value = legacyList
         _previousSensors.value = emptyList()
+    }
+
+    private fun hasLiveReceiverMirror(): Boolean {
+        if (!Applic.Nativesloaded) return false
+        try {
+            Applic.ensureNetStarted()
+        } catch (_: Throwable) {}
+        val hostCount = try { Natives.backuphostNr() } catch (_: Throwable) { 0 }
+        for (index in 0 until hostCount) {
+            val receiveMode = try { Natives.getbackuphostreceive(index) } catch (_: Throwable) { 0 }
+            if ((receiveMode and 2) == 0) continue
+            val deactivated = try { Natives.getHostDeactivated(index) } catch (_: Throwable) { false }
+            if (deactivated) continue
+            val status = try { Natives.mirrorStatus(index) ?: "" } catch (_: Throwable) { "" }
+            if (isLiveMirrorStatus(status)) return true
+        }
+        return false
+    }
+
+    private fun isLiveMirrorStatus(status: String): Boolean {
+        val normalized = status.replace(Regex("<[^>]+>"), "")
+        return (normalized.contains("TCP/IP live socket: true", ignoreCase = true) &&
+            normalized.contains("receive=true", ignoreCase = true)) ||
+            normalized.contains("Direct Bluetooth (BLE GATT)=true", ignoreCase = true) ||
+            normalized.contains("Messages (Wear OS MessageClient)=true", ignoreCase = true)
     }
 
     private fun loadLogsFromNative() {
