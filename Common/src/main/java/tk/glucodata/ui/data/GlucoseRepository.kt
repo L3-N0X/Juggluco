@@ -19,11 +19,13 @@ import tk.glucodata.BleMirror
 import tk.glucodata.BuildConfig
 import tk.glucodata.Log
 import tk.glucodata.MainActivity
+import tk.glucodata.JugglucoSend
 import tk.glucodata.MessageSender
 import tk.glucodata.Natives
 import tk.glucodata.Nightscout
 import tk.glucodata.Notify
 import tk.glucodata.SensorBridge
+import tk.glucodata.SendLikexDrip
 import tk.glucodata.SuperGattCallback
 import tk.glucodata.WatchBridge
 import tk.glucodata.XInfuus
@@ -32,6 +34,7 @@ import tk.glucodata.ui.model.AgpProfile
 import tk.glucodata.ui.model.AlarmBehavior
 import tk.glucodata.ui.model.AlarmConfig
 import tk.glucodata.ui.model.AlarmSoundStream
+import tk.glucodata.ui.model.BroadcastReceiverApp
 import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.DisplayConfig
 import tk.glucodata.ui.model.ExchangesConfig
@@ -119,6 +122,18 @@ class GlucoseRepository(
 
     private val _exchanges = MutableStateFlow(ExchangesConfig())
     val exchanges: StateFlow<ExchangesConfig> = _exchanges.asStateFlow()
+
+    private val _xdripReceiverApps = MutableStateFlow<List<BroadcastReceiverApp>>(emptyList())
+    val xdripReceiverApps: StateFlow<List<BroadcastReceiverApp>> = _xdripReceiverApps.asStateFlow()
+
+    private val _xdripReceiverAppsLoading = MutableStateFlow(false)
+    val xdripReceiverAppsLoading: StateFlow<Boolean> = _xdripReceiverAppsLoading.asStateFlow()
+
+    private val _glucodataReceiverApps = MutableStateFlow<List<BroadcastReceiverApp>>(emptyList())
+    val glucodataReceiverApps: StateFlow<List<BroadcastReceiverApp>> = _glucodataReceiverApps.asStateFlow()
+
+    private val _glucodataReceiverAppsLoading = MutableStateFlow(false)
+    val glucodataReceiverAppsLoading: StateFlow<Boolean> = _glucodataReceiverAppsLoading.asStateFlow()
 
     private val _displayConfig = MutableStateFlow(DisplayConfig())
     val displayConfig: StateFlow<DisplayConfig> = _displayConfig.asStateFlow()
@@ -221,9 +236,21 @@ class GlucoseRepository(
                 )
 
                 // Read Exchanges
+                val xdripReceiverPackages = Natives.xdripRecepters()
+                    .filterNotNull()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                val glucodataReceiverPackages = Natives.glucodataRecepters()
+                    .filterNotNull()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
                 _exchanges.value = ExchangesConfig(
-                    xdripBroadcast = Natives.getxbroadcast(),
-                    glucodataBroadcast = Natives.getJugglucobroadcast(),
+                    xdripBroadcast = xdripReceiverPackages.isNotEmpty(),
+                    xdripReceiverPackages = xdripReceiverPackages,
+                    glucodataBroadcast = glucodataReceiverPackages.isNotEmpty(),
+                    glucodataReceiverPackages = glucodataReceiverPackages,
                     librelinkBroadcast = Natives.getlibrelinkused(),
                     everSenseBroadcast = try { Natives.geteverSensebroadcast() } catch (_: Throwable) { false },
                     healthConnect = try { Natives.gethealthConnect() } catch (_: Throwable) { false },
@@ -894,12 +921,102 @@ class GlucoseRepository(
 
     // --- EXCHANGES ACTIONS ---
 
-    fun setXdripBroadcast(enabled: Boolean) {
-        _exchanges.value = _exchanges.value.copy(xdripBroadcast = enabled)
+    private fun discoverBroadcastReceiverApps(
+        action: String,
+        selectedPackages: List<String>
+    ): List<BroadcastReceiverApp> = try {
+        val packageManager = Applic.app.packageManager
+        val installedPackages = packageManager
+            .queryBroadcastReceivers(Intent(action), 0)
+            .asSequence()
+            .mapNotNull { it.activityInfo?.packageName }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toList()
+        val installedApps = installedPackages.map { packageName ->
+            val label = try {
+                val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
+                packageManager.getApplicationLabel(applicationInfo).toString().trim()
+            } catch (_: Throwable) {
+                packageName
+            }
+            BroadcastReceiverApp(
+                packageName = packageName,
+                label = label.ifEmpty { packageName }
+            )
+        }
+        val installedPackageSet = installedPackages.toSet()
+        val unavailableApps = selectedPackages
+            .filterNot { it in installedPackageSet }
+            .map { BroadcastReceiverApp(packageName = it, label = it, installed = false) }
+        (installedApps + unavailableApps)
+            .distinctBy { it.packageName }
+            .sortedWith(compareBy({ !it.installed }, { it.label.lowercase() }, { it.packageName }))
+    } catch (_: Throwable) {
+        emptyList()
     }
 
-    fun setGlucodataBroadcast(enabled: Boolean) {
-        _exchanges.value = _exchanges.value.copy(glucodataBroadcast = enabled)
+    private fun normalizeReceiverPackages(packageNames: Sequence<String>): List<String> = packageNames
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && it.toByteArray(Charsets.UTF_8).size < 100 }
+        .distinct()
+        .take(10)
+        .toList()
+
+    fun refreshXdripReceiverApps() {
+        _xdripReceiverAppsLoading.value = true
+        scope.launch(Dispatchers.IO) {
+            _xdripReceiverApps.value = discoverBroadcastReceiverApps(
+                action = SendLikexDrip.ACTION,
+                selectedPackages = _exchanges.value.xdripReceiverPackages
+            )
+            _xdripReceiverAppsLoading.value = false
+        }
+    }
+
+    fun setXdripReceivers(packageNames: List<String>) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    val normalizedPackages = normalizeReceiverPackages(packageNames.asSequence())
+                    Natives.setxdripRecepters(normalizedPackages.toTypedArray())
+                    SendLikexDrip.setreceivers()
+                    val savedPackages = normalizeReceiverPackages(Natives.xdripRecepters().asSequence())
+                    _exchanges.value = _exchanges.value.copy(
+                        xdripBroadcast = savedPackages.isNotEmpty(),
+                        xdripReceiverPackages = savedPackages
+                    )
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun refreshGlucodataReceiverApps() {
+        _glucodataReceiverAppsLoading.value = true
+        scope.launch(Dispatchers.IO) {
+            _glucodataReceiverApps.value = discoverBroadcastReceiverApps(
+                action = JugglucoSend.ACTION,
+                selectedPackages = _exchanges.value.glucodataReceiverPackages
+            )
+            _glucodataReceiverAppsLoading.value = false
+        }
+    }
+
+    fun setGlucodataReceivers(packageNames: List<String>) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    val normalizedPackages = normalizeReceiverPackages(packageNames.asSequence())
+                    Natives.setglucodataRecepters(normalizedPackages.toTypedArray())
+                    JugglucoSend.setreceivers()
+                    val savedPackages = normalizeReceiverPackages(Natives.glucodataRecepters().asSequence())
+                    _exchanges.value = _exchanges.value.copy(
+                        glucodataBroadcast = savedPackages.isNotEmpty(),
+                        glucodataReceiverPackages = savedPackages
+                    )
+                }
+            } catch (_: Throwable) {}
+        }
     }
 
     fun setHealthConnect(enabled: Boolean, context: Activity?) {

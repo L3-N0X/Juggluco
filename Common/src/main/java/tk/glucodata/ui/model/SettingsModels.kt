@@ -64,9 +64,17 @@ data class AlarmBehavior(
     val durationSecs: Int = 60
 )
 
+data class BroadcastReceiverApp(
+    val packageName: String,
+    val label: String,
+    val installed: Boolean = true
+)
+
 data class ExchangesConfig(
     val xdripBroadcast: Boolean = false,
+    val xdripReceiverPackages: List<String> = emptyList(),
     val glucodataBroadcast: Boolean = true,
+    val glucodataReceiverPackages: List<String> = emptyList(),
     val librelinkBroadcast: Boolean = false,
     val everSenseBroadcast: Boolean = false,
     val healthConnect: Boolean = false,

@@ -825,6 +825,12 @@
     <string name="settings_glucodata_broadcast_desc">Broadcast glucose locally to Juggluco watchfaces &amp; apps</string>
     <string name="settings_xdrip_broadcast">xDrip Broadcast</string>
     <string name="settings_xdrip_broadcast_desc">Broadcast readings to xDrip+ and compatible apps</string>
+    <string name="loc_glucodata_receiver_dialog_title">Glucodata receiver apps</string>
+    <string name="loc_no_glucodata_receivers">No installed apps listen for Glucodata broadcasts.</string>
+    <string name="loc_xdrip_receiver_dialog_title">xDrip receiver apps</string>
+    <string name="loc_no_xdrip_receivers">No installed apps listen for xDrip broadcasts.</string>
+    <string name="loc_receiver_not_installed">%1$s · Not installed</string>
+    <string name="loc_receiver_limit">Select up to 10 receiver apps.</string>
     <string name="settings_librelink_broadcast">Patched Libre Broadcast</string>
     <string name="settings_librelink_broadcast_desc">Broadcast readings via com.librelink.app</string>
     <string name="settings_health_connect">Google Health Connect</string>
