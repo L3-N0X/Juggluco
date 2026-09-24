@@ -42,6 +42,8 @@ import androidx.wear.compose.material3.TitleCard
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.ui.theme.WearColorPreset
+import tk.glucodata.ui.theme.WearThemePreferences
 import kotlin.math.roundToInt
 
 internal data class ThresholdSpec(
@@ -265,6 +267,7 @@ fun WearSettingsScreen(
     val targetHigh by repository.targetHigh.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
     val hardwareConfig by repository.hardwareConfig.collectAsState()
+    val colorPreset by WearThemePreferences.colorPreset.collectAsState()
 
     val haptic = LocalHapticFeedback.current
     fun tap(action: () -> Unit) {
@@ -322,6 +325,21 @@ fun WearSettingsScreen(
                 checked = voiceAnnounce,
                 onCheckedChange = { enabled -> tap { repository.setVoiceAnnounce(enabled) } }
             )
+            item {
+                ListSubHeader {
+                    Text("Appearance")
+                }
+            }
+            WearColorPreset.values().forEach { preset ->
+                item {
+                    RadioButton(
+                        selected = colorPreset == preset,
+                        onSelect = { tap { WearThemePreferences.setColorPreset(preset) } },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(preset.label) }
+                    )
+                }
+            }
             // Display & device
             item {
                 ListSubHeader {

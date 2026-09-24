@@ -1,11 +1,15 @@
 package tk.glucodata.ui.screens.settings
 
 import android.app.Activity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShortText
@@ -36,6 +40,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.DeltaCalculation
+import tk.glucodata.ui.theme.AppThemePreferences
 
 @Composable
 fun DisplaySettingsScreen(
@@ -54,7 +61,10 @@ fun DisplaySettingsScreen(
     onNavigateBack: () -> Unit
 ) {
     val displayConfig by repository.displayConfig.collectAsState()
+    val customColorArgb by AppThemePreferences.customColorArgb.collectAsState()
+    val customColor = customColorArgb?.let { Color(it) }
     val context = LocalContext.current
+    var showColorPicker by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var currentLanguageCode by remember {
         mutableStateOf(AppLanguageManager.getCurrentLanguageCode())
@@ -135,6 +145,40 @@ fun DisplaySettingsScreen(
             }
 
             SettingsActionRow(
+                title = stringResource(R.string.settings_custom_color),
+                subtitle = stringResource(
+                    if (customColor == null) {
+                        R.string.settings_custom_color_system
+                    } else {
+                        R.string.settings_custom_color_custom
+                    }
+                ),
+                icon = Icons.Default.Palette,
+                onClick = { showColorPicker = true },
+                trailingContent = {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(
+                                brush = if (customColor == null) {
+                                    Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.secondary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )
+                                    )
+                                } else {
+                                    Brush.linearGradient(listOf(customColor))
+                                },
+                                shape = CircleShape
+                            )
+                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                    )
+                }
+            )
+
+            SettingsActionRow(
                 title = stringResource(R.string.languagename),
                 subtitle = AppLanguageManager.getLanguageDisplayName(currentLanguageCode, context),
                 icon = Icons.Default.Language,
@@ -176,6 +220,21 @@ fun DisplaySettingsScreen(
                     showLanguageDialog = false
                 },
                 onDismissRequest = { showLanguageDialog = false }
+            )
+        }
+
+        if (showColorPicker) {
+            ColorPickerDialog(
+                initialColorArgb = customColorArgb,
+                onColorSelected = { colorArgb ->
+                    AppThemePreferences.setCustomColor(colorArgb)
+                    showColorPicker = false
+                },
+                onUseSystemColors = {
+                    AppThemePreferences.useSystemColors()
+                    showColorPicker = false
+                },
+                onDismiss = { showColorPicker = false }
             )
         }
 

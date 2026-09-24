@@ -120,20 +120,12 @@ fun WearGlucoseHero(
 
         Spacer(modifier = Modifier.height(2.dp))
 
-        // Unit, Delta, Time Ago
+        // Delta, Time Ago
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = unit.symbol,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
             if (deltaText != null) {
-                Spacer(modifier = Modifier.width(6.dp))
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
@@ -147,11 +139,11 @@ fun WearGlucoseHero(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
+                Spacer(modifier = Modifier.width(6.dp))
             }
 
-            Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = "• $timeAgo",
+                text = timeAgo,
                 fontSize = 13.sp,
                 color = if (isStale) clinical.low else MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -2,7 +2,8 @@ package tk.glucodata.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -138,44 +139,50 @@ fun WearQuickLogDial(
             modifier = Modifier
                 .size(168.dp)
                 .pointerInput(step, range, centerPx, degreesPerStep) {
-                    var accAngle = 0f
-                    var prevAngle = Float.NaN
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            prevAngle = angleOf(offset)
-                            accAngle = 0f
-                        },
-                        onDragEnd = {
-                            prevAngle = Float.NaN
-                            accAngle = 0f
-                        },
-                        onDragCancel = {
-                            prevAngle = Float.NaN
-                            accAngle = 0f
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            if (prevAngle.isNaN()) {
-                                prevAngle = angleOf(change.position)
-                                return@detectDragGestures
+                    val touchSlopPx = with(density) { 12.dp.toPx() }
+
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var totalDragX = 0f
+                        var totalDragY = 0f
+                        var isAdjusting = false
+                        var accAngle = 0f
+                        var previousPosition = down.position
+
+                        do {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+
+                            val dx = change.position.x - change.previousPosition.x
+                            val dy = change.position.y - change.previousPosition.y
+                            totalDragX += kotlin.math.abs(dx)
+                            totalDragY += kotlin.math.abs(dy)
+
+                            if (!isAdjusting && totalDragX > touchSlopPx && totalDragX > totalDragY * 1.15f) {
+                                isAdjusting = true
                             }
-                            val current = angleOf(change.position)
-                            var delta = current - prevAngle
-                            if (delta > 180f) delta -= 360f
-                            if (delta < -180f) delta += 360f
-                            prevAngle = current
-                            accAngle += delta
-                            val steps = (accAngle / degreesPerStep).toInt()
-                            if (steps != 0) {
-                                accAngle -= steps * degreesPerStep
-                                val next = quantize(latestValue + steps * step)
-                                if (next != latestValue) {
-                                    latestOnChange(next)
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+
+                            if (isAdjusting) {
+                                val current = angleOf(change.position)
+                                var delta = current - angleOf(previousPosition)
+                                if (delta > 180f) delta -= 360f
+                                if (delta < -180f) delta += 360f
+                                previousPosition = change.position
+                                accAngle += delta
+                                val steps = (accAngle / degreesPerStep).toInt()
+                                if (steps != 0) {
+                                    accAngle -= steps * degreesPerStep
+                                    val next = quantize(latestValue + steps * step)
+                                    if (next != latestValue) {
+                                        latestOnChange(next)
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
                                 }
+                                change.consume()
                             }
-                        }
-                    )
+                        } while (change.pressed)
+                    }
                 },
             contentAlignment = Alignment.Center
         ) {

@@ -1,6 +1,7 @@
 package tk.glucodata.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -108,47 +109,27 @@ fun WearQuickLogScreen(
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Category selector (2 rows for comfortable tap targets and readability)
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     listOf(
-                        Pair("Carbs", LogType.CARBS),
-                        Pair("Bolus", LogType.RAPID_INSULIN)
-                    ).forEach { (label, type) ->
-                        LogCategoryPill(
-                            label = label,
-                            isSelected = selectedType == type,
-                            onClick = {
-                                selectedType = type
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
-                ) {
-                    listOf(
-                        Pair("Basal", LogType.BASAL_INSULIN),
-                        Pair("BG", LogType.BLOOD_GLUCOSE)
-                    ).forEach { (label, type) ->
-                        LogCategoryPill(
-                            label = label,
-                            isSelected = selectedType == type,
-                            onClick = {
-                                selectedType = type
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
+                        listOf("Carbs" to LogType.CARBS, "Bolus" to LogType.RAPID_INSULIN),
+                        listOf("Basal" to LogType.BASAL_INSULIN, "BG" to LogType.BLOOD_GLUCOSE)
+                    ).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            row.forEach { (label, type) ->
+                                LogCategoryPill(
+                                    label = label,
+                                    isSelected = selectedType == type,
+                                    onClick = {
+                                        selectedType = type
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }

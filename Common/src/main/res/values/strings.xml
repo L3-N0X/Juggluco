@@ -844,6 +844,14 @@
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_system">System</string>
+    <string name="settings_custom_color">Custom color</string>
+    <string name="settings_custom_color_system">Using system Material You colors</string>
+    <string name="settings_custom_color_custom">Using your custom color</string>
+    <string name="settings_color_picker_title">Choose a color</string>
+    <string name="settings_color_picker_hue">Hue</string>
+    <string name="settings_color_picker_saturation">Saturation</string>
+    <string name="settings_color_picker_brightness">Brightness</string>
+    <string name="settings_color_picker_system">Use system colors</string>
     <string name="settings_language_desc">Select app display language</string>
     <string name="settings_language_system_default">System default</string>
     <string name="settings_language_dialog_title">Select Language</string>

@@ -35,7 +35,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
-import tk.glucodata.ui.components.WearAlertButton
+import tk.glucodata.ui.components.WearAlertIcon
 import tk.glucodata.ui.components.WearGlucoseHero
 import tk.glucodata.ui.components.WearMiniGraph
 import tk.glucodata.ui.data.GlucoseRepository
@@ -70,26 +70,24 @@ fun WearHomeScreen(
             anchorType = ScalingLazyListAnchorType.ItemStart,
             autoCentering = null,
             rotaryScrollableBehavior = RotaryScrollableDefaults.behavior(scrollableState = listState),
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 20.dp),
+            contentPadding = PaddingValues(start = 10.dp, top = 20.dp, end = 10.dp, bottom = 72.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 1. Hero Glucose Readout
             item {
-                WearGlucoseHero(
-                    currentReading = currentReading,
-                    readings = readings,
-                    unit = unit,
-                    targetLow = targetLow,
-                    targetHigh = targetHigh,
-                    onClick = onNavigateToGraph,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
-                )
-            }
-
-            // Alert state: tap dismisses a ringing alert, otherwise opens the alerts.
-            item {
-                WearAlertButton(onOpenAlerts = onNavigateToAlerts)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    WearAlertIcon(onOpenAlerts = onNavigateToAlerts)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    WearGlucoseHero(
+                        currentReading = currentReading,
+                        readings = readings,
+                        unit = unit,
+                        targetLow = targetLow,
+                        targetHigh = targetHigh,
+                        onClick = onNavigateToGraph
+                    )
+                }
             }
 
             // 2. Mini Sparkline Graph Card
@@ -104,7 +102,7 @@ fun WearHomeScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 6.dp, vertical = 6.dp),
+                            .padding(horizontal = 3.dp, vertical = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         WearMiniGraph(
