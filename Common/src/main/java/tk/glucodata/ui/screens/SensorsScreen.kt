@@ -1,6 +1,8 @@
 package tk.glucodata.ui.screens
 
 import android.app.Activity
+import android.content.Intent
+import android.provider.CalendarContract
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -89,6 +91,7 @@ fun SensorsScreen(
     modifier: Modifier = Modifier
 ) {
     val sensorDetails by repository.sensorDetails.collectAsState()
+    val activationState by repository.sensorActivationState.collectAsState()
     val previousSensors by repository.previousSensors.collectAsState()
     val unit by repository.unit.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
@@ -153,14 +156,57 @@ fun SensorsScreen(
     // Modal Dialogs
     if (showStartSensorDialog) {
         StartSensorDialog(
-            onDismiss = { showStartSensorDialog = false },
-            onTriggerNfcScan = onTriggerNfcScan,
-            onSensorActivated = { sensorType ->
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.sensor_activation_initiated, context.getString(sensorType.titleRes)),
-                    Toast.LENGTH_SHORT
-                ).show()
+            activationState = activationState,
+            onStartScan = { sensorType ->
+                if (sensorType.usesNfc) {
+                    repository.beginSensorActivation()
+                    onTriggerNfcScan()
+                } else {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.sensor_pairing_compose_nfc_only),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            onRetry = { sensorType ->
+                if (sensorType.usesNfc) {
+                    repository.beginSensorActivation()
+                    onTriggerNfcScan()
+                } else {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.sensor_pairing_compose_nfc_only),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            onCancel = { repository.cancelSensorActivation() },
+            onClose = {
+                repository.resetSensorActivation()
+                showStartSensorDialog = false
+            },
+            onAddToCalendar = { sensorName, endTime ->
+                try {
+                    context.startActivity(
+                        Intent(Intent.ACTION_INSERT)
+                            .setData(CalendarContract.Events.CONTENT_URI)
+                            .putExtra(CalendarContract.Events.TITLE, context.getString(R.string.enddatesensor) + sensorName)
+                            .putExtra(CalendarContract.Events.DESCRIPTION, context.getString(R.string.sensor) + " " + sensorName + context.getString(R.string.endstime))
+                            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, endTime)
+                            .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endTime + 1000L)
+                    )
+                } catch (error: Throwable) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.sensor_expiry_calendar_failed, error.message ?: ""),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            },
+            onDismiss = {
+                repository.resetSensorActivation()
+                showStartSensorDialog = false
             }
         )
     }

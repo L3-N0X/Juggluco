@@ -97,6 +97,7 @@ import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.Toast;
+import tk.glucodata.ui.ComposeUiBridge;
 
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.UiThread;
@@ -855,7 +856,7 @@ private static boolean askNFC=true;
 private static    final int nfcflags=NfcAdapter.FLAG_READER_NFC_V | NfcAdapter.FLAG_READER_NFC_A|NfcAdapter.FLAG_READER_NFC_B|NfcAdapter.FLAG_READER_NFC_F|NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK| NfcAdapter.FLAG_READER_NFC_BARCODE; //=415. Activation of sensor was only possible if app not at the foreground, so I add some flags
 //private static    final int nfcflags=NfcAdapter.FLAG_READER_NFC_V | NfcAdapter.FLAG_READER_NFC_A|NfcAdapter.FLAG_READER_NFC_B|NfcAdapter.FLAG_READER_NFC_F| NfcAdapter.FLAG_READER_NFC_BARCODE; // Activation of sensor was only possible if app not at the foreground, so I add some flags
 //private static    final int nfcflags=NfcAdapter.FLAG_READER_NFC_V |NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK; 
-public void setnfc() {
+public boolean setnfc() {
 try {
     if (mNfcAdapter == null) {
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
@@ -866,9 +867,9 @@ try {
          if(askNFC) {
             {if(doLog) {Log.i(LOG_ID, "No NFC adapter found!");};};
             Applic.argToaster(this, getResources().getString(R.string.error_nfc_device_not_supported), Toast.LENGTH_SHORT);
-            askNFC=false;
-            return;
-            }
+             askNFC=false;
+             return false;
+             }
         }
     } else {
         if(!mNfcAdapter.isEnabled()) {
@@ -887,8 +888,8 @@ try {
                    }
                   }
 
-            return;
-        } else {
+             return false;
+         } else {
     
 //            mNfcAdapter.enableReaderMode(this, this,  NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS|NfcAdapter.FLAG_READER_NFC_V , null);
 
@@ -909,9 +910,12 @@ try {
     if(mess==null) {
         mess="error";
         }
-    Log.e(LOG_ID,"setnfc "+mess);
-        }
-}
+     Log.e(LOG_ID,"setnfc "+mess);
+     return false;
+     }
+ return true;
+ }
+
 
 boolean active=false;
 /*
@@ -1091,6 +1095,9 @@ synchronized void   startnfc(Tag tag) {
         if(!isWearable) {
             if(hasTech(techs,"android.nfc.tech.IsoDep")) {
                if(doLog){showbytes("tag", tag.getId());};
+               if (ComposeUiBridge.isComposeUiActive) {
+                   ComposeUiBridge.reportSensorActivationFailure("Unsupported NFC tag");
+               }
                tk.glucodata.NovoPen.Scan.onTag(this,tag);
                return;
                }
@@ -1105,8 +1112,11 @@ synchronized void   startnfc(Tag tag) {
             Log.i(LOG_ID,"onTagDiscovered: ");
         }
 
-   if(!isWearable) {
+    if(!isWearable) {
         // Generic NDEF fallback (TagInfo-style readout)
+        if (ComposeUiBridge.isComposeUiActive) {
+            ComposeUiBridge.reportSensorActivationFailure("Unsupported NFC tag");
+        }
         if (Thread.currentThread().equals(Looper.getMainLooper().getThread())) {
             new Thread(() -> Sib3Scan.readNdef(this,tag)).start();
         } else {
@@ -1157,14 +1167,18 @@ String filespath=files.getAbsolutePath();
    
    }
 
-void activateresult(boolean res) {
-    String message= "Activation "+(res?"successfull":"failed");
-    Applic.argToaster(this,message,Toast.LENGTH_SHORT);
-    AlertDialog.Builder builder = new AlertDialog.Builder(this);
-    builder.setNegativeButton(R.string.ok, (dialog, id) -> { // User cancelled the dialog
-    requestRender();
-    }).setTitle("  ").setMessage(message).show().setCanceledOnTouchOutside(false);
-}
+ void activateresult(boolean res) {
+     if (ComposeUiBridge.isComposeUiActive) {
+         ComposeUiBridge.reportSensorActivationCommand(res);
+         return;
+     }
+     String message= "Activation "+(res?"successfull":"failed");
+     Applic.argToaster(this,message,Toast.LENGTH_SHORT);
+     AlertDialog.Builder builder = new AlertDialog.Builder(this);
+     builder.setNegativeButton(R.string.ok, (dialog, id) -> { // User cancelled the dialog
+     requestRender();
+     }).setTitle("  ").setMessage(message).show().setCanceledOnTouchOutside(false);
+ }
 
     @Override
     public  void onTagDiscovered(Tag tag) {
@@ -2199,12 +2213,16 @@ Runnable doswitch=null;
 
 
 private void runNfcV(Tag tag) {
-    if (Thread.currentThread().equals(Looper.getMainLooper().getThread())) {
+     if (ComposeUiBridge.isComposeUiActive) {
+         ComposeUiBridge.reportSensorTagRead();
+     }
+     if (Thread.currentThread().equals(Looper.getMainLooper().getThread())) {
         new Thread(() -> ScanNfcV.scan(curve, tag)).start();
-    } else {
-        ScanNfcV.scan(curve, tag);
-    }
-}
+     } else {
+         ScanNfcV.scan(curve, tag);
+     }
+ }
+
 
 
 int mirrorlistcolor=-1;

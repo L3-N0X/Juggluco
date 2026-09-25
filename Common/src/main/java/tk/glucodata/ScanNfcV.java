@@ -45,6 +45,7 @@ import android.widget.Toast;
 import java.util.Arrays;
 
 import tk.glucodata.settings.Settings;
+import tk.glucodata.ui.ComposeUiBridge;
 
 import static android.content.Context.VIBRATOR_SERVICE;
 import static android.view.View.GONE;
@@ -387,6 +388,9 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
 
             }
     if(value==0) {
+        if (ComposeUiBridge.isComposeUiActive && ret != 0) {
+            ComposeUiBridge.reportSensorActivationFailure("Sensor activation failed (" + ret + ")");
+        }
         curve.render.badscan = ret;
         failure(vibrator);
         }
@@ -471,8 +475,15 @@ static private void newsensor(MainActivity act,String text,String name) {
     });
     }
 static boolean askcalendar=true;
-static int calendar(MainActivity act,int ret,String name) {
-    if(askcalendar)  {
+ static int calendar(MainActivity act,int ret,String name) {
+     if (ComposeUiBridge.isComposeUiActive) {
+         askcalendar=false;
+         newdevice=null;
+         ComposeUiBridge.reportSensorActivated(name);
+         return 0;
+     }
+     if(askcalendar)  {
+
         int waitmin=(ret&0xff)==5?ret>>8:0;
         String mess=(waitmin>0) ?
 (act.getString(R.string.sensor)+" "+name+act.getString(R.string.ready_in)+waitmin+" "+act.getString(R.string.minutes)) :act.getString(R.string.ready_for_use);

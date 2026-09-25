@@ -62,6 +62,24 @@ import tk.glucodata.ui.model.WearDiagnosticInfo
 import tk.glucodata.ui.model.WearWatchDevice
 import kotlin.math.roundToInt
 
+sealed interface SensorActivationState {
+    data object Idle : SensorActivationState
+    data object Waiting : SensorActivationState
+    data object Reading : SensorActivationState
+    data object Activating : SensorActivationState
+    data object AwaitingSecondScan : SensorActivationState
+    data object Verifying : SensorActivationState
+    data class Success(
+        val sensorName: String,
+        val endTime: Long,
+        val canAddToCalendar: Boolean,
+        val sensorTypeName: String? = null,
+        val warmupMinutes: Int = 60
+    ) : SensorActivationState
+    data class Failure(val reason: String? = null) : SensorActivationState
+    data object Cancelled : SensorActivationState
+}
+
 class GlucoseRepository(
     private val scope: CoroutineScope
 ) {
@@ -99,6 +117,9 @@ class GlucoseRepository(
 
     private val _previousSensors = MutableStateFlow<List<SensorDetail>>(emptyList())
     val previousSensors: StateFlow<List<SensorDetail>> = _previousSensors.asStateFlow()
+
+    private val _sensorActivationState = MutableStateFlow<SensorActivationState>(SensorActivationState.Idle)
+    val sensorActivationState: StateFlow<SensorActivationState> = _sensorActivationState.asStateFlow()
 
     private val _logs = MutableStateFlow<List<LogRecord>>(emptyList())
     val logs: StateFlow<List<LogRecord>> = _logs.asStateFlow()
@@ -447,6 +468,83 @@ class GlucoseRepository(
             loadLogsFromNative()
             recalculateStats()
         }
+    }
+
+    fun beginSensorActivation() {
+        _sensorActivationState.value = SensorActivationState.Waiting
+    }
+
+    fun reportSensorTagRead() {
+        if (_sensorActivationState.value is SensorActivationState.Waiting) {
+            _sensorActivationState.value = SensorActivationState.Reading
+        }
+    }
+
+    fun reportSensorActivationCommand(success: Boolean) {
+        if (!success) {
+            reportSensorActivationFailure()
+        } else if (_sensorActivationState.value in setOf(
+                SensorActivationState.Reading,
+                SensorActivationState.Activating
+            )
+        ) {
+            _sensorActivationState.value = SensorActivationState.AwaitingSecondScan
+        }
+    }
+
+    fun reportSensorActivated(sensorName: String) {
+        if (_sensorActivationState.value !in setOf(
+                SensorActivationState.Waiting,
+                SensorActivationState.Reading,
+                SensorActivationState.Activating,
+                SensorActivationState.AwaitingSecondScan
+            )
+        ) {
+            return
+        }
+        _sensorActivationState.value = SensorActivationState.Verifying
+        scope.launch(Dispatchers.IO) {
+            loadSensorsFromNative()
+            val endData = try {
+                if (Applic.Nativesloaded) Natives.getSensorEndData(sensorName) else 0L
+            } catch (_: Throwable) {
+                0L
+            }
+            val endTime = (endData and 0xFFFFFFFFL) * 1000L
+            if (_sensorActivationState.value is SensorActivationState.Verifying) {
+                val detail = _sensorDetails.value.firstOrNull { it.id == sensorName }
+                _sensorActivationState.value = SensorActivationState.Success(
+                    sensorName = sensorName,
+                    endTime = endTime,
+                    canAddToCalendar = (endData ushr 32) != 0L && endTime > System.currentTimeMillis(),
+                    sensorTypeName = detail?.sensorTypeName,
+                    warmupMinutes = detail?.warmupMinutes ?: 60
+                )
+            }
+        }
+    }
+
+    fun reportSensorActivationFailure(reason: String? = null) {
+        if (_sensorActivationState.value !in setOf(
+                SensorActivationState.Waiting,
+                SensorActivationState.Reading,
+                SensorActivationState.Activating,
+                SensorActivationState.AwaitingSecondScan,
+                SensorActivationState.Verifying
+            )
+        ) {
+            return
+        }
+        _sensorActivationState.value = SensorActivationState.Failure(reason)
+    }
+
+    fun cancelSensorActivation() {
+        if (_sensorActivationState.value is SensorActivationState.Success) return
+        _sensorActivationState.value = SensorActivationState.Cancelled
+    }
+
+    fun resetSensorActivation() {
+        _sensorActivationState.value = SensorActivationState.Idle
     }
 
     private fun loadReadingsFromNative() {

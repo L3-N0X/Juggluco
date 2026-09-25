@@ -35,9 +35,14 @@ object ComposeUiBridge {
                 repository = repo,
                 onTriggerNfcScan = {
                     try {
-                        activity.setnfc()
-                        Applic.argToaster(activity, activity.getString(R.string.nfc_ready_instruction), Toast.LENGTH_SHORT)
+                        val started = activity.setnfc()
+                        if (started) {
+                            Applic.argToaster(activity, activity.getString(R.string.nfc_ready_instruction), Toast.LENGTH_SHORT)
+                        } else {
+                            repo.reportSensorActivationFailure()
+                        }
                     } catch (e: Throwable) {
+                        repo.reportSensorActivationFailure(e.message)
                         Applic.argToaster(activity, activity.getString(R.string.nfc_unavailable_error, e.message), Toast.LENGTH_SHORT)
                     }
                 },
@@ -51,6 +56,26 @@ object ComposeUiBridge {
         }
 
         return repo
+    }
+
+    @JvmStatic
+    fun reportSensorTagRead() {
+        repository?.reportSensorTagRead()
+    }
+
+    @JvmStatic
+    fun reportSensorActivationCommand(success: Boolean) {
+        repository?.reportSensorActivationCommand(success)
+    }
+
+    @JvmStatic
+    fun reportSensorActivated(sensorName: String) {
+        repository?.reportSensorActivated(sensorName)
+    }
+
+    @JvmStatic
+    fun reportSensorActivationFailure(reason: String? = null) {
+        repository?.reportSensorActivationFailure(reason)
     }
 
     @JvmStatic
