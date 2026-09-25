@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyListAnchorType
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.material3.Button
@@ -95,7 +96,10 @@ fun WearQuickLogScreen(
     }
 
     val haptic = LocalHapticFeedback.current
-    val listState = rememberScalingLazyListState()
+    val listState = rememberScalingLazyListState(
+        initialCenterItemIndex = 0,
+        initialCenterItemScrollOffset = 0
+    )
 
     ScreenScaffold(
         scrollState = listState,
@@ -104,6 +108,8 @@ fun WearQuickLogScreen(
         ScalingLazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
+            anchorType = ScalingLazyListAnchorType.ItemStart,
+            autoCentering = null,
             rotaryScrollableBehavior = RotaryScrollableDefaults.behavior(scrollableState = listState),
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -112,7 +118,7 @@ fun WearQuickLogScreen(
             item {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     listOf(
                         listOf("Carbs" to LogType.CARBS, "Bolus" to LogType.RAPID_INSULIN),

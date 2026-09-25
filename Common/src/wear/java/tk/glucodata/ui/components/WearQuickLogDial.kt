@@ -139,12 +139,20 @@ fun WearQuickLogDial(
             modifier = Modifier
                 .size(168.dp)
                 .pointerInput(step, range, centerPx, degreesPerStep) {
-                    val touchSlopPx = with(density) { 12.dp.toPx() }
+                    val touchSlopPx = with(density) { 8.dp.toPx() }
+                    val dialRadiusPx = minOf(maxWidth.toPx(), maxHeight.toPx()) / 2f
+                    val ringInnerRadiusPx = dialRadiusPx * 0.6f
 
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        var totalDragX = 0f
-                        var totalDragY = 0f
+                        focusRequester.requestFocus()
+                        val downRadiusPx = kotlin.math.hypot(
+                            down.position.x - centerPx.x,
+                            down.position.y - centerPx.y
+                        )
+                        val startedOnRing = downRadiusPx >= ringInnerRadiusPx
+                        var totalDistance = 0f
+                        var totalAngle = 0f
                         var isAdjusting = false
                         var accAngle = 0f
                         var previousPosition = down.position
@@ -156,20 +164,28 @@ fun WearQuickLogDial(
 
                             val dx = change.position.x - change.previousPosition.x
                             val dy = change.position.y - change.previousPosition.y
-                            totalDragX += kotlin.math.abs(dx)
-                            totalDragY += kotlin.math.abs(dy)
+                            val current = angleOf(change.position)
+                            var angleDelta = current - angleOf(previousPosition)
+                            if (angleDelta > 180f) angleDelta -= 360f
+                            if (angleDelta < -180f) angleDelta += 360f
 
-                            if (!isAdjusting && totalDragX > touchSlopPx && totalDragX > totalDragY * 1.15f) {
+                            totalDistance += kotlin.math.hypot(dx, dy)
+                            totalAngle += angleDelta
+                            previousPosition = change.position
+
+                            val angularDistance = kotlin.math.abs(totalAngle) * dialRadiusPx
+                            if (!isAdjusting &&
+                                startedOnRing &&
+                                totalDistance > touchSlopPx &&
+                                angularDistance > totalDistance * 0.6f
+                            ) {
                                 isAdjusting = true
+                                accAngle = totalAngle
+                            } else if (isAdjusting) {
+                                accAngle += angleDelta
                             }
 
                             if (isAdjusting) {
-                                val current = angleOf(change.position)
-                                var delta = current - angleOf(previousPosition)
-                                if (delta > 180f) delta -= 360f
-                                if (delta < -180f) delta += 360f
-                                previousPosition = change.position
-                                accAngle += delta
                                 val steps = (accAngle / degreesPerStep).toInt()
                                 if (steps != 0) {
                                     accAngle -= steps * degreesPerStep

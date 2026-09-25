@@ -87,7 +87,6 @@ internal fun WearGraphHeader(
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .clickable(role = Role.Button, onClick = onNow)
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
                     )
                 }
             }

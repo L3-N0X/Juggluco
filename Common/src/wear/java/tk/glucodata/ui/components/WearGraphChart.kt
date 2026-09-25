@@ -422,35 +422,29 @@ internal class WearGraphChartRenderer(
         spec: WearGraphChartSpec
     ): Brush {
         fun stopAt(value: Float): Float =
-            ((value - transform.minValue) / (transform.maxValue - transform.minValue)).coerceIn(0f, 1f)
+            ((transform.y(value) - transform.geometry.top) /
+                (transform.geometry.bottom - transform.geometry.top).coerceAtLeast(1f))
+                .coerceIn(0f, 1f)
 
         val colors = spec.clinicalColors
-        val stops = ArrayList<Pair<Float, Color>>(6)
-        val epsilon = 0.0015f
+        val stops = ArrayList<Pair<Float, Color>>(10)
+        val epsilon = 0.0008f
 
         fun append(position: Float, color: Color) {
             val previous = stops.lastOrNull()?.first ?: 0f
             stops += position.coerceIn(previous, 1f) to color
         }
 
-        fun transition(value: Float, color: Color) {
-            if (value in transform.minValue..transform.maxValue) {
-                append(stopAt(value) + epsilon, color)
-            }
-        }
-
-        when {
-            transform.maxValue > 250f -> append(0f, colors.veryHigh)
-            transform.maxValue > spec.targetHigh -> append(0f, colors.high)
-            transform.maxValue > spec.targetLow -> append(0f, colors.inRange)
-            transform.maxValue > 54f -> append(0f, colors.low)
-            else -> append(0f, colors.veryLow)
-        }
-        if (transform.maxValue > 250f) transition(spec.targetHigh, colors.high)
-        if (transform.maxValue > spec.targetHigh) transition(spec.targetHigh, colors.inRange)
-        if (transform.maxValue > spec.targetLow) transition(spec.targetLow, colors.low)
-        if (transform.maxValue > 54f) transition(54f, colors.veryLow)
-        append(1f, stops.last().second)
+        append(0f, colors.veryHigh)
+        append(stopAt(250f), colors.veryHigh)
+        append(stopAt(250f) + epsilon, colors.high)
+        append(stopAt(spec.targetHigh), colors.high)
+        append(stopAt(spec.targetHigh) + epsilon, colors.inRange)
+        append(stopAt(spec.targetLow), colors.inRange)
+        append(stopAt(spec.targetLow) + epsilon, colors.low)
+        append(stopAt(54f), colors.low)
+        append(stopAt(54f) + epsilon, colors.veryLow)
+        append(1f, colors.veryLow)
 
         return Brush.verticalGradient(
             colorStops = stops.toTypedArray(),
