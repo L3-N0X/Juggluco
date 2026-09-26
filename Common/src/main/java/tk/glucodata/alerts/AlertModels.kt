@@ -312,7 +312,13 @@ data class AlertSettings(
     /** When off, alerts on this device only vibrate. */
     val soundOnThisDevice: Boolean = true,
     /** Ring here when a connected phone or watch raises an alert. */
-    val mirrorAlerts: Boolean = true
+    val mirrorAlerts: Boolean = true,
+    /**
+     * Show full-screen alerts on the running screen too. Android only opens a full-screen
+     * intent by itself while the device is locked or the screen is off, so this switch
+     * makes every alert with a full-screen alert appear over whatever is in use.
+     */
+    val fullScreenOnActiveScreen: Boolean = false
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("enabled", enabled)
@@ -321,6 +327,7 @@ data class AlertSettings(
         .put("syncFromPhone", syncFromPhone)
         .put("soundHere", soundOnThisDevice)
         .put("mirror", mirrorAlerts)
+        .put("fullScreenActive", fullScreenOnActiveScreen)
 
     fun isSnoozed(now: Long = System.currentTimeMillis()): Boolean = snoozeAllUntil > now
 
@@ -338,7 +345,8 @@ data class AlertSettings(
                     snoozeOptions = options?.takeIf { it.isNotEmpty() } ?: defaults.snoozeOptions,
                     syncFromPhone = json.optBoolean("syncFromPhone", defaults.syncFromPhone),
                     soundOnThisDevice = json.optBoolean("soundHere", defaults.soundOnThisDevice),
-                    mirrorAlerts = json.optBoolean("mirror", defaults.mirrorAlerts)
+                    mirrorAlerts = json.optBoolean("mirror", defaults.mirrorAlerts),
+                    fullScreenOnActiveScreen = json.optBoolean("fullScreenActive", defaults.fullScreenOnActiveScreen)
                 )
             }.getOrDefault(defaults)
         }

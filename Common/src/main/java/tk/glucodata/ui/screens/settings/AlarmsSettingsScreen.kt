@@ -167,6 +167,20 @@ fun AlarmsSettingsScreen(
                 }
             )
             SnoozeAllRow(snoozeUntil = settings.snoozeAllUntil, now = now, enabled = settings.enabled)
+
+            val anyFullScreen = rules.any { it.enabled && it.fullScreen }
+            SettingsSwitchRow(
+                title = stringResource(R.string.loc_alert_full_screen_active),
+                subtitle = if (anyFullScreen) {
+                    stringResource(R.string.loc_alert_full_screen_active_desc)
+                } else {
+                    stringResource(R.string.loc_alert_full_screen_active_none)
+                },
+                icon = Icons.Default.Fullscreen,
+                checked = settings.fullScreenOnActiveScreen,
+                enabled = settings.enabled && anyFullScreen,
+                onCheckedChange = { on -> AlertStore.updateSettings { it.copy(fullScreenOnActiveScreen = on) } }
+            )
         }
 
         PermissionRows(context = context, rules = rules)

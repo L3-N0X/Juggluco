@@ -1211,6 +1211,9 @@
     <string name="loc_alert_stop_resolved_desc">Stoppt das Klingeln, wenn ein neuer Messwert die Bedingung nicht mehr erfüllt</string>
     <string name="loc_alert_full_screen">Vollbildalarm</string>
     <string name="loc_alert_full_screen_desc">Zeigt den Wert über dem Sperrbildschirm mit großen Schummern- und Verwerfen-Schaltflächen</string>
+    <string name="loc_alert_full_screen_active">Vollbildalarm auch bei Benutzung</string>
+    <string name="loc_alert_full_screen_active_desc">Zeigt jeden Vollbildalarm auch über dem gerade genutzten Bildschirm, nicht nur auf dem Sperrbildschirm</string>
+    <string name="loc_alert_full_screen_active_none">Noch kein Alarm mit Vollbildalarm</string>
     <string name="loc_alert_speak_value">Wert vorlesen</string>
     <string name="loc_alert_speak_value_desc">Liest den Glukosewert vor dem Ton vor</string>
     <string name="loc_alert_flashlight">Taschenlampe</string>

@@ -59,6 +59,7 @@ import tk.glucodata.ui.theme.WearJugglucoTheme
 class WearAlertActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AlertPlayer.fullScreenShowing = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -87,6 +88,11 @@ class WearAlertActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        AlertPlayer.fullScreenShowing = false
+        super.onDestroy()
     }
 }
 

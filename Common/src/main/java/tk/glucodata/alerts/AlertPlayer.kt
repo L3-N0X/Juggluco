@@ -1,6 +1,7 @@
 package tk.glucodata.alerts
 
 import android.annotation.SuppressLint
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -558,10 +559,41 @@ object AlertPlayer {
         }
     }
 
-    private fun fullScreenIntent(): PendingIntent {
-        val intent = Intent(context, fullScreenActivity)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
-        return PendingIntent.getActivity(context, 81451, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    private fun fullScreenIntent(): PendingIntent =
+        PendingIntent.getActivity(context, 81451, alertActivityIntent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+    private fun alertActivityIntent(): Intent = Intent(context, fullScreenActivity)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+
+    /**
+     * True while the alert activity is on screen. The system only opens a full-screen
+     * intent by itself when the device is locked or the screen is off, so the alert has
+     * to be started by hand otherwise, and only once.
+     */
+    @Volatile
+    var fullScreenShowing: Boolean = false
+
+    private fun systemOpensFullScreen(): Boolean {
+        val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        val locked = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            keyguard?.isDeviceLocked == true
+        } else {
+            @Suppress("DEPRECATION")
+            keyguard?.isKeyguardLocked == true
+        }
+        if (locked) return true
+        val power = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        return power?.isInteractive == false
+    }
+
+    /** Puts the alert over whatever the device is showing, for the global active-screen option. */
+    private fun openFullScreenWhileInUse() {
+        if (fullScreenShowing || systemOpensFullScreen()) return
+        try {
+            context.startActivity(alertActivityIntent())
+        } catch (th: Throwable) {
+            Log.stack(LOG_ID, "openFullScreenWhileInUse", th)
+        }
     }
 
     private fun postNotification(alert: ActiveAlert, silentUpdate: Boolean) {
@@ -594,13 +626,17 @@ object AlertPlayer {
                 .addAction(Notification.Action.Builder(null, context.getString(R.string.snooze_minutes, snoozeMinutes), actionIntent(AlertActionReceiver.ACTION_SNOOZE, snoozeMinutes)).build())
                 .addAction(Notification.Action.Builder(null, context.getString(R.string.dismiss), actionIntent(AlertActionReceiver.ACTION_DISMISS)).build())
 
-            if ((alert.rule.fullScreen || Applic.isWearable) && canUseFullScreen()) {
+            val fullScreen = alert.rule.fullScreen || Applic.isWearable
+            if (fullScreen && canUseFullScreen()) {
                 builder.setContentIntent(fullScreenIntent())
                 if (!silentUpdate) builder.setFullScreenIntent(fullScreenIntent(), true)
             } else {
                 builder.setContentIntent(Notify.mkpending())
             }
             notificationManager.notify(NOTIFICATION_ID, builder.build())
+            if (fullScreen && !silentUpdate && AlertStore.settings.value.fullScreenOnActiveScreen) {
+                openFullScreenWhileInUse()
+            }
         } catch (th: Throwable) {
             Log.stack(LOG_ID, "postNotification", th)
         }

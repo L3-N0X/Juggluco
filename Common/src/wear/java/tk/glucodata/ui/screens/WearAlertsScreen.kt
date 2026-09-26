@@ -223,6 +223,14 @@ fun WearAlertsScreen(
             }
             item {
                 AlarmSwitchRow(
+                    title = "Full screen while in use",
+                    summary = if (settings.fullScreenOnActiveScreen) "Alerts cover the watch screen" else "Only on the lock screen",
+                    checked = settings.fullScreenOnActiveScreen,
+                    onCheckedChange = { on -> tap { AlertStore.updateSettings { it.copy(fullScreenOnActiveScreen = on) } } }
+                )
+            }
+            item {
+                AlarmSwitchRow(
                     title = "Value chime",
                     summary = if (legacyAlarms.valueAvailableNotification) "On" else "Off",
                     checked = legacyAlarms.valueAvailableNotification,

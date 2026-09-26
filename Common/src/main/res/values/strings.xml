@@ -1335,6 +1335,9 @@
     <string name="loc_alert_stop_resolved_desc">Stops ringing when a new reading no longer meets the condition</string>
     <string name="loc_alert_full_screen">Full-screen alert</string>
     <string name="loc_alert_full_screen_desc">Shows the value over the lock screen with large snooze and dismiss buttons</string>
+    <string name="loc_alert_full_screen_active">Full-screen alert while in use</string>
+    <string name="loc_alert_full_screen_active_desc">Also shows every full-screen alert over the screen you are using, not only on the lock screen</string>
+    <string name="loc_alert_full_screen_active_none">No alert uses a full-screen alert yet</string>
     <string name="loc_alert_speak_value">Speak value</string>
     <string name="loc_alert_speak_value_desc">Reads the glucose value aloud before the sound</string>
     <string name="loc_alert_flashlight">Flashlight</string>

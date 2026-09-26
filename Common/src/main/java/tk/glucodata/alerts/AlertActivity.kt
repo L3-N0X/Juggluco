@@ -48,10 +48,11 @@ import tk.glucodata.ui.screens.ScreenLayout
 import tk.glucodata.ui.theme.JugglucoTheme
 import tk.glucodata.ui.theme.LocalClinicalColors
 
-/** Full-screen alert shown over the lock screen for alerts with "Full-screen alert" on. */
+/** Full-screen alert shown for alerts with "Full-screen alert" on, over the lock screen or, with the global option, over the running screen. */
 class AlertActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AlertPlayer.fullScreenShowing = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -80,6 +81,11 @@ class AlertActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        AlertPlayer.fullScreenShowing = false
+        super.onDestroy()
     }
 }
 
