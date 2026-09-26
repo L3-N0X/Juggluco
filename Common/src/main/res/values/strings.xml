@@ -253,9 +253,9 @@
 
 	<string name="privatekey">Private Key</string>
 <string name="localonly">Local only</string>
-<string name="toolongsecret">: api_secret too long. max=</string>
+<string name="toolongsecret">api_secret too long. max=</string>
 <string name="invalidport">" invalid port number"</string>
-<string name="newsecret">"new api_secret: "</string>
+<string name="newsecret">"new api_secret set"</string>
 <string name="newport">"new port ="</string>
 <string name="webserver">Web server</string>
 <string name="treatments">Give Amounts</string>
@@ -1619,6 +1619,10 @@
     <string name="loc_update_interval">Update interval (seconds)</string>
     <string name="loc_ports_range">Ports must be valid numbers between 1024 and 65535</string>
     <string name="loc_ports_identical">HTTP and SSL ports cannot be identical</string>
+    <string name="loc_ports_mirror_collision">The port must differ from the mirror listen port %1$s</string>
+    <string name="loc_secret_too_long">API secret is too long, at most %1$d characters are allowed</string>
+    <string name="loc_secret_charset">API secret may only contain printable characters</string>
+    <string name="loc_interval_range">Update interval must be between 1 and %1$d seconds</string>
     <string name="loc_web_server_saved">Web server configuration saved</string>
     <string name="loc_save_restart_server">Save and restart server</string>
     <string name="loc_rest_compatibility">REST API compatibility</string>
@@ -1656,6 +1660,7 @@
     <string name="loc_invalid_mirror_port">Invalid port (must be between 1024 and 65535)</string>
     <string name="loc_connection_saved">Connection saved successfully</string>
     <string name="loc_failed_save_connection">Failed to save connection</string>
+    <string name="loc_failed_load_connection">This connection is no longer available</string>
     <string name="loc_mirror_testing_info">For side-by-side local relay testing, set the target IP to 127.0.0.1 and the target port to your production app\'s listen port (default 17580). This dev build receives live glucose data without a physical Sensor connection.</string>
 
     <string name="loc_graph_today">Today</string>

@@ -120,7 +120,7 @@ public static void show(MainActivity context,View parent) {
 		v -> {
 		 var newkey=editkey.getText().toString();
 		 if(newkey.length()>=MAXKEY) {
-			Applic.argToaster(context,newkey + context.getString(R.string.toolongsecret)+MAXKEY, Toast.LENGTH_LONG);
+			Applic.argToaster(context,context.getString(R.string.toolongsecret)+MAXKEY, Toast.LENGTH_LONG);
 			return;
 		 	}
 		 var portstr=portview.getText().toString();
@@ -158,7 +158,7 @@ public static void show(MainActivity context,View parent) {
 			}
 		 if(!newkey.equals(oldkey[0])) {
 		 	oldkey[0]=newkey;
-			Applic.argToaster(context,context.getString(R.string.newsecret)+newkey, Toast.LENGTH_LONG);
+		 	Applic.argToaster(context,context.getString(R.string.newsecret), Toast.LENGTH_LONG);
 		 	Natives.setApiSecret(newkey);
 			}
 		if(portnum!= Natives.getsslport()) {

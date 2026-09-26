@@ -1339,12 +1339,100 @@ static     constexpr const char isnull[]="null";
 
 extern void makesha1secret();
 
+constexpr const int maxwebserverapissecret=79;
+constexpr const int maxwebserverinterval=86400;
+
+enum {
+    webserverconfig_ok=0,
+    webserverconfig_httpport=1,
+    webserverconfig_sslport=2,
+    webserverconfig_identical=3,
+    webserverconfig_interval=4,
+    webserverconfig_secretlong=5,
+    webserverconfig_secrettype=6,
+    webserverconfig_mirrorport=7
+    };
+
+static int mirrordataport() {
+#ifndef TESTMENU
+    const std::lock_guard<std::mutex> lock(change_host_mutex);
+#endif
+    const char *mirrorport=backup?backup->getmyport():nullptr;
+    if(!mirrorport||!mirrorport[0])
+        return 0;
+    int portnum=0;
+    for(const char *iter=mirrorport;*iter;iter++) {
+        if(*iter<'0'||*iter>'9')
+            return 0;
+        portnum=portnum*10+(*iter-'0');
+        if(portnum>65535)
+            return 0;
+        }
+    return portnum;
+    }
+
+static int checksecret(JNIEnv *env,jstring japisecret,char *secretbuf) {
+    const jint len=japisecret?env->GetStringUTFLength(japisecret):0;
+    if(len<0||len>maxwebserverapissecret)
+        return webserverconfig_secretlong;
+    if(len&&env->GetStringLength(japisecret)!=len)
+        return webserverconfig_secrettype;
+    if(len)
+        env->GetStringUTFRegion(japisecret,0,len,secretbuf);
+    for(jint i=0;i<len;i++) {
+        if(secretbuf[i]<' '||secretbuf[i]>0x7E)
+            return webserverconfig_secrettype;
+        }
+    secretbuf[len]='\0';
+    return webserverconfig_ok;
+    }
+
+extern "C" JNIEXPORT jint  JNICALL   fromjava(setWebServerConfig)(JNIEnv *env, jclass cl,jint jhttpport,jint jsslport,jint jinterval,jstring japisecret) {
+    if(jhttpport<1024||jhttpport>65535)
+        return webserverconfig_httpport;
+    if(jsslport<1024||jsslport>65535)
+        return webserverconfig_sslport;
+    if(jhttpport==jsslport)
+        return webserverconfig_identical;
+    if(jinterval<1||jinterval>maxwebserverinterval)
+        return webserverconfig_interval;
+    char secret[maxwebserverapissecret+1];
+    const int secretresult=checksecret(env,japisecret,secret);
+    if(secretresult!=webserverconfig_ok)
+        return secretresult;
+    const int mirrorport=mirrordataport();
+    if(mirrorport&&(mirrorport==jhttpport||mirrorport==jsslport))
+        return webserverconfig_mirrorport;
+    settings->data()->httpport=jhttpport;
+    settings->data()->sslport=jsslport;
+    settings->data()->nightinterval=jinterval;
+#ifndef WEAROS
+    memcpy(settings->data()->apisecret,secret,strlen(secret)+1);
+    settings->data()->apisecretlength=strlen(secret);
+    makesha1secret();
+#endif
+    return webserverconfig_ok;
+    }
+
 extern "C" JNIEXPORT void  JNICALL   fromjava(setApiSecret)(JNIEnv *env, jclass cl,jstring japisecret) {
 #ifndef WEAROS
-    const jint jlen = env->GetStringLength(japisecret);
-    env->GetStringUTFRegion(japisecret, 0,jlen, settings->data()->apisecret);
-    jint len = env->GetStringUTFLength( japisecret);
-    settings->data()->apisecret[len]='\0';
+    if(!japisecret) return;
+    const jint maxlen=sizeof(settings->data()->apisecret)-1;
+    const jint len=env->GetStringUTFLength( japisecret);
+    if(len<0||len>maxlen) {
+        LOGGER("setApiSecret too long %d>%d\n",len,maxlen);
+        return;
+        }
+    const jint jlen=env->GetStringLength( japisecret);
+    if(jlen!=len) {
+        LOGGER("setApiSecret unexpected character count %d/%d\n",len,jlen);
+        return;
+        }
+    char secret[sizeof(settings->data()->apisecret)];
+    if(len)
+        env->GetStringUTFRegion(japisecret, 0,jlen, secret);
+    secret[len]='\0';
+    memcpy(settings->data()->apisecret,secret,len+1);
     settings->data()->apisecretlength=len;
     makesha1secret();
 #endif
@@ -1373,6 +1461,10 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getuseSSL)(JNIEnv *env, jclass
 
 
 extern "C" JNIEXPORT void  JNICALL   fromjava(setsslport)(JNIEnv *env, jclass cl,jint val) {
+    if(val<1024||val>65535) {
+        LOGGER("setsslport(%d) out of range\n",val);
+        return;
+        }
     settings->data()->sslport=val;
     }
 extern "C" JNIEXPORT jint  JNICALL   fromjava(getsslport)(JNIEnv *env, jclass cl) {
@@ -1380,6 +1472,10 @@ extern "C" JNIEXPORT jint  JNICALL   fromjava(getsslport)(JNIEnv *env, jclass cl
     }
 
 extern "C" JNIEXPORT void  JNICALL   fromjava(sethttpport)(JNIEnv *env, jclass cl,jint val) {
+    if(val<1024||val>65535) {
+        LOGGER("sethttpport(%d) out of range\n",val);
+        return;
+        }
     settings->data()->httpport=val;
     }
 extern "C" JNIEXPORT jint  JNICALL   fromjava(gethttpport)(JNIEnv *env, jclass cl) {
@@ -1740,6 +1836,10 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getRTL)(JNIEnv *env, jclass cl
     }
 
 extern "C" JNIEXPORT void  JNICALL   fromjava(setinterval)(JNIEnv *env, jclass cl,jint val) {
+    if(val<1||val>maxwebserverinterval) {
+        LOGGER("setinterval(%d) out of range\n",val);
+        return;
+        }
     settings->data()->nightinterval=val;
     }
 extern "C" JNIEXPORT jint  JNICALL   fromjava(getinterval)(JNIEnv *env, jclass cl) {

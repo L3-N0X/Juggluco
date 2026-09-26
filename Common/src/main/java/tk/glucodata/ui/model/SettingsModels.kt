@@ -160,3 +160,34 @@ data class MirrorConnection(
     val isDeactivated: Boolean,
     val status: String
 )
+
+data class MirrorHostEditState(
+    val index: Int,
+    val label: String,
+    val hasLabel: Boolean,
+    val ips: List<String>,
+    val port: String,
+    val receiveFrom: Int,
+    val activeReceive: Int,
+    val sendAmounts: Boolean,
+    val sendStream: Boolean,
+    val sendScans: Boolean,
+    val sendPassive: Boolean,
+    val restore: Boolean,
+    val startTime: Long,
+    val detect: Boolean,
+    val testIp: Boolean,
+    val hasHostname: Boolean,
+    val iceLabel: String,
+    val side: Boolean,
+    val transport: Int,
+    val bleClient: Boolean,
+    val bleReverse: Boolean,
+    val bleUnproven: Boolean,
+    val wearOs: Boolean,
+    val deactivated: Boolean,
+    val hasPassword: Boolean
+) {
+    val isReceiver: Boolean get() = (receiveFrom and 2) != 0
+    val isIce: Boolean get() = iceLabel.isNotEmpty()
+}

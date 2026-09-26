@@ -298,10 +298,15 @@ static public String changehostError(MainActivity act,int pos) {
                case -5 : yield "Hostname too long";
             case -6 : yield "Database busy, try again";
                case -7 : yield "Invalid mirror transport or missing connection label";
-               default : yield "Error";
+               case -9 : yield "This connection label is already in use";
+              case -10 : yield "Connection label too long, at most 15 characters";
+              case -11 : yield "Password too long, at most 16 characters";
+              case -12 : yield "This connection has no address to change";
+                default : yield "Error";
             };
             return mess;
             }
+
 
    private void resentconfirmation(MainActivity act,int hostindex) {
            AlertDialog.Builder builder = new AlertDialog.Builder(act);
@@ -1281,7 +1286,11 @@ ViewGroup.LayoutParams params;
          }
 
       Save.setOnClickListener(v->  {
-         Natives.setreceiveport(portview.getText().toString());
+         int portstatus=Natives.setreceiveport(portview.getText().toString());
+         if(portstatus!=Natives.RECEIVEPORT_OK) {
+            Applic.argToaster(act,portstatus==Natives.RECEIVEPORT_RANGE?R.string.portrange:R.string.invalidport,Toast.LENGTH_LONG);
+            return;
+            }
          Save.setVisibility(GONE);
          hidekeyboard(act);
       });

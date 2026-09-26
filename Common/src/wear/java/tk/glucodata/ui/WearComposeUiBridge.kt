@@ -3,8 +3,13 @@ package tk.glucodata.ui
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import tk.glucodata.Applic
 import tk.glucodata.MainActivity
+import tk.glucodata.MessageSender
+import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 
 object WearComposeUiBridge {
@@ -32,6 +37,33 @@ object WearComposeUiBridge {
                         Applic.argToaster(activity, "NFC ready: Hold watch to sensor", Toast.LENGTH_SHORT)
                     } catch (e: Throwable) {
                         Applic.argToaster(activity, "NFC error: ${e.message}", Toast.LENGTH_SHORT)
+                    }
+                },
+                onSyncPhone = {
+                    activity.lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            Applic.switchSync()
+                            MessageSender.reinit()
+                            withContext(Dispatchers.Main.immediate) {
+                                repo.refreshMirrorConnections()
+                                Toast.makeText(
+                                    activity,
+                                    activity.getString(R.string.wear_phone_sync_started),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        } catch (e: Throwable) {
+                            withContext(Dispatchers.Main.immediate) {
+                                Toast.makeText(
+                                    activity,
+                                    activity.getString(
+                                        R.string.wear_phone_sync_error,
+                                        e.message ?: activity.getString(R.string.failed)
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
                     }
                 },
                 onOpenLegacyView = {

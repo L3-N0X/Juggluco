@@ -57,20 +57,23 @@ fun WebServerSettingsScreen(
     val oldHttpPort = remember {
         try {
             val p = Natives.gethttpport()
-            if (p in 1024..65535) p.toString() else "17580"
+            if (p in Natives.WEBSERVER_MIN_PORT..Natives.WEBSERVER_MAX_PORT) p.toString() else "17580"
         } catch (_: Throwable) { "17580" }
     }
     val oldSslPort = remember {
         try {
             val p = Natives.getsslport()
-            if (p in 1024..65535) p.toString() else "17581"
+            if (p in Natives.WEBSERVER_MIN_PORT..Natives.WEBSERVER_MAX_PORT) p.toString() else "17581"
         } catch (_: Throwable) { "17581" }
     }
     val oldInterval = remember {
         try {
             val iv = Natives.getinterval()
-            if (iv > 0) iv.toString() else "60"
+            if (iv in 1..Natives.WEBSERVER_MAX_INTERVAL) iv.toString() else "60"
         } catch (_: Throwable) { "60" }
+    }
+    val mirrorListenPort = remember {
+        try { Natives.getreceiveport()?.trim().orEmpty() } catch (_: Throwable) { "" }
     }
 
     var apiSecret by remember { mutableStateOf(oldSecret) }
@@ -160,9 +163,11 @@ fun WebServerSettingsScreen(
                     onClick = {
                         val hp = httpPort.toIntOrNull()
                         val sp = sslPort.toIntOrNull()
-                        val iv = pollInterval.toIntOrNull() ?: 60
+                        val iv = pollInterval.toIntOrNull()
 
-                        if (hp == null || hp !in 1024..65535 || sp == null || sp !in 1024..65535) {
+                        if (hp == null || hp !in Natives.WEBSERVER_MIN_PORT..Natives.WEBSERVER_MAX_PORT ||
+                            sp == null || sp !in Natives.WEBSERVER_MIN_PORT..Natives.WEBSERVER_MAX_PORT
+                        ) {
                             Toast.makeText(context, context.getString(R.string.loc_ports_range), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
@@ -170,15 +175,43 @@ fun WebServerSettingsScreen(
                             Toast.makeText(context, context.getString(R.string.loc_ports_identical), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
+                        if (iv == null || iv !in 1..Natives.WEBSERVER_MAX_INTERVAL) {
+                            Toast.makeText(context, context.getString(R.string.loc_interval_range, Natives.WEBSERVER_MAX_INTERVAL), Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (apiSecret.length > Natives.WEBSERVER_MAX_APISECRET) {
+                            Toast.makeText(context, context.getString(R.string.loc_secret_too_long, Natives.WEBSERVER_MAX_APISECRET), Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (apiSecret.any { it.code !in 0x20..0x7E }) {
+                            Toast.makeText(context, context.getString(R.string.loc_secret_charset), Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (mirrorListenPort.isNotBlank() && (hp.toString() == mirrorListenPort || sp.toString() == mirrorListenPort)) {
+                            Toast.makeText(context, context.getString(R.string.loc_ports_mirror_collision, mirrorListenPort), Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
 
                         try {
-                            Natives.sethttpport(hp)
-                            Natives.setsslport(sp)
-                            Natives.setinterval(iv)
-                            Natives.setApiSecret(apiSecret)
+                            val status = Natives.setWebServerConfig(hp, sp, iv, apiSecret)
+                            if (status != Natives.WEBSERVERCONFIG_OK) {
+                                val message = when (status) {
+                                    Natives.WEBSERVERCONFIG_HTTPPORT, Natives.WEBSERVERCONFIG_SSLPORT -> context.getString(R.string.loc_ports_range)
+                                    Natives.WEBSERVERCONFIG_IDENTICAL -> context.getString(R.string.loc_ports_identical)
+                                    Natives.WEBSERVERCONFIG_INTERVAL -> context.getString(R.string.loc_interval_range, Natives.WEBSERVER_MAX_INTERVAL)
+                                    Natives.WEBSERVERCONFIG_SECRETLONG -> context.getString(R.string.loc_secret_too_long, Natives.WEBSERVER_MAX_APISECRET)
+                                    Natives.WEBSERVERCONFIG_SECRETTYPE -> context.getString(R.string.loc_secret_charset)
+                                    Natives.WEBSERVERCONFIG_MIRRORPORT -> {
+                                        val live = try { Natives.getreceiveport()?.trim().orEmpty() } catch (_: Throwable) { mirrorListenPort }
+                                        context.getString(R.string.loc_ports_mirror_collision, live.ifBlank { mirrorListenPort })
+                                    }
+                                    else -> context.getString(R.string.loc_error_saving, status.toString())
+                                }
+                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
                             if (exchanges.xdripWebServer) {
-                                repository.setXdripWebServer(false)
-                                repository.setXdripWebServer(true)
+                                repository.restartXdripWebServer()
                             }
                             Toast.makeText(context, context.getString(R.string.loc_web_server_saved), Toast.LENGTH_SHORT).show()
                         } catch (e: Throwable) {

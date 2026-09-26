@@ -7,26 +7,35 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyListAnchorType
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.material3.Button
@@ -34,10 +43,16 @@ import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.TimeText
+import tk.glucodata.R
 import tk.glucodata.alerts.AlertKind
+import tk.glucodata.alerts.AlertOutput
 import tk.glucodata.alerts.AlertPlayer
 import tk.glucodata.alerts.AlertStore
+import tk.glucodata.alerts.formatMinutes
+import tk.glucodata.ui.theme.LocalClinicalColors
 import tk.glucodata.ui.theme.WearJugglucoTheme
 
 /** Full-screen alert on the watch: value first, then Dismiss and the snooze choices. */
@@ -82,82 +97,147 @@ private fun WearAlertScreen(
     onSnooze: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val listState = rememberScalingLazyListState(initialCenterItemIndex = 1)
+    val context = LocalContext.current
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val scheme = MaterialTheme.colorScheme
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(scheme.errorContainer)
+    val clinical = LocalClinicalColors.current
+    val rule = alert.rule
+    val critical = rule.output == AlertOutput.ALARM
+    val glucoseColor = when (rule.kind) {
+        AlertKind.LOW, AlertKind.FALLING -> if (critical) clinical.veryLow else clinical.low
+        AlertKind.HIGH, AlertKind.RISING -> if (critical) clinical.veryHigh else clinical.high
+        AlertKind.SIGNAL_LOSS -> scheme.onSurface
+    }
+    val visibleSnoozeOptions = snoozeOptions.take(3)
+
+    ScreenScaffold(
+        scrollState = listState,
+        timeText = { TimeText() }
     ) {
         ScalingLazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(scheme.surfaceContainerLow),
             state = listState,
+            anchorType = ScalingLazyListAnchorType.ItemStart,
+            autoCentering = null,
             rotaryScrollableBehavior = RotaryScrollableDefaults.behavior(scrollableState = listState),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 24.dp),
+            contentPadding = PaddingValues(start = 10.dp, top = 20.dp, end = 10.dp, bottom = 72.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             item {
-                Text(
-                    text = alert.rule.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = scheme.onErrorContainer,
-                    textAlign = TextAlign.Center
-                )
-            }
-            item {
-                val reading = alert.reading
-                if (alert.rule.kind == AlertKind.SIGNAL_LOSS || reading == null) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "${alert.lostMinutes} min",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = scheme.onErrorContainer
+                        text = rule.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = scheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.height(2.dp))
+                    val reading = alert.reading
+                    if (rule.kind == AlertKind.SIGNAL_LOSS || reading == null) {
                         Text(
-                            text = reading.displayValue,
-                            fontSize = 48.sp,
+                            text = pluralStringResource(
+                                R.plurals.loc_minutes_value,
+                                alert.lostMinutes,
+                                alert.lostMinutes
+                            ),
+                            fontSize = 40.sp,
                             fontWeight = FontWeight.Bold,
-                            color = scheme.onErrorContainer
+                            color = scheme.onSurface,
+                            textAlign = TextAlign.Center
                         )
-                        Text(
-                            text = " " + AlertPlayer.arrow(reading.rate),
-                            fontSize = 30.sp,
-                            color = scheme.onErrorContainer
-                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = reading.displayValue,
+                                fontSize = 48.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = glucoseColor,
+                                letterSpacing = (-1).sp
+                            )
+                            Text(
+                                text = " " + AlertPlayer.arrow(reading.rate),
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = glucoseColor
+                            )
+                        }
                     }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = AlertPlayer.detail(alert),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
                 }
-            }
-            item {
-                Text(
-                    text = AlertPlayer.detail(alert),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onErrorContainer,
-                    textAlign = TextAlign.Center
-                )
             }
             item {
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = scheme.error,
-                        contentColor = scheme.onError
+                        containerColor = scheme.primary,
+                        contentColor = scheme.onPrimary
                     ),
-                    icon = { Icon(Icons.Default.NotificationsOff, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize)) },
-                    label = { Text("Dismiss") }
+                    icon = {
+                        Icon(
+                            Icons.Default.NotificationsOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize)
+                        )
+                    },
+                    label = { Text(stringResource(R.string.dismiss)) }
                 )
             }
-            snoozeOptions.take(3).forEach { minutes ->
+            if (visibleSnoozeOptions.isNotEmpty()) {
                 item {
-                    FilledTonalButton(
-                        onClick = { onSnooze(minutes) },
-                        modifier = Modifier.fillMaxWidth(),
-                        icon = { Icon(Icons.Default.Snooze, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize)) },
-                        label = { Text("Snooze ${if (minutes % 60 == 0) "${minutes / 60} h" else "$minutes min"}") }
+                    Text(
+                        text = stringResource(R.string.loc_snooze_choices),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = scheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
                     )
+                }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        visibleSnoozeOptions.forEach { minutes ->
+                            val label = formatMinutes(context, minutes)
+                            val contentLabel = stringResource(R.string.loc_snooze_duration, label)
+                            FilledTonalButton(
+                                onClick = { onSnooze(minutes) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .semantics { contentDescription = contentLabel },
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = scheme.surfaceContainerHigh,
+                                    contentColor = scheme.onSurface
+                                ),
+                                label = {
+                                    Text(
+                                        text = label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }

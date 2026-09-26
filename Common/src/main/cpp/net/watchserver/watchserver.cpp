@@ -2948,8 +2948,8 @@ extern uint16_t choose_language( std::string_view accept_language, const std::un
             if(hit!=end) {
                hit+=tokenlen;   
                const auto len=strcspn(hit," &");
-               foundsecret={hit,len};
-               LOGGERWEB("has token %.*s#%zd\n",(int)len,foundsecret.data(),foundsecret.size());
+                foundsecret={hit,len};
+                LOGGERWEB("has token #%zd\n",foundsecret.size());
                }
             }
          const char *realsecret;
@@ -2961,7 +2961,7 @@ extern uint16_t choose_language( std::string_view accept_language, const std::un
             realsecret=settings->data()->apisecret;
             }
          if(seclen!=foundsecret.size()||memcmp(realsecret,foundsecret.data(),seclen)) {
-            LOGGERWEB("%s#%d!=%.*s#%zd \n", realsecret,seclen,(int)foundsecret.size(), foundsecret.data(),foundsecret.size());
+            LOGGERWEB("#%d!=#%zd \n", seclen,foundsecret.size());
             std::string_view request="api/v2/authorization/request/"sv;
             if(!memcmp(request.data(),starttoget,request.size())) {
                starttoget+=request.size();
@@ -2984,9 +2984,7 @@ extern uint16_t choose_language( std::string_view accept_language, const std::un
                                 struct tm stm;
                             localtime_r(&tim, &stm);
 
-                            int it=snprintf( nighterrorbuf,maxnighterror,R"(%02d:%02d %02d:%02d: Wrong secret)",stm.tm_mday,stm.tm_mon+1,stm.tm_hour,stm.tm_min);
-                            if(!issha1)
-                                snprintf( nighterrorbuf+it,maxnighterror-it,R"( "%.*s")",(int)foundsecret.size(),foundsecret.data());
+                            snprintf( nighterrorbuf,maxnighterror,R"(%02d:%02d %02d:%02d: Wrong secret, len=%d expected=%d)",stm.tm_mday,stm.tm_mon+1,stm.tm_hour,stm.tm_min,(int)foundsecret.size(),(int)seclen);
 
                             nosecret(foundsecret, outdata) ;
 

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import tk.glucodata.Applic
@@ -48,6 +49,7 @@ import tk.glucodata.ui.model.HardwareConfig
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.model.MirrorConnection
+import tk.glucodata.ui.model.MirrorHostEditState
 import tk.glucodata.ui.model.NumberStore
 import tk.glucodata.ui.model.NumberStoreSource
 import tk.glucodata.ui.model.SensorDetail
@@ -205,6 +207,7 @@ class GlucoseRepository(
         refreshSettings()
         refreshAll()
         refreshWearDevices()
+        refreshMirrorConnections()
         startPolling()
     }
 
@@ -1619,6 +1622,17 @@ class GlucoseRepository(
         }
     }
 
+    fun restartXdripWebServer() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setusexdripwebserver(false)
+                    Natives.setusexdripwebserver(true)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
     fun setLibrelinkBroadcast(enabled: Boolean) {
         _exchanges.value = _exchanges.value.copy(librelinkBroadcast = enabled)
         scope.launch(Dispatchers.IO) {
@@ -1653,7 +1667,7 @@ class GlucoseRepository(
                         val ips = rawIps?.filterNotNull()?.filter { it.isNotBlank() } ?: emptyList()
                         val label = try { Natives.getbackuplabel(i) ?: "" } catch (_: Throwable) { "" }
                         val port = try { Natives.getbackuphostport(i) ?: "" } catch (_: Throwable) { "" }
-                        val isReceiver = try { Natives.getbackuphostreceive(i) != 0 } catch (_: Throwable) { false }
+                        val isReceiver = try { (Natives.getbackuphostreceive(i) and 2) != 0 } catch (_: Throwable) { false }
                         val sendAmounts = try { Natives.getbackuphostnums(i) } catch (_: Throwable) { false }
                         val sendStream = try { Natives.getbackuphoststream(i) } catch (_: Throwable) { false }
                         val sendScans = try { Natives.getbackuphostscans(i) } catch (_: Throwable) { false }
@@ -1816,7 +1830,48 @@ class GlucoseRepository(
         }
     }
 
-    fun saveMirrorConnection(
+    suspend fun mirrorHostEditState(index: Int): MirrorHostEditState? = withContext(Dispatchers.IO) {
+        try {
+            if (!Applic.Nativesloaded || index < 0) return@withContext null
+            val raw = Natives.getMirrorHostEditState(index) ?: return@withContext null
+            if (raw.size < Natives.MIRRORSTATE_SIZE) return@withContext null
+            fun boolAt(pos: Int) = raw[pos] as? Boolean ?: false
+            fun intAt(pos: Int) = (raw[pos] as? Int) ?: 0
+            MirrorHostEditState(
+                index = index,
+                label = raw[Natives.MIRRORSTATE_LABEL] as? String ?: "",
+                hasLabel = boolAt(Natives.MIRRORSTATE_HASLABEL),
+                ips = (raw[Natives.MIRRORSTATE_IPS] as? Array<*>)
+                    ?.mapNotNull { it as? String }
+                    ?: emptyList(),
+                port = raw[Natives.MIRRORSTATE_PORT] as? String ?: "",
+                receiveFrom = intAt(Natives.MIRRORSTATE_RECEIVEFROM),
+                activeReceive = intAt(Natives.MIRRORSTATE_ACTIVERECEIVE),
+                sendAmounts = boolAt(Natives.MIRRORSTATE_SENDNUMS),
+                sendStream = boolAt(Natives.MIRRORSTATE_SENDSTREAM),
+                sendScans = boolAt(Natives.MIRRORSTATE_SENDSCANS),
+                sendPassive = boolAt(Natives.MIRRORSTATE_SENDPASSIVE),
+                restore = boolAt(Natives.MIRRORSTATE_RESTORE),
+                startTime = (raw[Natives.MIRRORSTATE_STARTTIME] as? Long) ?: 0L,
+                detect = boolAt(Natives.MIRRORSTATE_DETECT),
+                testIp = boolAt(Natives.MIRRORSTATE_TESTIP),
+                hasHostname = boolAt(Natives.MIRRORSTATE_HOSTNAME),
+                iceLabel = raw[Natives.MIRRORSTATE_ICE] as? String ?: "",
+                side = boolAt(Natives.MIRRORSTATE_SIDE),
+                transport = intAt(Natives.MIRRORSTATE_TRANSPORT),
+                bleClient = boolAt(Natives.MIRRORSTATE_BLECLIENT),
+                bleReverse = boolAt(Natives.MIRRORSTATE_BLEREVERSE),
+                bleUnproven = boolAt(Natives.MIRRORSTATE_BLEUNPROVEN),
+                wearOs = boolAt(Natives.MIRRORSTATE_WEAROS),
+                deactivated = boolAt(Natives.MIRRORSTATE_DEACTIVATED),
+                hasPassword = boolAt(Natives.MIRRORSTATE_HASPASS)
+            )
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    suspend fun saveMirrorConnection(
         index: Int,
         ips: List<String>,
         port: String,
@@ -1827,44 +1882,83 @@ class GlucoseRepository(
         sendAmounts: Boolean = true,
         isActiveOnly: Boolean = false,
         isPassiveOnly: Boolean = false,
-        password: String? = null
-    ): Boolean {
-        return try {
-            if (!Applic.Nativesloaded) return false
+        changedFields: Int = 0,
+        password: String? = null,
+        passwordAction: Int = Natives.MIRRORPASS_PRESERVE
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            if (!Applic.Nativesloaded) return@withContext false
             val cleanIps = ips.map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { listOf("127.0.0.1") }
             val cleanPort = port.trim().ifEmpty { "17580" }
-            val pos = Natives.changebackuphost(
-                index,
-                cleanIps.toTypedArray(),
-                cleanIps.size,
-                false,
-                cleanPort,
-                if (isReceiver) false else sendAmounts,
-                if (isReceiver) false else sendStream,
-                if (isReceiver) false else sendScans,
-                false,
-                isReceiver,
-                isActiveOnly || isReceiver,
-                isPassiveOnly,
-                password?.ifBlank { null },
-                0L,
-                label.trim().ifEmpty { if (isReceiver) "Receiver" else "Sender" },
-                false,
-                false,
-                null,
-                false,
-                BleMirror.TRANSPORT_TCP,
-                false
-            )
-            if (pos >= 0) {
+            val cleanLabel = label.trim()
+            if (index < 0) {
+                val pos = Natives.changebackuphost(
+                    -1,
+                    cleanIps.toTypedArray(),
+                    cleanIps.size,
+                    false,
+                    cleanPort,
+                    if (isReceiver) false else sendAmounts,
+                    if (isReceiver) false else sendStream,
+                    if (isReceiver) false else sendScans,
+                    false,
+                    isReceiver,
+                    isActiveOnly || isReceiver,
+                    isPassiveOnly,
+                    null,
+                    0L,
+                    cleanLabel.ifEmpty { if (isReceiver) "Receiver" else "Sender" },
+                    false,
+                    false,
+                    null,
+                    false,
+                    BleMirror.TRANSPORT_TCP,
+                    false
+                )
+                if (pos < 0) return@withContext false
                 BleMirror.configurationChanged(pos, true)
                 MessageSender.reinit()
                 Applic.switchSync()
                 refreshMirrorConnections()
-                true
-            } else {
-                false
+                return@withContext true
             }
+            if (changedFields == 0) {
+                refreshMirrorConnections()
+                return@withContext true
+            }
+            if (mirrorHostEditState(index) == null) return@withContext false
+            val pass = password?.ifBlank { null }
+            val action = if (pass != null && passwordAction == Natives.MIRRORPASS_SET) {
+                Natives.MIRRORPASS_SET
+            } else if (passwordAction == Natives.MIRRORPASS_CLEAR) {
+                Natives.MIRRORPASS_CLEAR
+            } else {
+                Natives.MIRRORPASS_PRESERVE
+            }
+            val pos = Natives.patchbackuphost(
+                index,
+                changedFields,
+                cleanIps.toTypedArray(),
+                cleanIps.size,
+                cleanPort,
+                if (isReceiver) 2 else 0,
+                sendAmounts,
+                sendStream,
+                sendScans,
+                cleanLabel.ifEmpty { null },
+                pass,
+                action
+            )
+            if (pos < 0) return@withContext false
+            if (changedFields == Natives.MIRRORFIELD_LABEL) {
+                refreshMirrorConnections()
+                return@withContext true
+            }
+            BleMirror.configurationChanged(pos, true)
+            MessageSender.reinit()
+            Applic.switchSync()
+            refreshMirrorConnections()
+            true
         } catch (_: Throwable) {
             false
         }
@@ -1900,8 +1994,9 @@ class GlucoseRepository(
         return try {
             val cleanPort = port.trim()
             val num = cleanPort.toIntOrNull()
-            if (num != null && num in 1024..65535) {
-                Natives.setreceiveport(cleanPort)
+            if (num != null && num in 1024..65535 &&
+                Natives.setreceiveport(cleanPort) == Natives.RECEIVEPORT_OK
+            ) {
                 MessageSender.reinit()
                 true
             } else {
@@ -2484,6 +2579,7 @@ class GlucoseRepository(
                     }
                     if (counter % 5 == 0) {
                         refreshWearDevices()
+                        refreshMirrorConnections()
                     }
                 } catch (_: Throwable) {}
             }

@@ -31,6 +31,7 @@ object WearNavRoutes {
 fun WearApp(
     repository: GlucoseRepository,
     onTriggerNfcScan: () -> Unit,
+    onSyncPhone: () -> Unit,
     onOpenLegacyView: (() -> Unit)? = null
 ) {
     val navController = rememberSwipeDismissableNavController()
@@ -69,7 +70,8 @@ fun WearApp(
                 composable(WearNavRoutes.SENSORS) {
                     WearSensorsScreen(
                         repository = repository,
-                        onTriggerNfcScan = onTriggerNfcScan
+                        onTriggerNfcScan = onTriggerNfcScan,
+                        onSyncPhone = onSyncPhone
                     )
                 }
 

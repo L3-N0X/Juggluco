@@ -20,6 +20,7 @@
 
 
 #pragma once 
+#include <string>
 #include <string_view>
 #include <condition_variable>
 #include <chrono>
@@ -59,11 +60,108 @@ xquotes(MIRRORPORT)
 
 };
 
+enum {
+    receiveport_status_ok=0,
+    receiveport_status_nodigits=1,
+    receiveport_status_range=2
+    };
+
+enum {
+    mirrorfield_label=1,
+    mirrorfield_ips=2,
+    mirrorfield_port=4,
+    mirrorfield_receivefrom=8,
+    mirrorfield_sendnums=16,
+    mirrorfield_sendstream=32,
+    mirrorfield_sendscans=64,
+    mirrorfield_password=128
+    };
+
+enum {
+    mirrorpass_preserve=0,
+    mirrorpass_set=1,
+    mirrorpass_clear=2
+    };
+
+enum {
+    mirrorstate_label=0,
+    mirrorstate_haslabel=1,
+    mirrorstate_ips=2,
+    mirrorstate_port=3,
+    mirrorstate_receivefrom=4,
+    mirrorstate_activereceive=5,
+    mirrorstate_sendnums=6,
+    mirrorstate_sendstream=7,
+    mirrorstate_sendscans=8,
+    mirrorstate_sendpassive=9,
+    mirrorstate_restore=10,
+    mirrorstate_starttime=11,
+    mirrorstate_detect=12,
+    mirrorstate_testip=13,
+    mirrorstate_hostname=14,
+    mirrorstate_ice=15,
+    mirrorstate_side=16,
+    mirrorstate_transport=17,
+    mirrorstate_bleclient=18,
+    mirrorstate_blereverse=19,
+    mirrorstate_bleunproven=20,
+    mirrorstate_wearos=21,
+    mirrorstate_deactivated=22,
+    mirrorstate_haspass=23,
+    mirrorstate_size=24
+    };
+
+enum {
+    changehost_invalidport=-1,
+    changehost_invalidaddress=-2,
+    changehost_invalidindex=-3,
+    changehost_toomanysenders=-4,
+    changehost_hostnamelong=-5,
+    changehost_noenv=-6,
+    changehost_invalidtransport=-7,
+    changehost_nohostname=-8,
+    changehost_duplicatelabel=-9,
+    changehost_labellong=-10,
+    changehost_passwordlong=-11,
+    changehost_iceaddress=-12
+    };
+
+constexpr const int maxmirroraddresslen=256;
+
+#include "net/passhost.hpp"
+
+struct mirrorhoststate {
+    std::string label;
+    std::string icelabel;
+    std::array<std::string,passhost_t::maxip> ips;
+    int nr=0;
+    int portnum=0;
+    uint32_t starttime=0;
+    int receivefrom=0;
+    int activereceive=0;
+    int transport=passhost_t::transport_automatic;
+    bool haslabel=false;
+    bool sendnums=false;
+    bool sendstream=false;
+    bool sendscans=false;
+    bool sendpassive=false;
+    bool restore=false;
+    bool detect=false;
+    bool testip=true;
+    bool hashostname=false;
+    bool side=false;
+    bool bleclient=false;
+    bool blereverse=false;
+    bool bleunproven=false;
+    bool wearos=false;
+    bool deactivated=false;
+    bool haspass=false;
+    };
+
 
 #include "inout.hpp"
 #include "net/backup.hpp"
 #include "destruct.hpp"
-#include "net/passhost.hpp"
 #include "net/netstuff.hpp"
 #include "sensoren.hpp"
 
@@ -690,6 +788,56 @@ static const std::array< char,17> passback(const std::array<uint8_t,16> &passin)
     return plain;
     }
 
+static bool samehostlabel(const passhost_t &host,const char *label) {
+    if(!host.hasname||!label)
+        return false;
+    return !strncmp(host.getname(),label,passhost_t::maxnamelen);
+    }
+
+int findbylabel(int index,const char *label) const {
+    if(!label||!label[0])
+        return -1;
+    const int nr=getupdatedata()->hostnr;
+    for(int pos=0;pos<nr;pos++) {
+        if(pos==index)
+            continue;
+        const passhost_t &host=getupdatedata()->allhosts[pos];
+        if(samehostlabel(host,label)) {
+            LOGGER("label %s already used by host %d\n",label,pos);
+            return pos;
+            }
+        }
+    return -1;
+    }
+
+int validatelabel(int index,const char *label) const {
+    if(!label)
+        return 0;
+    const int len=strlen(label);
+    if(len>=passhost_t::maxnamelen) {
+        LOGGER("label too long %d>=%d\n",len,passhost_t::maxnamelen);
+        return changehost_labellong;
+        }
+    if(label[0]&&findbylabel(index,label)>=0)
+        return changehost_duplicatelabel;
+    return 0;
+    }
+
+static int portnumber(string_view port,int *portint) {
+    if(port.data()==nullptr||port.size()==0)
+        return 0;
+    if(port.size()>5)
+        return changehost_invalidport;
+    int value=0;
+    for(const char iter:port) {
+        if(iter<'0'||iter>'9')
+            return changehost_invalidport;
+        value=value*10+(iter-'0');
+        }
+    *portint=value;
+    return 0;
+    }
+
 void resethost(passhost_t &ph) {
     LOGGER("resethost(%s)\n",ph.getnameif());
     if(ph.index>=0) {  
@@ -717,10 +865,17 @@ int jsetips(const char *port,JNIEnv *env, const jobjectArray jar, const int len,
     int uselen=std::min(lmaxip,len);
     for(int i=0;i<uselen;i++) {
         jstring  jname=(jstring)env->GetObjectArrayElement(jar,i);
-        int namelen= env->GetStringUTFLength( jname);
-        char name[namelen+1];
-
-        jint jnamelen = env->GetStringLength( jname);
+        if(!jname) {
+            LOGGER("jsetips element %d is null\n",i);
+            return -1;
+            }
+        const jint jnamelen= env->GetStringLength( jname);
+        jint namelen= env->GetStringUTFLength( jname);
+        if(namelen<=0||namelen>=maxmirroraddresslen||jnamelen!=namelen) {
+            LOGGER("jsetips invalid address length %d/%d\n",namelen,jnamelen);
+            return -1;
+            }
+        char name[maxmirroraddresslen];
         env->GetStringUTFRegion( jname, 0,jnamelen, name); 
         name[namelen]='\0';
         int start=0;
@@ -803,14 +958,14 @@ void setactivereceive(int allindex,passhost_t *ph,bool startthread=true) {
 
 
 int changeICEhost(const char *ICElabel,int index,const bool sendnums,const bool sendstream,const bool sendscans,const bool receive,string_view pass,uint32_t starttime,const char *label,bool side,bool startthreads=true,int transport=passhost_t::transport_automatic,int bleclient=0);
-int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,string_view port,const bool sendnums,const bool sendstream,const bool sendscans,const bool restore,const bool receive,const bool activeonly,string_view pass,uint32_t starttime,bool passiveonly,const char *label=nullptr,const bool testip=true,bool startthreads=true,bool hashostname=false,int transport=-1,int bleclient=-1) {
+int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,string_view port,const bool sendnums,const bool sendstream,const bool sendscans,const bool restore,const bool receive,const bool activeonly,string_view pass,uint32_t starttime,bool passiveonly,const char *label=nullptr,const bool testip=true,bool startthreads=true,bool hashostname=false,int transport=-1,int bleclient=-1,const bool keepaddresses=false) {
     const int hostnr=getupdatedata()->hostnr;
     LOGGER("hostnr=%d changehost(%d,sendnums=%d,sendstream=%d,sendscans=%d,receive=%d,activeonly=%d,passiveonly=%d,label=%s port=%s nr=%d hashostname=%d\n",hostnr,index,sendnums,sendstream,sendscans,receive,activeonly,passiveonly,label,port.data(),nr,hashostname);
     if(index<0) 
         index=hostnr;
     if(index>=maxallhosts)  {
         LOGAR("changehost: index>=maxallhosts");
-        return -3;
+        return changehost_invalidindex;
         }
     const bool newhost=(index==hostnr);
     auto &thehost=getupdatedata()->allhosts[index];
@@ -822,30 +977,85 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
     const bool savednoip=thehost.noip;
     const int selectedtransport=transport<0?(newhost?passhost_t::transport_automatic:thehost.gettransport()):transport;
     const bool selectedbleclient=bleclient<0?(newhost?false:thehost.bleclient):bleclient;
+    const bool usesnetworktransport=selectedtransport==passhost_t::transport_automatic||selectedtransport==passhost_t::transport_tcp;
+    const int lmaxip=passhost_t::maxip-(label?1:0);
     if(selectedtransport<passhost_t::transport_automatic||selectedtransport>passhost_t::transport_bluetooth) {
         LOGGER("changehost: invalid mirror transport %d\n",selectedtransport);
-        return -7;
+        return changehost_invalidtransport;
         }
     if((selectedtransport==passhost_t::transport_messages||selectedtransport==passhost_t::transport_bluetooth)&&
             (!label||!*label)) {
         LOGAR("changehost: Bluetooth/messages transport needs a label");
-        return -7;
+        return changehost_invalidtransport;
+        }
+    if(const int labelerror=validatelabel(index,label)) {
+        LOGGER("changehost: invalid label %d\n",labelerror);
+        return labelerror;
+        }
+    if(pass.size()>passhost_t::maxpasslen) {
+        LOGGER("changehost: password too long %d>%d\n",pass.size(),passhost_t::maxpasslen);
+        return changehost_passwordlong;
         }
     const bool receiveactive=receive&&activeonly;
     if(port.data()==nullptr||port.size()==0) {
         port={defaultport,sizeof(defaultport)-1};
         }
-    else {
-        if(port.size()>5) {
-            LOGAR("changehost: port.size()>5)");
-            return -1;
+    int portint=0;
+    if(const int porterror=portnumber(port,&portint)) {
+        LOGGER("changehost: invalid port %.*s\n",int(port.size()),port.data());
+        return porterror;
+        }
+    if(usesnetworktransport&&!passiveonly&&(portint>65535||portint<1024)) {
+        LOGGER("port out of range %d\n",portint);
+        return changehost_invalidport;
+        }
+    const bool sendto= sendnums|| sendstream|| sendscans;
+    if(sendto&&(newhost||thehost.index==-1)&&getupdatedata()->sendnr>=maxsendtohost) {
+        LOGGER("changehost: sendnr(%d)>=maxsendtohost(%d)\n",getupdatedata()->sendnr,maxsendtohost);
+        return changehost_toomanysenders;
+        }
+    std::array<sockaddr_in6,passhost_t::maxip> newips{};
+    char newhostname[passhost_t::hostnamedata::maxhostname]{};
+    int newnr=0;
+    if(keepaddresses) {
+        if(newhost) {
+            LOGAR("changehost: keepaddresses for a new host");
+            return changehost_invalidaddress;
             }
         }
-    int portint=atoi(port.data());
-    if((selectedtransport==passhost_t::transport_automatic||selectedtransport==passhost_t::transport_tcp)&&
-            !passiveonly&&(portint>65535||portint<1024)) {
-        LOGGER("port out of range %d\n",portint);
-        return -1;
+    else if(hashostname) {
+        if(!env||!jnames) {
+            LOGAR("changehost: hostname without env");
+            return changehost_noenv;
+            }
+        jstring  jhostname=(jstring)env->GetObjectArrayElement(jnames,0);
+        if(!jhostname) {
+            LOGAR("no hostname");
+            return changehost_nohostname;
+            }
+        const jint namelen= env->GetStringUTFLength( jhostname);
+        const jint jnamelen= env->GetStringLength( jhostname);
+        if(namelen<0||namelen>=passhost_t::hostnamedata::maxhostname||jnamelen!=namelen) {
+            LOGGER("supplied name too long %d>%d\n",namelen,passhost_t::hostnamedata::maxhostname);
+            return changehost_hostnamelong;
+            }
+        env->GetStringUTFRegion( jhostname, 0,jnamelen, newhostname); 
+        newhostname[namelen]='\0';
+        newnr=1;
+        }
+    else if(usesnetworktransport) {
+        newnr=env?jsetips(port.data(),env, jnames, nr,newips.data(),lmaxip):
+                 setips(port.data(),(const char **)jnames, nr,newips.data(),lmaxip);
+        if(newnr<0) {
+            LOGGER("changehost: invalid address\n");
+            return changehost_invalidaddress;
+            }
+        if(!newnr&&!detect&&!(passiveonly&&!testip)) {
+            LOGAR("changehost: no usable address");
+            return changehost_invalidaddress;
+            }
+        if(detect&&newnr<lmaxip)
+            newips[newnr]={.sin6_family=AF_INET6,.sin6_port=htons(portint),.sin6_addr=noaddress};
         }
 
      struct oldnet {
@@ -859,19 +1069,17 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
             };
         };
     struct oldnet desnet;
-    const bool sendto= sendnums|| sendstream|| sendscans;
     const bool reconnect=(receive&&!passiveonly)||(sendto&&!activeonly);
     int tohost;
     bool newthread=false;
     const bool dontopen=sendto&&passiveonly;
-    int lmaxip=passhost_t::maxip-(label?1:0);
     LOGGER("changehost newhost=%d thehost.index=%d\n",newhost,thehost.index);
     if(sendto) {
         if(newhost||thehost.index==-1) {  //Fout??
             tohost=getupdatedata()->sendnr;
             if(tohost>=maxsendtohost) {
                 LOGGER("changehost: tohost(%d)>=maxsendtohost(%d)\n",tohost,maxsendtohost);
-                return -4;
+                return changehost_toomanysenders;
                 }
             thehost.index=tohost;
             newthread=true;
@@ -914,56 +1122,35 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
     keepTCP:
     if(!newhost&&thehost.activereceive)
         endactivereceive(index) ;
-    int res;
-    if(hashostname) {
-        thehost.hostname=true;
-        if(env) {
-            jstring  jhostname=(jstring)env->GetObjectArrayElement(jnames,0);
-            if(!jhostname) {
-                              LOGAR("no hostname");
-                              if(newhost&&sendto) {
-                                          --getupdatedata()->sendnr;
-                              }
-                return -8;
-                }
-            int namelen= env->GetStringUTFLength( jhostname);
-
-            if(namelen>=passhost_t::hostnamedata::maxhostname) { //terminanting zero
-                LOGGER("supplied name too long %d>%d\n",namelen,passhost_t::hostnamedata::maxhostname);
-                if(newhost&&sendto) {
-                 --getupdatedata()->sendnr;
-                   }
-                return -5;
-                }
-
-            jint jnamelen = env->GetStringLength( jhostname);
-
-            char *hostname=thehost.gethostname();
-
-            env->GetStringUTFRegion( jhostname, 0,jnamelen, hostname); 
-            hostname[namelen]='\0';
-            }
+    int res=newnr;
+    bool detected=detect;
+    if(keepaddresses) {
+        std::copy_n(savedips.begin(),passhost_t::maxip,thehost.ips);
+        thehost.hostname=savedhostname;
+        thehost.noip=savednoip;
+        if(savedhostname)
+            thehost.setportwithhostname(portint);
         else {
-            LOGAR("What to do with hashostname with env=null?");
-            if(newhost&&sendto) {
-                  --getupdatedata()->sendnr;
-               }
-            return -6;
+            for(int i=0;i<savednr;i++)
+                thehost.ips[i].sin6_port=htons(portint);
             }
+        res=thehost.nr=savednr;
+        }
+    else if(hashostname) {
+        thehost.hostname=true;
+        char *hostname=thehost.gethostname();
+        memcpy(hostname,newhostname,strlen(newhostname)+1);
         thehost.setportwithhostname(portint);
         res=thehost.nr=1;
-        detect=false;
+        detected=false;
         }
     else   {
        thehost.hostname=false;
-       res=thehost.nr=env?jsetips(port.data(),env, jnames, nr,thehost.ips,lmaxip): setips(port.data(),(const char **)jnames, nr,thehost.ips,lmaxip);
-        }
+       if(newnr>0)
+           std::copy_n(newips.begin(),newnr,thehost.ips);
+       res=thehost.nr=newnr;
+       }
     int ret=index;
-    if(res<0) {
-               LOGGER("changehost res(%d)<0",res);
-        thehost.nr=0;
-        ret=-2;
-        }
     if(selectedtransport==passhost_t::transport_messages||selectedtransport==passhost_t::transport_bluetooth) {
         if(newhost) {
             thehost.nr=0;
@@ -981,10 +1168,13 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
             ret=index;
             }
         }
-    else if(detect) {
+    else if(keepaddresses) {
+        thehost.detect=detected;
+        }
+    else if(detected&&!hashostname) {
         if(res<lmaxip)  {
             thehost.detect=true;
-            thehost.ips[res]={.sin6_family=AF_INET6,.sin6_port=htons(atoi(port.data())),.sin6_addr=noaddress};
+            thehost.ips[res]={.sin6_family=AF_INET6,.sin6_port=htons(portint),.sin6_addr=noaddress};
             }
         else
             thehost.detect=false;
@@ -992,7 +1182,7 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
     else {
         if(!hashostname&&res==0&&!(passiveonly&&!testip))   {
             LOGAR("res==0&&!(passiveonly&&!testip))");
-            ret=-2;
+            ret=changehost_invalidaddress;
             }
         thehost.detect=false;
         }
@@ -1021,7 +1211,8 @@ false             false          0
     thehost.receivefrom=receive?(reconnect?3:2):((sendto&reconnect)?1:0);
     LOGGER("changehost receivefrom=%d\n", thehost.receivefrom);
     setpass( thehost.pass,pass);
-    thehost.deactivated=false;
+    if(newhost)
+        thehost.deactivated=false;
 
     if(newhost)  {
         ++(getupdatedata()->hostnr);
@@ -1030,7 +1221,7 @@ false             false          0
         thehost.newconnection=true;
         }
     else {
-        LOGGER("wearos(%d)=%d\n", index,thehost.wearos);
+        LOGGER("wearos(%d)=%d deactivated=%d\n", index,thehost.wearos,thehost.deactivated);
         }
 
     setConnectTime(index,0);
@@ -1063,6 +1254,221 @@ false             false          0
     #endif
     LOGGER("changehost=%d\n",ret);
     return ret;
+    }
+
+bool getmirrorstate(int index,struct mirrorhoststate &state) const {
+    if(index<0||index>=getupdatedata()->hostnr)
+        return false;
+    const passhost_t &host=getupdatedata()->allhosts[index];
+    state.haslabel=host.hasname;
+    state.label=host.hasname?std::string(host.getname(),strnlen(host.getname(),passhost_t::maxnamelen)):std::string();
+    state.icelabel=host.ICE?std::string(host.getICEname()):std::string();
+    state.nr=std::clamp(host.nr,0,passhost_t::maxip);
+    for(int i=0;i<passhost_t::maxip;i++) {
+        if(host.ICE)
+            state.ips[i].clear();
+        else if(i>=state.nr)
+            state.ips[i].clear();
+        else if(host.hashostname())
+            state.ips[i]=i?std::string():std::string(host.gethostname());
+        else
+            state.ips[i]=std::string(namehost(host.ips+i));
+        }
+    if(host.ICE)
+        state.nr=state.icelabel.empty()?0:1;
+    const int sendindex=host.index;
+    const bool hassender=sendindex>=0&&sendindex<getupdatedata()->sendnr;
+    const updateone *sender=hassender?getupdatedata()->tosend+sendindex:nullptr;
+    state.portnum=host.getport();
+    state.receivefrom=host.receivefrom;
+    state.activereceive=host.activereceive;
+    state.sendpassive=host.sendpassive;
+    state.sendnums=sender&&sender->sendnums;
+    state.sendstream=sender&&sender->sendstream;
+    state.sendscans=sender&&sender->sendscans;
+    state.restore=sender&&sender->restore;
+    state.starttime=sender?sender->starttime:0;
+    state.detect=host.detect;
+    state.testip=!host.noip;
+    state.hashostname=host.hashostname();
+    state.side=host.side;
+    state.transport=host.gettransport();
+    state.bleclient=host.bleclient;
+    state.blereverse=host.blereverse;
+    state.bleunproven=host.bleunproven;
+    state.wearos=host.wearos;
+    state.deactivated=host.deactivated;
+    state.haspass=host.haspass();
+    return true;
+    }
+
+int patchhost(int index,JNIEnv *env,jobjectArray jnames,int nr,int mask,string_view port,int receivefrom,const bool sendnums,const bool sendstream,const bool sendscans,string_view label,string_view pass,int passaction) {
+    LOGGER("patchhost(%d,mask=%d,nr=%d,receivefrom=%d,sendnums=%d,sendstream=%d,sendscans=%d,passaction=%d)\n",
+            index,mask,nr,receivefrom,sendnums,sendstream,sendscans,passaction);
+    struct mirrorhoststate state;
+    if(!getmirrorstate(index,state)) {
+        LOGAR("patchhost: invalid index");
+        return changehost_invalidindex;
+        }
+    if(!mask)
+        return index;
+    if(mask&~(mirrorfield_label|mirrorfield_ips|mirrorfield_port|mirrorfield_receivefrom|
+              mirrorfield_sendnums|mirrorfield_sendstream|mirrorfield_sendscans|mirrorfield_password)) {
+        LOGAR("patchhost: unknown field mask");
+        return changehost_invalidport;
+        }
+    const char *newlabel=label.data();
+    std::array<char,17> savedpass{};
+    string_view mergedpass;
+    switch(passaction) {
+        case mirrorpass_preserve:
+            if(state.haspass) {
+                savedpass=passback(getupdatedata()->allhosts[index].pass);
+                int passlength=0;
+                while(passlength<passhost_t::maxpasslen&&savedpass[passlength])
+                    ++passlength;
+                mergedpass=string_view(savedpass.data(),passlength);
+                }
+            break;
+        case mirrorpass_set:
+            if(pass.size()>passhost_t::maxpasslen) {
+                LOGGER("patchhost: password too long %d>%d\n",pass.size(),passhost_t::maxpasslen);
+                return changehost_passwordlong;
+                }
+            mergedpass=pass;
+            break;
+        case mirrorpass_clear:
+            break;
+        default:
+            LOGAR("patchhost: invalid password action");
+            return changehost_passwordlong;
+        }
+    if(mask&mirrorfield_label) {
+        if(const int labelerror=validatelabel(index,newlabel)) {
+            LOGGER("patchhost: invalid label %d\n",labelerror);
+            return labelerror;
+            }
+        if(newlabel&&!*newlabel)
+            newlabel=nullptr;
+        }
+    else
+        newlabel=state.haslabel?state.label.c_str():nullptr;
+    if(mask==mirrorfield_label) {
+        auto &onlylabel=getupdatedata()->allhosts[index];
+        if(state.haslabel==(newlabel!=nullptr)&&(!newlabel||!strcmp(state.label.c_str(),newlabel))) {
+            LOGGER("patchhost: label unchanged for %s(%d)\n",state.label.c_str(),index);
+            return index;
+            }
+        LOGGER("patchhost: rename %s(%d) to %s\n",state.label.c_str(),index,newlabel?newlabel:"");
+        if(newlabel)
+            onlylabel.setname(newlabel);
+        else {
+            memset(const_cast<char *>(onlylabel.getname()),0,passhost_t::maxnamelen);
+            onlylabel.hasname=false;
+            }
+        return index;
+        }
+    if((mask&mirrorfield_ips)&&(!jnames||nr<1)) {
+        LOGAR("patchhost: address change without addresses");
+        return changehost_invalidaddress;
+        }
+    char portbuf[6];
+    if(mask&mirrorfield_port) {
+        if(port.data()==nullptr||port.size()==0) {
+            LOGAR("patchhost: empty port");
+            return changehost_invalidport;
+            }
+        int portint=0;
+        if(const int porterror=portnumber(port,&portint)) {
+            LOGGER("patchhost: invalid port %.*s\n",int(port.size()),port.data());
+            return porterror;
+            }
+        memcpy(portbuf,port.data(),port.size());
+        portbuf[port.size()]='\0';
+        }
+    else
+        getport(index,portbuf);
+    const int mergedreceivefrom=(mask&mirrorfield_receivefrom)?receivefrom:state.receivefrom;
+    const bool mergedreceive=(mergedreceivefrom&2)!=0;
+    const bool mergedactiveonly=(mask&mirrorfield_receivefrom)?mergedreceive:state.activereceive>0;
+    const bool mergedpassiveonly=(mask&mirrorfield_receivefrom)?false:
+        (mergedreceive?state.receivefrom==2:state.sendpassive);
+    const bool mergedsendto=sendnums||sendstream||sendscans;
+    const bool mergedreconnect=(mergedreceive&&!mergedpassiveonly)||(mergedsendto&&!mergedactiveonly);
+    const int wantreceivefrom=mergedreceive?(mergedreconnect?3:2):((mergedsendto&&mergedreconnect)?1:0);
+    const bool mergedsendpassive=mergedsendto&&mergedpassiveonly;
+    const bool mergedrestore=state.restore;
+    const uint32_t mergedstarttime=state.starttime;
+    const bool keepaddresses=!(mask&mirrorfield_ips);
+    if(!state.icelabel.empty()) {
+        if(!keepaddresses) {
+            LOGAR("patchhost: ICE connections have no address to change");
+            return changehost_iceaddress;
+            }
+        auto &icehost=getupdatedata()->allhosts[index];
+        const bool savedwearos=icehost.wearos;
+        const bool saveddeactivated=icehost.deactivated;
+        const bool savedblereverse=icehost.blereverse;
+        const bool savedbleunproven=icehost.bleunproven;
+        const bool savedside=icehost.side;
+        const int savedindex=icehost.index;
+        updateone *savedsender=savedindex>=0&&savedindex<getupdatedata()->sendnr?
+            getupdatedata()->tosend+savedindex:nullptr;
+        const bool savedrestore=savedsender&&savedsender->restore;
+        const int iceret=changeICEhost(state.icelabel.c_str(),index,sendnums,sendstream,sendscans,mergedreceive,
+                mergedpass,mergedstarttime,newlabel,state.side,true,state.transport,state.bleclient);
+        if(iceret<0) {
+            LOGGER("patchhost: changeICEhost=%d\n",iceret);
+            return iceret;
+            }
+        icehost.wearos=savedwearos;
+        icehost.deactivated=saveddeactivated;
+        icehost.blereverse=savedblereverse;
+        icehost.bleunproven=savedbleunproven;
+        icehost.side=savedside;
+        icehost.receivefrom=wantreceivefrom;
+        icehost.sendpassive=mergedsendpassive;
+        updateone *icesender=icehost.index>=0&&icehost.index<getupdatedata()->sendnr?
+            getupdatedata()->tosend+icehost.index:nullptr;
+        if(icesender&&savedindex==icehost.index)
+            icesender->restore=savedrestore;
+        if(state.activereceive>0) {
+            if(!icehost.activereceive)
+                setactivereceive(index,&icehost,true);
+            }
+        else if(icehost.activereceive)
+            endactivereceive(index);
+        LOGGER("patchhost: saved ICE %s(%d)\n",icehost.getnameif(),index);
+        return index;
+        }
+    const int ret=changehost(index,env,jnames,nr,state.detect,string_view(portbuf,strlen(portbuf)),
+            sendnums,sendstream,sendscans,mergedrestore,mergedreceive,mergedactiveonly,mergedpass,
+            mergedstarttime,mergedpassiveonly,newlabel,state.testip,true,state.hashostname,
+            state.transport,state.bleclient,keepaddresses);
+    if(ret<0) {
+        LOGGER("patchhost: changehost=%d\n",ret);
+        return ret;
+        }
+    auto &patched=getupdatedata()->allhosts[index];
+    if(patched.sendpassive!=mergedsendpassive) {
+        LOGGER("patchhost: restore sendpassive %d->%d for %s(%d)\n",patched.sendpassive,mergedsendpassive,
+                patched.getnameif(),index);
+        patched.sendpassive=mergedsendpassive;
+        }
+    if(patched.receivefrom!=wantreceivefrom) {
+        LOGGER("patchhost: restore receivefrom %d->%d for %s(%d)\n",patched.receivefrom,wantreceivefrom,
+                patched.getnameif(),index);
+        patched.receivefrom=wantreceivefrom;
+        }
+    if(state.activereceive>0) {
+        if(!patched.activereceive)
+            setactivereceive(index,&patched,true);
+        }
+    else if(patched.activereceive)
+        endactivereceive(index);
+    LOGGER("patchhost saved %s(%d) nr=%d detect=%d receivefrom=%d\n",patched.getnameif(),index,patched.nr,
+            patched.detect,patched.receivefrom);
+    return index;
     }
 
 

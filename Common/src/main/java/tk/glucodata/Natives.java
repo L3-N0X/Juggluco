@@ -281,6 +281,49 @@ public static native boolean getbackupside(int pos);
 public static native boolean getbackupbleclient(int pos);
 public static native boolean getbackupblereverse(int pos);
 public static native boolean getbackupbleunproven(int pos);
+
+public static final int MIRRORFIELD_LABEL=1;
+public static final int MIRRORFIELD_IPS=2;
+public static final int MIRRORFIELD_PORT=4;
+public static final int MIRRORFIELD_RECEIVEFROM=8;
+public static final int MIRRORFIELD_SENDNUMS=16;
+public static final int MIRRORFIELD_SENDSTREAM=32;
+public static final int MIRRORFIELD_SENDSCANS=64;
+public static final int MIRRORFIELD_PASSWORD=128;
+
+public static final int MIRRORPASS_PRESERVE=0;
+public static final int MIRRORPASS_SET=1;
+public static final int MIRRORPASS_CLEAR=2;
+
+public static final int MIRRORSTATE_LABEL=0;
+public static final int MIRRORSTATE_HASLABEL=1;
+public static final int MIRRORSTATE_IPS=2;
+public static final int MIRRORSTATE_PORT=3;
+public static final int MIRRORSTATE_RECEIVEFROM=4;
+public static final int MIRRORSTATE_ACTIVERECEIVE=5;
+public static final int MIRRORSTATE_SENDNUMS=6;
+public static final int MIRRORSTATE_SENDSTREAM=7;
+public static final int MIRRORSTATE_SENDSCANS=8;
+public static final int MIRRORSTATE_SENDPASSIVE=9;
+public static final int MIRRORSTATE_RESTORE=10;
+public static final int MIRRORSTATE_STARTTIME=11;
+public static final int MIRRORSTATE_DETECT=12;
+public static final int MIRRORSTATE_TESTIP=13;
+public static final int MIRRORSTATE_HOSTNAME=14;
+public static final int MIRRORSTATE_ICE=15;
+public static final int MIRRORSTATE_SIDE=16;
+public static final int MIRRORSTATE_TRANSPORT=17;
+public static final int MIRRORSTATE_BLECLIENT=18;
+public static final int MIRRORSTATE_BLEREVERSE=19;
+public static final int MIRRORSTATE_BLEUNPROVEN=20;
+public static final int MIRRORSTATE_WEAROS=21;
+public static final int MIRRORSTATE_DEACTIVATED=22;
+public static final int MIRRORSTATE_HASPASS=23;
+public static final int MIRRORSTATE_SIZE=24;
+
+public static final int MAXMIRRORADDRESSES=4;
+public static native Object[] getMirrorHostEditState(int pos);
+public static native int patchbackuphost(int pos,int mask,String[] names,int nr,String port,int receivefrom,boolean nums,boolean stream,boolean scans,String label,String pass,int passaction);
 /**
  * One-shot migration for pre-side phone/tablet mirror rows.
  * Assigns side from the existing Scans send flag while preserving the
@@ -327,7 +370,11 @@ public static native void resetbackuphost(int pos);
 public static native void deletebackuphost(int pos);
 public static native boolean resetbylabel(String label,boolean galaxy);
 
-public static native void setreceiveport(String port);
+public static final int RECEIVEPORT_OK=0;
+public static final int RECEIVEPORT_NODIGITS=1;
+public static final int RECEIVEPORT_RANGE=2;
+
+public static native int setreceiveport(String port);
 public static native String getreceiveport( );
 public static native void networkpresent( );
 public static native void networkabsent();
@@ -697,6 +744,21 @@ public static native int getsslport( );
 
 public static native void sethttpport(int val);
 public static native int gethttpport( );
+
+public static final int WEBSERVERCONFIG_OK=0;
+public static final int WEBSERVERCONFIG_HTTPPORT=1;
+public static final int WEBSERVERCONFIG_SSLPORT=2;
+public static final int WEBSERVERCONFIG_IDENTICAL=3;
+public static final int WEBSERVERCONFIG_INTERVAL=4;
+public static final int WEBSERVERCONFIG_SECRETLONG=5;
+public static final int WEBSERVERCONFIG_SECRETTYPE=6;
+public static final int WEBSERVERCONFIG_MIRRORPORT=7;
+public static final int WEBSERVER_MAX_APISECRET=79;
+public static final int WEBSERVER_MIN_PORT=1024;
+public static final int WEBSERVER_MAX_PORT=65535;
+public static final int WEBSERVER_MAX_INTERVAL=86400;
+
+public static native int setWebServerConfig(int httpport,int sslport,int interval,String apisecret);
 
 public static native void setsaytreatments(boolean val);
 public static native boolean getsaytreatments( );

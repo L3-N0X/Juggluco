@@ -245,9 +245,9 @@
 
          <string name="privatekey">Privater Schlüssel</string>
 <string name="localonly">Nur lokal</string>
-<string name="toolongsecret">: api_secret zu lang. max=</string>
+<string name="toolongsecret">api_secret zu lang. max=</string>
 <string name="invalidport">" ungültige Portnummer"</string>
-<string name="newsecret">"neues api_secret: "</string>
+<string name="newsecret">"neues api_secret gesetzt"</string>
 <string name="newport">"neuer port="</string>
 
 <string name="webserver">Webserver</string>
@@ -619,6 +619,9 @@
     <string name="sensor_time_remaining">Verbleibende Zeit</string>
     <string name="sensor_lifetime_gauge">Sensor-Lebensdauer</string>
     <string name="sensor_warmup_gauge">Sensor-Aufwärmphase</string>
+    <string name="sensor_mirrored_status">Stream gespiegelt</string>
+    <string name="sensor_mirrored_title">Sensorstream von einer anderen App</string>
+    <string name="sensor_mirrored_desc">Live-Daten für diesen Sensor werden von einer anderen Juggluco-App bereitgestellt. Sensor-Kopplung und Verbindungssteuerung werden dort verwaltet.</string>
     <string name="sensor_reconnect">Sensor neu verbinden</string>
     <string name="sensor_use_again">Sensor erneut verwenden</string>
     <string name="sensor_forget">Entkoppeln &amp; neu suchen</string>
@@ -1492,6 +1495,10 @@
     <string name="loc_update_interval">Aktualisierungsintervall (Sekunden)</string>
     <string name="loc_ports_range">Ports müssen gültige Zahlen zwischen 1024 und 65535 sein</string>
     <string name="loc_ports_identical">HTTP- und SSL-Port dürfen nicht identisch sein</string>
+    <string name="loc_ports_mirror_collision">Der Port muss sich vom Mirror-Listen-Port %1$s unterscheiden</string>
+    <string name="loc_secret_too_long">API-Secret ist zu lang, erlaubt sind höchstens %1$d Zeichen</string>
+    <string name="loc_secret_charset">API-Secret darf nur druckbare Zeichen enthalten</string>
+    <string name="loc_interval_range">Aktualisierungsintervall muss zwischen 1 und %1$d Sekunden liegen</string>
     <string name="loc_web_server_saved">Webserver-Konfiguration gespeichert</string>
     <string name="loc_save_restart_server">Speichern und Server neu starten</string>
     <string name="loc_rest_compatibility">REST-API-Kompatibilität</string>
@@ -1529,6 +1536,7 @@
     <string name="loc_invalid_mirror_port">Ungültiger Port (muss zwischen 1024 und 65535 liegen)</string>
     <string name="loc_connection_saved">Verbindung erfolgreich gespeichert</string>
     <string name="loc_failed_save_connection">Verbindung konnte nicht gespeichert werden</string>
+    <string name="loc_failed_load_connection">Diese Verbindung ist nicht mehr verfügbar</string>
     <string name="loc_mirror_testing_info">Für parallele lokale Relay-Tests setze die Ziel-IP auf 127.0.0.1 und den Ziel-Port auf den Abhör-Port deiner Produktions-App (Standard 17580). Dieser Dev-Build empfängt Live-Glukosedaten ohne physische Sensorverbindung.</string>
 
     <string name="loc_graph_today">Heute</string>

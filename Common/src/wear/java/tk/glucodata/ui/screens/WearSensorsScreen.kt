@@ -1,27 +1,36 @@
 package tk.glucodata.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.Card
+import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
@@ -30,21 +39,41 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
-import androidx.wear.compose.material3.TitleCard
+import kotlinx.coroutines.delay
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.model.MirrorConnection
 import tk.glucodata.ui.model.SensorState
 import tk.glucodata.ui.theme.LocalClinicalColors
-import java.util.Locale
 
 @Composable
 fun WearSensorsScreen(
     repository: GlucoseRepository,
-    onTriggerNfcScan: () -> Unit
+    onTriggerNfcScan: () -> Unit,
+    onSyncPhone: () -> Unit
 ) {
     val sensors by repository.sensors.collectAsState()
     val mirrorConnections by repository.mirrorConnections.collectAsState()
     val clinical = LocalClinicalColors.current
+    var syncRequested by remember { mutableStateOf(false) }
+
+    val activeMirrors = mirrorConnections.filterNot { it.isDeactivated }
+    val livePhoneMirrors = activeMirrors.filter { it.hasLivePhoneCarrier() }
+    val phoneStatus = when {
+        livePhoneMirrors.isNotEmpty() -> stringResource(R.string.wear_phone_receiving)
+        activeMirrors.isNotEmpty() -> stringResource(R.string.wear_phone_unavailable)
+        else -> stringResource(R.string.wear_phone_no_link)
+    }
+
+    LaunchedEffect(Unit) {
+        repository.refreshMirrorConnections()
+    }
+    LaunchedEffect(syncRequested) {
+        if (syncRequested) {
+            delay(2_000L)
+            syncRequested = false
+        }
+    }
 
     val listState = rememberScalingLazyListState()
 
@@ -62,11 +91,10 @@ fun WearSensorsScreen(
         ) {
             item {
                 ListHeader {
-                    Text("Sensors & Status")
+                    Text(stringResource(R.string.wear_sensors_status_title))
                 }
             }
 
-            // NFC Scan Action
             item {
                 Button(
                     onClick = onTriggerNfcScan,
@@ -79,15 +107,14 @@ fun WearSensorsScreen(
                         )
                     },
                     label = {
-                        Text("Scan Sensor")
+                        Text(stringResource(R.string.wear_scan_sensor))
                     }
                 )
             }
 
-            // Active sensors section
             item {
                 ListSubHeader {
-                    Text("Sensors")
+                    Text(stringResource(R.string.sensors))
                 }
             }
 
@@ -104,86 +131,121 @@ fun WearSensorsScreen(
                             )
                         },
                         label = {
-                            Text("No Active Sensor")
+                            Text(stringResource(R.string.wear_scan_or_pair_sensor))
+                        },
+                        secondaryLabel = {
+                            Text(stringResource(R.string.wear_no_active_sensor))
                         }
                     )
                 }
             } else {
                 items(sensors.size) { index ->
                     val sensor = sensors[index]
-                    TitleCard(
-                        onClick = {},
-                        title = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                    val stateLabel = stringResource(sensor.state.labelRes)
+                    val remainingLabel = if (sensor.daysRemaining > 0f) {
+                        stringResource(R.string.wear_sensor_days_remaining, sensor.daysRemaining)
+                    } else {
+                        null
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 64.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Text(
                                     text = sensor.name,
-                                    style = MaterialTheme.typography.titleSmall
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                Text(
-                                    text = stringResource(sensor.state.labelRes),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (sensor.state == SensorState.ACTIVE) clinical.inRange else clinical.low
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = stateLabel,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = if (sensor.state == SensorState.ACTIVE) clinical.inRange else clinical.low
+                                    )
+                                    if (remainingLabel != null) {
+                                        Text(
+                                            text = " • $remainingLabel",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (sensor.daysRemaining > 0f) {
-                            Text(
-                                text = String.format(Locale.US, "%.1f days remaining", sensor.daysRemaining),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }
             }
 
-            // Phone Mirror Sync Info
             item {
                 ListSubHeader {
-                    Text("Phone Sync")
+                    Text(stringResource(R.string.wear_phone_connection))
                 }
             }
 
             item {
-                val activeMirrors = mirrorConnections.filter { !it.isDeactivated }
-                TitleCard(
-                    onClick = {},
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Bluetooth,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = if (activeMirrors.isNotEmpty()) "Connected" else "Direct Mode",
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                        }
+                FilledTonalButton(
+                    onClick = {
+                        syncRequested = true
+                        onSyncPhone()
                     },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = if (activeMirrors.isNotEmpty()) {
-                            "${activeMirrors.size} active connection(s)"
-                        } else {
-                            "Direct sensor mode"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                    enabled = !syncRequested,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = stringResource(R.string.wear_sync_with_phone),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    secondaryLabel = {
+                        Text(
+                            text = if (syncRequested) {
+                                stringResource(R.string.wear_sync_requested)
+                            } else {
+                                phoneStatus
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                )
             }
         }
     }
+}
+
+private fun MirrorConnection.hasLivePhoneCarrier(): Boolean {
+    val normalized = status.replace(Regex("<[^>]+>"), "")
+    return (normalized.contains("TCP/IP live socket: true", ignoreCase = true) &&
+        normalized.contains("receive=true", ignoreCase = true)) ||
+        normalized.contains("Direct Bluetooth (BLE GATT)=true", ignoreCase = true) ||
+        normalized.contains("Messages (Wear OS MessageClient)=true", ignoreCase = true)
 }

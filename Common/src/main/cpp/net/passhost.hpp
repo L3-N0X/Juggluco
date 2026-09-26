@@ -57,6 +57,7 @@ struct hostnamedata {
     char name[maxhostname];
 };
 inline static constexpr const int maxnamelen=16;
+inline static constexpr const int maxpasslen=16;
 	struct sockaddr_in6 ips[maxip];
 static_assert(sizeof(ips)==(sizeof(hostnamedata)+sizeof(sockaddr_in6)));
 	int nr;
