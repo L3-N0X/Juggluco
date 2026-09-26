@@ -1012,6 +1012,7 @@
 
     <string name="settings_summary_unit">Unit</string>
     <string name="settings_summary_target_range">Target Range</string>
+    <string name="settings_summary_target_range_value">%1$s–%2$s</string>
     <string name="settings_summary_role">Role</string>
     <string name="settings_role_receiver">Receiver</string>
     <string name="settings_role_sender">Sender</string>

@@ -226,7 +226,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = stringResource(R.string.target_label, unit.format(targetLow), unit.format(targetHigh)),
+                        text = stringResource(R.string.settings_summary_target_range_value, unit.format(targetLow), unit.format(targetHigh)),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

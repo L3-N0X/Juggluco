@@ -908,6 +908,7 @@
 
     <string name="settings_summary_unit">Einheit</string>
     <string name="settings_summary_target_range">Zielbereich</string>
+    <string name="settings_summary_target_range_value">%1$s–%2$s</string>
     <string name="settings_summary_role">Rolle</string>
     <string name="settings_role_receiver">Empfänger</string>
     <string name="settings_role_sender">Sender</string>
