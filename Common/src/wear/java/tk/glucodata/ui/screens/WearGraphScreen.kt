@@ -13,10 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -37,11 +35,28 @@ import tk.glucodata.ui.components.WearGraphChartRenderer
 import tk.glucodata.ui.components.WearGraphChartSpec
 import tk.glucodata.ui.components.WearGraphHeader
 import tk.glucodata.ui.components.WearTimeRangeSelector
+import tk.glucodata.ui.components.rememberWearSeries
 import tk.glucodata.ui.data.GlucoseRepository
-import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.theme.LocalClinicalColors
 import kotlin.math.abs
 
+/**
+ * Wear glucose graph.
+ *
+ * The window is split in two on purpose.
+ *
+ * [panOffset] is read **only** by the canvas' draw lambda, so dragging it invalidates drawing alone -
+ * no recomposition of this screen, no rebuilt reading list, no per-frame allocations. It is a
+ * snapshot state specifically so that Compose can track that narrow dependency.
+ *
+ * [settledOffset] is published once when the gesture ends, and that is what the header and the
+ * pan limits react to, so the text above the chart updates once per interaction instead of sixty
+ * times a second.
+ *
+ * The visible points are addressed as a binary-searched index range over the prepared
+ * `WearSeries` rather than a filtered `List<GlucosePoint>`, so the amount of work in a frame is
+ * proportional to what is actually on screen.
+ */
 @Composable
 fun WearGraphScreen(
     repository: GlucoseRepository,
@@ -53,65 +68,74 @@ fun WearGraphScreen(
     val targetHigh by repository.targetHigh.collectAsState()
 
     var selectedHours by remember { mutableIntStateOf(3) }
-    var scrubbedPoint by remember { mutableStateOf<GlucosePoint?>(null) }
-    var scrubX by remember { mutableFloatStateOf(-1f) }
-    var windowOffsetMillis by remember { mutableLongStateOf(0L) }
+
+    // Index of the inspected point, or -1. Kept as an index so scrubbing does not have to search the
+    // window for the point it already has.
+    var scrubIndex by remember { mutableIntStateOf(-1) }
+    val panOffset = remember { mutableLongStateOf(0L) }
+    var settledOffset by remember { mutableLongStateOf(0L) }
+
     val clinicalColors = LocalClinicalColors.current
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(selectedHours) {
-        windowOffsetMillis = 0L
-        scrubbedPoint = null
-        scrubX = -1f
+    val series by rememberWearSeries(readings)
+
+    val windowDurationMillis = remember(selectedHours) { selectedHours * 3600 * 1000L }
+    val newestTime = remember(series) { series.lastTime }
+    val oldestTime = remember(series) { series.firstTime }
+    val maxOffsetMillis = remember(newestTime, oldestTime, windowDurationMillis) {
+        (newestTime - windowDurationMillis - oldestTime).coerceAtLeast(0L)
     }
 
-    val now = remember(readings) {
-        readings.lastOrNull()?.timestamp ?: System.currentTimeMillis()
+    fun resetToLive() {
+        panOffset.longValue = 0L
+        settledOffset = 0L
+        scrubIndex = -1
     }
-    val windowDurationMillis = selectedHours * 3600 * 1000L
-    val oldestTimestamp = remember(readings) {
-        readings.firstOrNull()?.timestamp ?: now
-    }
-    val maxOffsetMillis = remember(now, oldestTimestamp, windowDurationMillis) {
-        (now - windowDurationMillis - oldestTimestamp).coerceAtLeast(0L)
+
+    LaunchedEffect(selectedHours) {
+        resetToLive()
     }
 
     LaunchedEffect(maxOffsetMillis) {
-        if (windowOffsetMillis > maxOffsetMillis) windowOffsetMillis = maxOffsetMillis
+        if (panOffset.longValue > maxOffsetMillis) {
+            panOffset.longValue = maxOffsetMillis
+            settledOffset = maxOffsetMillis
+        }
     }
-
-    val windowEnd = now - windowOffsetMillis
-    val windowStart = windowEnd - windowDurationMillis
-    val isLive = windowOffsetMillis <= 0L
-    val visibleReadings = remember(readings, windowStart, windowEnd) {
-        readings.filter { it.timestamp in windowStart..windowEnd }
-    }
-    val axisTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val graphGridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-    val graphSurfaceColor = MaterialTheme.colorScheme.surfaceContainer
-    val graphCrosshairColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-    val graphHighlightColor = MaterialTheme.colorScheme.primary
-    val graphRenderer = remember(density, axisTextColor, clinicalColors) {
-        WearGraphChartRenderer(density, axisTextColor, clinicalColors)
-    }
-    val axisMax = remember(visibleReadings, targetHigh, graphRenderer) {
-        graphRenderer.axisCeiling(visibleReadings.maxOfOrNull { it.valueMgDl } ?: targetHigh)
-    }
-
-    val latestWindowStart by rememberUpdatedState(windowStart)
-    val latestWindowEnd by rememberUpdatedState(windowEnd)
-    val latestNow by rememberUpdatedState(now)
-    val latestDuration by rememberUpdatedState(windowDurationMillis)
-    val latestMaxOffset by rememberUpdatedState(maxOffsetMillis)
-    val latestVisible by rememberUpdatedState(visibleReadings)
-    val latestScrub by rememberUpdatedState(scrubbedPoint)
 
     LaunchedEffect(Unit) {
         try {
             focusRequester.requestFocus()
         } catch (_: Throwable) {}
+    }
+
+    // Values the draw lambda and the gesture handler both need, without subscribing them to
+    // recomposition.
+    val currentNewest by rememberUpdatedState(newestTime)
+    val currentMaxOffset by rememberUpdatedState(maxOffsetMillis)
+    val currentSeries by rememberUpdatedState(series)
+    val currentDuration by rememberUpdatedState(windowDurationMillis)
+    val chartSpec = remember { WearGraphChartSpec() }
+    val axisTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val graphGridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    val graphSurfaceColor = MaterialTheme.colorScheme.surfaceContainer
+    val graphCrosshairColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+    val graphHighlightColor = MaterialTheme.colorScheme.primary
+    val renderer = remember(density, axisTextColor, clinicalColors) {
+        WearGraphChartRenderer(
+            density = density,
+            textColor = axisTextColor,
+            clinicalColors = clinicalColors
+        )
+    }
+
+    val settledWindowEnd = newestTime - settledOffset
+    val isLive = settledOffset <= 0L
+    val inspectedPoint = remember(series, scrubIndex) {
+        if (scrubIndex >= 0 && scrubIndex < series.size) series.pointAt(scrubIndex) else null
     }
 
     ScreenScaffold(
@@ -124,16 +148,21 @@ fun WearGraphScreen(
                 .focusRequester(focusRequester)
                 .focusable()
                 .onRotaryScrollEvent { event ->
-                    if (visibleReadings.isNotEmpty()) {
-                        val currentIndex = scrubbedPoint?.let(visibleReadings::indexOf) ?: visibleReadings.lastIndex
-                        val newIndex = if (event.verticalScrollPixels > 0) {
-                            (currentIndex + 1).coerceAtMost(visibleReadings.lastIndex)
-                        } else {
-                            (currentIndex - 1).coerceAtLeast(0)
-                        }
-                        if (newIndex != currentIndex) {
-                            scrubbedPoint = visibleReadings[newIndex]
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    val data = currentSeries
+                    if (!data.isEmpty) {
+                        val last = data.lastIndexAtOrBefore(currentNewest - panOffset.longValue)
+                        if (last >= 0) {
+                            // Start from the newest point, then walk from wherever the crown left us.
+                            val current = if (scrubIndex < 0) last else scrubIndex.coerceIn(0, last)
+                            val next = if (event.verticalScrollPixels > 0) {
+                                (current + 1).coerceAtMost(last)
+                            } else {
+                                (current - 1).coerceAtLeast(0)
+                            }
+                            if (next != current || scrubIndex < 0) {
+                                scrubIndex = next
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
                         }
                     }
                     true
@@ -141,17 +170,13 @@ fun WearGraphScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             WearGraphHeader(
-                selectedPoint = scrubbedPoint,
+                selectedPoint = inspectedPoint,
                 unit = unit,
                 selectedHours = selectedHours,
-                windowEnd = windowEnd,
+                windowEnd = settledWindowEnd,
                 isLive = isLive,
                 clinicalColors = clinicalColors,
-                onNow = {
-                    windowOffsetMillis = 0L
-                    scrubbedPoint = null
-                    scrubX = -1f
-                }
+                onNow = { resetToLive() }
             )
 
             Box(
@@ -164,6 +189,10 @@ fun WearGraphScreen(
                             val touchSlopPx = with(density) { 12.dp.toPx() }
                             val edgeBackPx = with(density) { 28.dp.toPx() }
                             if (down.position.x < edgeBackPx) return@awaitEachGesture
+
+                            val plotLeftPx = with(density) { 2.dp.toPx() }
+                            val plotRightPx = size.width - with(density) { 30.dp.toPx() }
+                            val plotWidth = (plotRightPx - plotLeftPx).coerceAtLeast(1f)
 
                             var totalDragX = 0f
                             var totalDragY = 0f
@@ -180,36 +209,41 @@ fun WearGraphScreen(
 
                                 if (!isPan && totalDragX > touchSlopPx && totalDragX > totalDragY * 1.15f) {
                                     isPan = true
-                                    scrubbedPoint = null
-                                    scrubX = -1f
+                                    scrubIndex = -1
                                 }
                                 if (isPan) {
-                                    val chartWidth = size.width.toFloat()
-                                    if (chartWidth > 0f && deltaX != 0f && latestMaxOffset > 0L) {
-                                        val deltaMillis = (-(deltaX / chartWidth) * latestDuration).toLong()
-                                        val newEnd = (latestWindowEnd + deltaMillis)
-                                            .coerceIn(latestNow - latestMaxOffset, latestNow)
-                                        windowOffsetMillis = (latestNow - newEnd)
-                                            .coerceIn(0L, latestMaxOffset)
+                                    val maxOffset = currentMaxOffset
+                                    if (deltaX != 0f && maxOffset > 0L) {
+                                        val deltaMillis = (-(deltaX / plotWidth) * currentDuration).toLong()
+                                        val newEnd = (currentNewest - panOffset.longValue + deltaMillis)
+                                            .coerceIn(currentNewest - maxOffset, currentNewest)
+                                        panOffset.longValue = (currentNewest - newEnd)
+                                            .coerceIn(0L, maxOffset)
                                     }
                                     change.consume()
                                 }
                             } while (event.changes.any { it.pressed })
 
-                            if (!isPan && totalDragX < touchSlopPx && totalDragY < touchSlopPx) {
-                                val snapshot = latestVisible
-                                if (snapshot.isNotEmpty() && size.width > 0) {
-                                    val chartLeft = with(density) { 2.dp.toPx() }
-                                    val chartRight = size.width - with(density) { 30.dp.toPx() }
-                                    val progress = ((down.position.x - chartLeft) / (chartRight - chartLeft).coerceAtLeast(1f)).coerceIn(0f, 1f)
-                                    val touchedTime = latestWindowStart + (progress * (latestWindowEnd - latestWindowStart)).toLong()
-                                    val nearest = snapshot.minByOrNull { abs(it.timestamp - touchedTime) }
-                                    if (nearest != null && nearest.timestamp == latestScrub?.timestamp) {
-                                        scrubbedPoint = null
-                                        scrubX = -1f
-                                    } else if (nearest != null) {
-                                        scrubbedPoint = nearest
-                                        scrubX = down.position.x
+                            if (isPan) {
+                                // Publish once the gesture has settled, so the header catches up
+                                // without the drag having recomposed the screen on every frame.
+                                settledOffset = panOffset.longValue
+                            } else if (totalDragX < touchSlopPx && totalDragY < touchSlopPx) {
+                                val data = currentSeries
+                                if (!data.isEmpty && size.width > 0) {
+                                    val windowEnd = currentNewest - panOffset.longValue
+                                    val windowStart = windowEnd - currentDuration
+                                    val progress = ((down.position.x - plotLeftPx) / plotWidth)
+                                        .coerceIn(0f, 1f)
+                                    val touchedTime = windowStart + (progress * currentDuration).toLong()
+                                    val nearest = data.nearestIndexTo(touchedTime)
+                                    if (nearest >= 0) {
+                                        if (nearest == scrubIndex) {
+                                            scrubIndex = -1
+                                        } else {
+                                            scrubIndex = nearest
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
                                     }
                                 }
                             }
@@ -217,25 +251,31 @@ fun WearGraphScreen(
                     }
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    graphRenderer.draw(
-                        scope = this,
-                        spec = WearGraphChartSpec(
-                            readings = visibleReadings,
-                            windowStart = windowStart,
-                            windowEnd = windowEnd,
-                            selectedHours = selectedHours,
-                            axisMax = axisMax,
-                            unit = unit,
-                            targetLow = targetLow,
-                            targetHigh = targetHigh,
-                            clinicalColors = clinicalColors,
-                            gridColor = graphGridColor,
-                            surfaceColor = graphSurfaceColor,
-                            crosshairColor = graphCrosshairColor,
-                            highlightColor = graphHighlightColor,
-                            selectedPoint = scrubbedPoint.takeIf { scrubX >= 0f }
-                        )
+                    val data = series
+                    val windowEnd = newestTime - panOffset.longValue
+                    val windowStart = windowEnd - windowDurationMillis
+                    val from = data.firstIndexAtOrAfter(windowStart)
+                    val to = data.lastIndexAtOrBefore(windowEnd)
+
+                    chartSpec.series = data
+                    chartSpec.fromIndex = from
+                    chartSpec.toIndex = to
+                    chartSpec.windowStart = windowStart
+                    chartSpec.windowEnd = windowEnd
+                    chartSpec.selectedHours = selectedHours
+                    chartSpec.unit = unit
+                    chartSpec.targetLow = targetLow
+                    chartSpec.targetHigh = targetHigh
+                    chartSpec.clinicalColors = clinicalColors
+                    chartSpec.gridColor = graphGridColor
+                    chartSpec.surfaceColor = graphSurfaceColor
+                    chartSpec.crosshairColor = graphCrosshairColor
+                    chartSpec.highlightColor = graphHighlightColor
+                    chartSpec.selectedIndex = scrubIndex
+                    chartSpec.axisMax = renderer.axisCeiling(
+                        data.maxValueBetween(windowStart, windowEnd).coerceAtLeast(targetHigh)
                     )
+                    renderer.draw(this, chartSpec)
                 }
             }
 

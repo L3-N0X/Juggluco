@@ -2,7 +2,7 @@ package tk.glucodata.ui.model
 
 import androidx.annotation.StringRes
 import tk.glucodata.R
-import java.util.Calendar
+import java.util.TimeZone
 
 data class StatsPeriod(
     val days: Int,
@@ -53,86 +53,100 @@ data class AgpProfile(
     val hasAnyData: Boolean get() = totalReadings > 0 && hourlyPercentiles.any { it.hasData }
 
     companion object {
+        /**
+         * Builds the hourly percentile profile.
+         *
+         * Values are bucketed into 24 primitive [FloatArray]s rather than 24 [ArrayList]s of boxed
+         * [Float]s, and the hour is derived arithmetically instead of through a [Calendar] per
+         * reading. Both matter: this runs over the entire sensor history - six figures of readings -
+         * and the old version boxed every one of them twice and allocated a per-reading calendar.
+         */
         fun calculate(readings: List<GlucosePoint>, period: StatsPeriod): AgpProfile {
-            val validReadings = readings.filter { it.valueMgDl > 0f }
-            if (validReadings.isEmpty()) {
-                val defaultHourly = (0..23).map { hour ->
-                    HourlyPercentiles(
-                        hour = hour,
-                        p10 = 0f,
-                        p25 = 0f,
-                        p50 = 0f,
-                        p75 = 0f,
-                        p90 = 0f,
-                        count = 0
-                    )
-                }
-                return AgpProfile(defaultHourly, period, 0f, period.days, 0)
+            if (readings.isEmpty()) {
+                return AgpProfile(emptyHourly(), period, 0f, period.days, 0)
             }
 
-            val cal = Calendar.getInstance()
-            val buckets = Array(24) { ArrayList<Float>() }
+            // Growable primitive buckets, one per hour of day.
+            var buckets = Array(24) { FloatArray(64) }
+            var counts = IntArray(24)
+            val overall = FloatArray(readings.size)
+            var total = 0
+            var minutesEast = TimeZone.getDefault().getOffset(readings[0].timestamp)
 
-            for (pt in validReadings) {
-                cal.timeInMillis = pt.timestamp
-                val hour = cal.get(Calendar.HOUR_OF_DAY)
-                buckets[hour].add(pt.valueMgDl)
+            for (pt in readings) {
+                val value = pt.valueMgDl
+                if (value <= 0f) continue
+                if ((total and 0x3FF) == 0) {
+                    // Re-derive the offset occasionally so a DST change or a zone change mid-history
+                    // does not leave every later bucket an hour out.
+                    minutesEast = TimeZone.getDefault().getOffset(pt.timestamp)
+                }
+                val local = pt.timestamp + minutesEast
+                val hour = (((local / 60_000L) % 24L) + 24L).toInt() % 24
+                var bucket = buckets[hour]
+                if (counts[hour] == bucket.size) bucket = bucket.copyOf(bucket.size * 2)
+                buckets[hour] = bucket
+                bucket[counts[hour]++] = value
+                overall[total++] = value
+            }
+
+            if (total == 0) {
+                return AgpProfile(emptyHourly(), period, 0f, period.days, 0)
             }
 
             val result = ArrayList<HourlyPercentiles>(24)
             for (hour in 0..23) {
-                val list = buckets[hour]
-                if (list.size >= 3) {
-                    list.sort()
-                    val p10 = getPercentile(list, 10f)
-                    val p25 = getPercentile(list, 25f)
-                    val p50 = getPercentile(list, 50f)
-                    val p75 = getPercentile(list, 75f)
-                    val p90 = getPercentile(list, 90f)
-                    result.add(HourlyPercentiles(hour, p10, p25, p50, p75, p90, list.size))
-                } else if (list.isNotEmpty()) {
-                    list.sort()
-                    val p10 = list.first()
-                    val p25 = getPercentile(list, 25f)
-                    val p50 = getPercentile(list, 50f)
-                    val p75 = getPercentile(list, 75f)
-                    val p90 = list.last()
-                    result.add(HourlyPercentiles(hour, p10, p25, p50, p75, p90, list.size))
+                val bucket = buckets[hour]
+                val count = counts[hour]
+                if (count == 0) {
+                    result.add(HourlyPercentiles(hour, 0f, 0f, 0f, 0f, 0f, 0))
                 } else {
+                    java.util.Arrays.sort(bucket, 0, count)
+                    val p10 = percentile(bucket, count, 10f)
+                    val p25 = percentile(bucket, count, 25f)
+                    val p50 = percentile(bucket, count, 50f)
+                    val p75 = percentile(bucket, count, 75f)
+                    val p90 = percentile(bucket, count, 90f)
                     result.add(
                         HourlyPercentiles(
                             hour = hour,
-                            p10 = 0f,
-                            p25 = 0f,
-                            p50 = 0f,
-                            p75 = 0f,
-                            p90 = 0f,
-                            count = 0
+                            p10 = if (count >= 3) p10 else bucket[0],
+                            p25 = p25,
+                            p50 = p50,
+                            p75 = p75,
+                            p90 = if (count >= 3) p90 else bucket[count - 1],
+                            count = count
                         )
                     )
                 }
             }
 
-            val allSorted = validReadings.map { it.valueMgDl }.sorted()
-            val overallMedian = if (allSorted.isNotEmpty()) getPercentile(allSorted, 50f) else 0f
+            val allSorted = overall.copyOf(total)
+            java.util.Arrays.sort(allSorted)
+            val overallMedian = percentile(allSorted, total, 50f)
 
             return AgpProfile(
                 hourlyPercentiles = result,
                 period = period,
                 overallMedian = overallMedian,
                 daysAnalyzed = period.days,
-                totalReadings = validReadings.size
+                totalReadings = total
             )
         }
 
-        private fun getPercentile(sortedList: List<Float>, percentile: Float): Float {
-            if (sortedList.isEmpty()) return 120f
-            if (sortedList.size == 1) return sortedList[0]
-            val index = (percentile / 100f) * (sortedList.size - 1)
+        private fun emptyHourly(): List<HourlyPercentiles> = (0..23).map { hour ->
+            HourlyPercentiles(hour = hour, p10 = 0f, p25 = 0f, p50 = 0f, p75 = 0f, p90 = 0f, count = 0)
+        }
+
+        /** Linear-interpolated percentile of the first [count] entries of an already sorted array. */
+        private fun percentile(sorted: FloatArray, count: Int, percentile: Float): Float {
+            if (count == 0) return 120f
+            if (count == 1) return sorted[0]
+            val index = (percentile / 100f) * (count - 1)
             val lower = index.toInt()
-            val upper = (lower + 1).coerceAtMost(sortedList.size - 1)
+            val upper = (lower + 1).coerceAtMost(count - 1)
             val weight = index - lower
-            return sortedList[lower] * (1f - weight) + sortedList[upper] * weight
+            return sorted[lower] * (1f - weight) + sorted[upper] * weight
         }
     }
 }

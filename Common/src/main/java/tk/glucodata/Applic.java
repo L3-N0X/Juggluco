@@ -684,13 +684,18 @@ static private final BroadcastReceiver minTimeReceiver = new BroadcastReceiver()
 };
 void domintime() {
     {if(doLog) {Log.i(LOG_ID,"TICK");};};
+    if (isWearable) {
+        // The legacy curve is never attached on a watch, so redrawing it is a no-op - but
+        // requestRender() fans out to a full repository reload, which walks every raw, calibrated
+        // and scan record of every sensor. Doing that once a minute just to repaint a view that is
+        // not on screen was one of the largest sources of garbage on Wear OS.
+        return;
+    }
     if (curve != null) {
         if((curve.render.stepresult & STEPBACK) == 0) {
             {if(doLog) {Log.i(LOG_ID,"requestRender()");};};
             curve.requestRender();
-            if (!isWearable) {
-                numdata.sendmessages();
-            }
+            numdata.sendmessages();
         }
     }
 }

@@ -7,12 +7,14 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -62,6 +64,7 @@ import tk.glucodata.ui.model.TimeRange
 import tk.glucodata.ui.model.WatchConfig
 import tk.glucodata.ui.model.WearDiagnosticInfo
 import tk.glucodata.ui.model.WearWatchDevice
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
 sealed interface SensorActivationState {
@@ -102,6 +105,30 @@ class GlucoseRepository(
     )
 
     private val logNoteLock = Any()
+
+    /**
+     * Guards the expensive native loads. [refreshAll] and the polling heartbeat both walk the whole
+     * sensor store, which allocates tens of megabytes per pass; letting two passes overlap turns a
+     * stutter into an out-of-memory death spiral on a watch, so at most one is ever in flight and
+     * requests that arrive while it runs are coalesced into a single follow-up pass.
+     */
+    private val nativeLoadMutex = Mutex()
+
+    /** Set by callers wanting a full reload; consumed by whichever pass holds [nativeLoadMutex]. */
+    private val nativeLoadPending = AtomicBoolean(false)
+
+    @Volatile
+    private var statsRecalcPending = false
+
+    @Volatile
+    private var statsRecalcJob: Job? = null
+
+    /** Fingerprints of the values already published, so identical reloads emit nothing. */
+    private var publishedReadingsFingerprint = 0L
+    private var publishedSensorsFingerprint = 0L
+    private var publishedSensorDetailsFingerprint = 0L
+    private var publishedLogsFingerprint = 0L
+
     private val _currentReading = MutableStateFlow<GlucosePoint?>(null)
     val currentReading: StateFlow<GlucosePoint?> = _currentReading.asStateFlow()
 
@@ -204,21 +231,25 @@ class GlucoseRepository(
 
     init {
         bloodLabelHistory += readBloodLabelHistory().filterNot { it in RESERVED_COMPOSE_LABELS }
-        refreshSettings()
-        refreshAll()
-        refreshWearDevices()
-        refreshMirrorConnections()
-        startPolling()
+        // Never touch JNI or SharedPreferences from whatever thread constructs the repository:
+        // on Wear that is the main thread, during activity creation.
+        scope.launch(Dispatchers.IO) {
+            refreshSettings()
+            refreshAllLocked()
+            refreshWearDevices()
+            refreshMirrorConnections()
+            startPolling()
+        }
     }
 
     fun setTimeRange(range: TimeRange?) {
         _selectedTimeRange.value = range
-        recalculateStats()
+        requestStatsRecalculation()
     }
 
     fun setStatsPeriod(period: StatsPeriod) {
         _statsPeriod.value = period
-        recalculateStats()
+        requestStatsRecalculation()
     }
 
     fun setStatsUseHistory(useHistory: Boolean) {
@@ -228,7 +259,7 @@ class GlucoseRepository(
                 Natives.analysedays(_statsPeriod.value.days, useHistory)
             }
         } catch (_: Throwable) {}
-        recalculateStats()
+        requestStatsRecalculation()
     }
 
     fun setUnit(newUnit: GlucoseUnit) {
@@ -260,7 +291,7 @@ class GlucoseRepository(
                 Natives.setTargetRange(unit.toDisplay(low), unit.toDisplay(high))
             }
         } catch (_: Throwable) {}
-        recalculateStats()
+        requestStatsRecalculation()
     }
 
     private fun readBloodLabelHistory(): Set<Int> {
@@ -464,12 +495,45 @@ class GlucoseRepository(
     }
 
     fun refreshAll() {
-        scope.launch(Dispatchers.IO) {
-            refreshSettings()
-            loadReadingsFromNative()
-            loadSensorsFromNative()
-            loadLogsFromNative()
-            recalculateStats()
+        scope.launch(Dispatchers.IO) { refreshAllLocked() }
+    }
+
+    /**
+     * Reloads everything, but never concurrently with itself. A reload that arrives while another is
+     * running simply marks the work as still-pending and returns; the pass already in flight picks
+     * the flag up and runs exactly once more on the way out. A burst of BLE callbacks therefore
+     * collapses into one extra pass instead of N overlapping walks of the sensor store.
+     */
+    private suspend fun refreshAllLocked() {
+        nativeLoadPending.set(true)
+        if (!nativeLoadMutex.tryLock()) return
+        try {
+            while (nativeLoadPending.getAndSet(false)) {
+                refreshSettings()
+                loadReadingsFromNative()
+                loadSensorsFromNative()
+                loadLogsFromNative()
+                recalculateStats()
+            }
+        } finally {
+            nativeLoadMutex.unlock()
+        }
+    }
+
+    /**
+     * Coalesces stats recomputation onto a single background pass. This used to run inline on the
+     * caller, which meant five full passes over every reading plus an AGP profile build (24 boxing
+     * buckets, a [java.util.Calendar] lookup per reading and two sorts) on the main thread of a UI
+     * that was only trying to react to a target-range tap.
+     */
+    private fun requestStatsRecalculation() {
+        statsRecalcPending = true
+        if (statsRecalcJob?.isActive == true) return
+        statsRecalcJob = scope.launch(Dispatchers.Default) {
+            while (statsRecalcPending) {
+                statsRecalcPending = false
+                recalculateStats()
+            }
         }
     }
 
@@ -550,8 +614,45 @@ class GlucoseRepository(
         _sensorActivationState.value = SensorActivationState.Idle
     }
 
+    /**
+     * Publishes [next] only when it differs from what every collector already has.
+     *
+     * A reload always allocates a brand new list, and a `StateFlow` conflates on `equals`, so
+     * assigning unconditionally meant every poll produced a structural comparison of the whole
+     * history and - when anything at all had shifted - a recomposition of the home screen and a full
+     * redraw of the graph. Scanning for a change first costs one linear pass over primitives and
+     * emits nothing in the overwhelmingly common case where the sensor store has not moved.
+     */
+    private fun publishReadings(next: List<GlucosePoint>) {
+        val fingerprint = readingsFingerprint(next)
+        if (fingerprint == publishedReadingsFingerprint && _readings.value.size == next.size) return
+        publishedReadingsFingerprint = fingerprint
+        _readings.value = next
+    }
+
+    /**
+     * Order-sensitive 64-bit digest of the history. Two lists with the same fingerprint are treated
+     * as identical, so a false "unchanged" would only ever cost a skipped redraw, never wrong data
+     * at a scale where a collision is conceivable.
+     */
+    private fun readingsFingerprint(readings: List<GlucosePoint>): Long {
+        var hash = 1125899906842597L
+        for (i in readings.indices) {
+            val point = readings[i]
+            hash = hash * 31 + point.timestamp
+            hash = hash * 31 + point.valueMgDl.toRawBits()
+            hash = hash * 31 + (if (point.isCalibrated) 1L else 0L)
+            hash = hash * 31 + (if (point.isScan) 1L else 0L)
+        }
+        return hash * 31 + readings.size
+    }
+
     private fun loadReadingsFromNative() {
-        var loadedList = ArrayList<GlucosePoint>()
+        val loadedList = ArrayList<GlucosePoint>(INITIAL_READING_CAPACITY)
+        // Hoisted out of the read loops: a StateFlow read per point, over six figures of points, is
+        // not free and the value cannot change halfway through a single pass.
+        val targetLow = _targetLow.value
+        val targetHigh = _targetHigh.value
         try {
             if (Applic.Nativesloaded) {
                 // Check latest reading first
@@ -605,7 +706,7 @@ class GlucoseRepository(
                                         isScan = false,
                                         isHistory = false,
                                         isCalibrated = false,
-                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), _targetLow.value, _targetHigh.value)
+                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), targetLow, targetHigh)
                                     )
                                 )
                             }
@@ -629,7 +730,7 @@ class GlucoseRepository(
                                         isScan = false,
                                         isHistory = false,
                                         isCalibrated = true,
-                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), _targetLow.value, _targetHigh.value)
+                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), targetLow, targetHigh)
                                     )
                                 )
                             }
@@ -653,7 +754,7 @@ class GlucoseRepository(
                                         isScan = true,
                                         isHistory = false,
                                         isCalibrated = false,
-                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), _targetLow.value, _targetHigh.value)
+                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), targetLow, targetHigh)
                                     )
                                 )
                             }
@@ -665,18 +766,29 @@ class GlucoseRepository(
         } catch (_: Throwable) {}
 
         if (_currentReading.value == null && loadedList.isNotEmpty()) {
-            val latest = loadedList.filter { !it.isScan && !it.isCalibrated }.lastOrNull() ?: loadedList.last()
+            var latest = loadedList[loadedList.size - 1]
+            for (point in loadedList) {
+                if (!point.isScan && !point.isCalibrated) latest = point
+            }
             _currentReading.value = latest
         }
 
-        loadedList.sortBy { it.timestamp }
-        _readings.value = loadedList
+        // In-place stable sort on the timestamp only. `sortBy` would copy the whole list again and
+        // box every timestamp to build a sort key; the readings arrive per sensor and per kind, so
+        // they are grouped rather than ordered and do need sorting, but they do not need a second
+        // six-figure list to do it.
+        loadedList.sortWith { a, b -> a.timestamp.compareTo(b.timestamp) }
+        publishReadings(loadedList)
     }
 
     private fun loadSensorsFromNative() {
         val detailsList = ArrayList<SensorDetail>()
         val legacyList = ArrayList<SensorInfo>()
         val mirroredSensorSource = hasLiveReceiverMirror()
+        // Derived from data rather than from the clock. `System.currentTimeMillis()` here made
+        // every reload produce a different list, so the sensor list was guaranteed to be unequal and
+        // the sensors screen recomposed on every single sweep even when nothing had changed.
+        val lastKnownReading = _readings.value.lastOrNull()?.timestamp ?: 0L
 
         try {
             if (Applic.Nativesloaded) {
@@ -733,7 +845,7 @@ class GlucoseRepository(
                                 signalQuality = if (info.isConnected && info.rssi != null && info.rssi != 0) SignalQuality.fromRssi(info.rssi) else SignalQuality.LOST,
                                 startTime = start,
                                 endTime = end,
-                                lastReadingTime = if (info.isConnected) System.currentTimeMillis() else 0L,
+                                lastReadingTime = if (info.isConnected) lastKnownReading else 0L,
                                 warmupMinutes = info.warmupMinutes,
                                 minWarmupMinutes = info.minWarmupMinutes,
                                 isConnected = info.isConnected,
@@ -753,7 +865,7 @@ class GlucoseRepository(
                                 state = if (info.isConnected) SensorState.ACTIVE else SensorState.DISCONNECTED,
                                 startTime = start,
                                 endTime = end,
-                                lastReadingTime = if (info.isConnected) System.currentTimeMillis() else 0L,
+                                lastReadingTime = if (info.isConnected) lastKnownReading else 0L,
                                 sensorType = typeName,
                                 isStreaming = info.isStreaming,
                                 isConnected = info.isConnected
@@ -798,7 +910,7 @@ class GlucoseRepository(
                                     signalQuality = SignalQuality.GOOD,
                                     startTime = start,
                                     endTime = end,
-                                    lastReadingTime = System.currentTimeMillis(),
+                                    lastReadingTime = lastKnownReading,
                                     warmupMinutes = warmup,
                                     minWarmupMinutes = minWarmup,
                                     isConnected = true,
@@ -819,7 +931,7 @@ class GlucoseRepository(
                                     state = SensorState.ACTIVE,
                                     startTime = start,
                                     endTime = end,
-                                    lastReadingTime = System.currentTimeMillis(),
+                                    lastReadingTime = lastKnownReading,
                                     sensorType = if (infoText.isNotEmpty()) infoText else "Active Sensor",
                                     isConnected = true,
                                     isStreaming = true
@@ -831,9 +943,53 @@ class GlucoseRepository(
             }
         } catch (_: Throwable) {}
 
-        _sensorDetails.value = detailsList
-        _sensors.value = legacyList
+        publishSensors(legacyList, detailsList)
+    }
+
+    /** Publishes the sensor lists only when their contents actually differ from the last publish. */
+    private fun publishSensors(legacy: List<SensorInfo>, details: List<SensorDetail>) {
+        val legacyHash = legacyFingerprint(legacy)
+        val detailsHash = sensorDetailFingerprint(details)
+        if (legacyHash != publishedSensorsFingerprint) {
+            publishedSensorsFingerprint = legacyHash
+            _sensors.value = legacy
+        }
+        if (detailsHash != publishedSensorDetailsFingerprint) {
+            publishedSensorDetailsFingerprint = detailsHash
+            _sensorDetails.value = details
+        }
         _previousSensors.value = emptyList()
+    }
+
+    private fun legacyFingerprint(sensors: List<SensorInfo>): Long {
+        var hash = 17L
+        for (sensor in sensors) {
+            hash = hash * 31 + sensor.id.hashCode()
+            hash = hash * 31 + sensor.state.hashCode()
+            hash = hash * 31 + sensor.startTime
+            hash = hash * 31 + sensor.endTime
+            hash = hash * 31 + sensor.lastReadingTime
+            hash = hash * 31 + (if (sensor.isConnected) 1L else 0L)
+            hash = hash * 31 + (if (sensor.isStreaming) 1L else 0L)
+        }
+        return hash * 31 + sensors.size
+    }
+
+    private fun sensorDetailFingerprint(details: List<SensorDetail>): Long {
+        var hash = 19L
+        for (sensor in details) {
+            hash = hash * 31 + sensor.id.hashCode()
+            hash = hash * 31 + sensor.status.hashCode()
+            hash = hash * 31 + sensor.signalQuality.hashCode()
+            hash = hash * 31 + sensor.startTime
+            hash = hash * 31 + sensor.endTime
+            hash = hash * 31 + sensor.lastReadingTime
+            hash = hash * 31 + (sensor.rssi ?: 0)
+            hash = hash * 31 + (if (sensor.isConnected) 1L else 0L)
+            hash = hash * 31 + (if (sensor.isStreaming) 1L else 0L)
+            hash = hash * 31 + (if (sensor.isMirrored) 1L else 0L)
+        }
+        return hash * 31 + details.size
     }
 
     private fun hasLiveReceiverMirror(): Boolean {
@@ -854,7 +1010,7 @@ class GlucoseRepository(
     }
 
     private fun isLiveMirrorStatus(status: String): Boolean {
-        val normalized = status.replace(Regex("<[^>]+>"), "")
+        val normalized = status.replace(MARKUP_PATTERN, "")
         return (normalized.contains("TCP/IP live socket: true", ignoreCase = true) &&
             normalized.contains("receive=true", ignoreCase = true)) ||
             normalized.contains("Direct Bluetooth (BLE GATT)=true", ignoreCase = true) ||
@@ -1068,6 +1224,7 @@ class GlucoseRepository(
                             if (itm.time <= 0) continue
                             logList.add(
                                 LogRecord(
+                                    id = LogRecord.nativeId(resolvedStore, pos),
                                     timestamp = itm.time * 1000L,
                                     type = nativeType(itm.label),
                                     value = itm.value,
@@ -1092,8 +1249,33 @@ class GlucoseRepository(
                     .thenByDescending { it.nativeSource?.store?.nativeIndex ?: -1 }
                     .thenByDescending { it.nativeSource?.position ?: -1 }
             )
-            _logs.value = hydratedLogs
+            publishLogs(hydratedLogs)
         }
+    }
+
+    /**
+     * Publishes the logbook only when it differs from the last publish. A native reload used to
+     * mint a brand new id for every entry, so the list could never compare equal and every collector
+     * recomposed every time the logbook was refreshed.
+     */
+    private fun publishLogs(next: List<LogRecord>) {
+        val fingerprint = logFingerprint(next)
+        if (fingerprint == publishedLogsFingerprint) return
+        publishedLogsFingerprint = fingerprint
+        _logs.value = next
+    }
+
+    private fun logFingerprint(records: List<LogRecord>): Long {
+        var hash = 23L
+        for (record in records) {
+            hash = hash * 31 + record.timestamp
+            hash = hash * 31 + record.value.toRawBits()
+            hash = hash * 31 + record.type.hashCode()
+            hash = hash * 31 + record.note.hashCode()
+            hash = hash * 31 + (record.nativeSource?.store?.nativeIndex ?: -1)
+            hash = hash * 31 + (record.nativeSource?.position ?: -1)
+        }
+        return hash * 31 + records.size
     }
 
     fun addCalibrationReference(
@@ -1118,7 +1300,7 @@ class GlucoseRepository(
             note = note,
             nativeLabel = targetNativeLabel
         )
-        _logs.value = (listOf(entry) + _logs.value).sortedByDescending { it.timestamp }
+        publishLogs((listOf(entry) + _logs.value).sortedByDescending { it.timestamp })
 
         scope.launch(Dispatchers.IO) {
             try {
@@ -1195,7 +1377,7 @@ class GlucoseRepository(
         if (type == LogType.BLOOD_GLUCOSE && targetNativeLabel < 0) return
         val source = entry.nativeSource
         if (source == null) {
-            _logs.value = _logs.value.map {
+            publishLogs(_logs.value.map {
                 if (it.id == entry.id) it.copy(
                     type = type,
                     value = value,
@@ -1203,11 +1385,11 @@ class GlucoseRepository(
                     note = note,
                     nativeLabel = targetNativeLabel
                 ) else it
-            }
+            })
             return
         }
 
-        _logs.value = _logs.value.map {
+        publishLogs(_logs.value.map {
             if (sameSource(it, entry)) it.copy(
                 type = type,
                 value = value,
@@ -1215,7 +1397,7 @@ class GlucoseRepository(
                 note = note,
                 nativeLabel = targetNativeLabel
             ) else it
-        }
+        })
         scope.launch(Dispatchers.IO) {
             synchronized(logNoteLock) {
                 try {
@@ -1266,11 +1448,11 @@ class GlucoseRepository(
     fun deleteLogEntry(entry: LogRecord) {
         val source = entry.nativeSource
         if (source == null) {
-            _logs.value = _logs.value.filterNot { it.id == entry.id }
+            publishLogs(_logs.value.filterNot { it.id == entry.id })
             return
         }
 
-        _logs.value = _logs.value.filterNot { sameSource(it, entry) }
+        publishLogs(_logs.value.filterNot { sameSource(it, entry) })
         scope.launch(Dispatchers.IO) {
             synchronized(logNoteLock) {
                 try {
@@ -2515,37 +2697,111 @@ class GlucoseRepository(
         }
     }
 
+    /**
+     * Recomputes the derived statistics from the currently published readings.
+     *
+     * [readings] is sorted by timestamp, so both windows are located with a binary search and
+     * addressed through [List.subList] views instead of building two throwaway filtered copies of a
+     * list that can hold six figures of points. The AGP profile is memoised against the inputs that
+     * actually change it, because rebuilding 24 percentile buckets over the whole history every time
+     * a single reading arrives was by far the most expensive thing this class did.
+     */
     private fun recalculateStats() {
         val all = _readings.value
+        val period = _statsPeriod.value
+        val low = _targetLow.value
+        val high = _targetHigh.value
+        val now = System.currentTimeMillis()
+
         if (all.isEmpty()) {
             _stats.value = GlucoseStats()
             _screenStats.value = GlucoseStats()
-            _agpProfile.value = AgpProfile.calculate(emptyList(), _statsPeriod.value)
+            _agpProfile.value = AgpProfile.calculate(emptyList(), period)
+            publishedAgpKey = null
             return
         }
 
-        val cutoff = System.currentTimeMillis() - _statsPeriod.value.durationMillis
-        val filtered = all.filter { it.timestamp >= cutoff }
-        val toUse = if (filtered.isNotEmpty()) filtered else all
+        val periodStart = lowerBound(all, now - period.durationMillis)
+        val toUse = if (periodStart < all.size) all.subList(periodStart, all.size) else all
 
-        _stats.value = GlucoseStats.calculate(toUse, _targetLow.value, _targetHigh.value)
-        _agpProfile.value = AgpProfile.calculate(toUse, _statsPeriod.value)
+        _stats.value = GlucoseStats.calculate(toUse, low, high)
 
-        // Calculate screen stats specifically for the selected time range window (e.g. 1h, 6h, or custom duration)
+        val agpKey = agpCacheKey(toUse, period, low, high)
+        if (agpKey != publishedAgpKey) {
+            _agpProfile.value = AgpProfile.calculate(toUse, period)
+            publishedAgpKey = agpKey
+        }
+
+        // Statistics for the selected screen range (e.g. 1h, 6h or a custom duration).
         val screenDuration = _selectedTimeRange.value?.durationMillis ?: (6 * 3600 * 1000L)
-        val screenCutoff = System.currentTimeMillis() - screenDuration
-        val screenFiltered = all.filter { it.timestamp >= screenCutoff }
-        val screenToUse = if (screenFiltered.isNotEmpty()) screenFiltered else all
-        _screenStats.value = GlucoseStats.calculate(screenToUse, _targetLow.value, _targetHigh.value)
+        val screenStart = lowerBound(all, now - screenDuration)
+        val screenToUse = if (screenStart < all.size) all.subList(screenStart, all.size) else all
+        _screenStats.value = GlucoseStats.calculate(screenToUse, low, high)
     }
 
+    private data class AgpCacheKey(
+        val period: StatsPeriod,
+        val low: Float,
+        val high: Float,
+        val count: Int,
+        val firstTimestamp: Long,
+        val lastTimestamp: Long,
+        val valueDigest: Long
+    )
+
+    @Volatile
+    private var publishedAgpKey: AgpCacheKey? = null
+
+    private fun agpCacheKey(
+        toUse: List<GlucosePoint>,
+        period: StatsPeriod,
+        low: Float,
+        high: Float
+    ): AgpCacheKey {
+        var digest = 7L
+        for (point in toUse) {
+            digest = digest * 31 + point.valueMgDl.toRawBits()
+        }
+        return AgpCacheKey(
+            period = period,
+            low = low,
+            high = high,
+            count = toUse.size,
+            firstTimestamp = toUse.firstOrNull()?.timestamp ?: 0L,
+            lastTimestamp = toUse.lastOrNull()?.timestamp ?: 0L,
+            valueDigest = digest
+        )
+    }
+
+    /** Index of the first element of the timestamp-sorted [points] at or after [time]. */
+    private fun lowerBound(points: List<GlucosePoint>, time: Long): Int {
+        var low = 0
+        var high = points.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (points[mid].timestamp < time) low = mid + 1 else high = mid
+        }
+        return low
+    }
+
+    /**
+     * Heartbeat that keeps the UI live.
+     *
+     * The cheap part - a single [Natives.lastglucose] call - still runs every few seconds and
+     * appends the point, which is all a live view needs. The expensive part used to run every 9
+     * seconds and walked every raw, calibrated and scan record of every sensor: hundreds of
+     * thousands of JNI calls, a fresh [GlucosePoint] each, a full sort, and tens of megabytes of
+     * garbage that stalled the render thread with 40 ms GC pauses. That is now a slow safety net,
+     * with the event-driven [refreshAll] covering the cases that actually matter (sensor activated,
+     * calibration written, scan taken, Bluetooth state changed).
+     */
     private fun startPolling() {
         scope.launch(Dispatchers.IO) {
-            var counter = 0
+            var ticks = 0
             while (isActive) {
-                delay(3_000L)
+                delay(FAST_POLL_INTERVAL_MILLIS)
                 try {
-                    counter++
+                    ticks++
                     if (Applic.Nativesloaded) {
                         val strGl = Natives.lastglucose()
                         if (strGl != null && strGl.time > 0) {
@@ -2563,27 +2819,70 @@ class GlucoseRepository(
                                     rate = strGl.rate,
                                     status = GlucoseStatus.fromValue(valMgDl, _targetLow.value, _targetHigh.value)
                                 )
-                                _currentReading.value = newPt
-                                val currentList = _readings.value
-                                if (currentList.none { it.timestamp == newPt.timestamp }) {
-                                    _readings.value = (currentList + newPt).sortedBy { it.timestamp }
-                                    recalculateStats()
+                                // A new object with the same time and value would still be unequal to
+                                // the old one, and that is enough to make every collector of
+                                // `currentReading` recompose - the home screen's hero and sparkline
+                                // included - three times a minute for no reason.
+                                val previous = _currentReading.value
+                                if (previous == null ||
+                                    previous.timestamp != newPt.timestamp ||
+                                    previous.valueMgDl != newPt.valueMgDl
+                                ) {
+                                    _currentReading.value = newPt
+                                }
+                                if (appendReading(newPt)) {
+                                    requestStatsRecalculation()
                                 }
                             }
                         }
                     }
-                    if (counter % 3 == 0) {
-                        loadReadingsFromNative()
-                        loadSensorsFromNative()
-                        loadLogsFromNative()
+                    if (ticks % FAST_TICKS_PER_SENSOR_SWEEP == 0) {
+                        sweepSensors()
                     }
-                    if (counter % 5 == 0) {
+                    if (ticks % FAST_TICKS_PER_FULL_REFRESH == 0) {
+                        refreshAllLocked()
+                    }
+                    if (ticks % FAST_TICKS_PER_DEVICE_SWEEP == 0) {
                         refreshWearDevices()
                         refreshMirrorConnections()
                     }
                 } catch (_: Throwable) {}
             }
         }
+    }
+
+    /**
+     * Sensor sweep that yields to a full reload rather than racing it. Both drive the same native
+     * library, and two threads inside it at once is not something to find out about on a watch.
+     */
+    private fun sweepSensors() {
+        if (!nativeLoadMutex.tryLock()) return
+        try {
+            loadSensorsFromNative()
+        } finally {
+            nativeLoadMutex.unlock()
+        }
+    }
+
+    /**
+     * Adds [point] to the published history when it is genuinely new. Returns whether the history
+     * actually changed.
+     *
+     * `readings` is kept sorted, and the same reading arrives here as both a raw and a calibrated
+     * point, so the insert has to be stable and the duplicate check has to key on the timestamp
+     * alone. [publishReadings] then decides whether anything is worth emitting.
+     */
+    private fun appendReading(point: GlucosePoint): Boolean {
+        val current = _readings.value
+        val insertAt = lowerBound(current, point.timestamp)
+        if (insertAt < current.size && current[insertAt].timestamp == point.timestamp) return false
+        val next = ArrayList<GlucosePoint>(current.size + 1)
+        next.addAll(current.subList(0, insertAt))
+        next.add(point)
+        next.addAll(current.subList(insertAt, current.size))
+        val before = _readings.value
+        publishReadings(next)
+        return before !== _readings.value
     }
 
     private fun isNfcLaunchEnabled(): Boolean {
@@ -2611,5 +2910,30 @@ class GlucoseRepository(
         const val LOG_NOTES_KEY = "notes"
         /** Native alarm kinds with user-facing sound behavior, in UI order. */
         val behaviorKinds = listOf(0, 5, 1, 6, 7, 8, 4, 2)
+
+        /**
+         * Heartbeat cadence. The cheap `lastglucose` poll stays at 3 s because a new reading really
+         * does arrive every 5 minutes and a user watching the number expects it to move promptly.
+         */
+        const val FAST_POLL_INTERVAL_MILLIS = 3_000L
+
+        /** Sensor list sweep, 15 s: cheap, and only publishes when something actually differs. */
+        const val FAST_TICKS_PER_SENSOR_SWEEP = 5
+
+        /** Paired-device sweep, 30 s. */
+        const val FAST_TICKS_PER_DEVICE_SWEEP = 10
+
+        /**
+         * Full native reload, 2 minutes. This walks every raw, calibrated and scan record of every
+         * sensor - six figures of JNI calls and tens of megabytes of garbage - so it is a safety net
+         * for "something changed and nobody told us", not the primary update path. Sensor
+         * activation, calibration, scans and Bluetooth transitions all arrive through [refreshAll].
+         */
+        const val FAST_TICKS_PER_FULL_REFRESH = 40
+
+        /** Pre-sizing hint for a full sensor read; grows on its own if a sensor holds more. */
+        const val INITIAL_READING_CAPACITY = 4096
+
+        val MARKUP_PATTERN = Regex("<[^>]+>")
     }
 }

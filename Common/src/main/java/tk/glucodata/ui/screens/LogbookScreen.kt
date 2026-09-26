@@ -133,11 +133,25 @@ fun LogbookScreen(
         if (selectedTypeFilter == null) timeFilteredLogs else timeFilteredLogs.filter { it.type == selectedTypeFilter }
     }
 
-    // Totals for selected time window
-    val windowBolus = timeFilteredLogs.filter { it.type == LogType.RAPID_INSULIN }.sumOf { it.value.toDouble() }
-    val windowBasal = timeFilteredLogs.filter { it.type == LogType.BASAL_INSULIN }.sumOf { it.value.toDouble() }
-    val windowCarbs = timeFilteredLogs.filter { it.type == LogType.CARBS || it.type == LogType.MEAL }.sumOf { it.value.toDouble() }
-    val windowChecks = timeFilteredLogs.count { it.type == LogType.BLOOD_GLUCOSE }
+    // Totals for selected time window. One pass, and remembered: this used to filter the whole
+    // window three times over and allocate a boxed Double per entry, on every recomposition.
+    val (windowBolus, windowBasal, windowCarbs, windowChecks) =
+        remember(timeFilteredLogs) {
+            var bolus = 0.0
+            var basal = 0.0
+            var carbs = 0.0
+            var checks = 0
+            for (entry in timeFilteredLogs) {
+                when (entry.type) {
+                    LogType.RAPID_INSULIN -> bolus += entry.value
+                    LogType.BASAL_INSULIN -> basal += entry.value
+                    LogType.CARBS, LogType.MEAL -> carbs += entry.value
+                    LogType.BLOOD_GLUCOSE -> checks++
+                    LogType.NOTE -> Unit
+                }
+            }
+            WindowTotals(bolus, basal, carbs, checks)
+        }
 
     val totalsTitle = when {
         customDays != null -> stringResource(
@@ -620,3 +634,11 @@ fun CustomLogbookRangeDialog(
         }
     )
 }
+
+/** Totals for the currently selected time window, computed in a single pass over the entries. */
+private data class WindowTotals(
+    val bolus: Double,
+    val basal: Double,
+    val carbs: Double,
+    val checks: Int
+)

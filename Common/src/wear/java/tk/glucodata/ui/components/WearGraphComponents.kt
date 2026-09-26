@@ -41,7 +41,17 @@ internal fun WearGraphHeader(
     clinicalColors: ClinicalColors,
     onNow: () -> Unit
 ) {
-    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    // The formatted timestamp is the only thing here that is not cheap, and the header recomposes
+    // whenever the inspected point or the settled window changes - so memoise it rather than
+    // allocating a Date and running a SimpleDateFormat on every pass.
+    val subtitle = remember(selectedPoint?.timestamp, windowEnd, isLive) {
+        val stamp = when {
+            selectedPoint != null -> selectedPoint.timestamp
+            !isLive -> windowEnd
+            else -> 0L
+        }
+        if (stamp <= 0L) null else timeLabel(stamp)
+    }
 
     Box(
         modifier = Modifier
@@ -63,7 +73,7 @@ internal fun WearGraphHeader(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "${unit.symbol} • ${timeFormatter.format(Date(selectedPoint.timestamp))}",
+                    text = "${unit.symbol} • ${subtitle.orEmpty()}",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -74,7 +84,7 @@ internal fun WearGraphHeader(
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = if (isLive) "History (${selectedHours}h)" else timeFormatter.format(Date(windowEnd)),
+                    text = if (isLive) "History (${selectedHours}h)" else subtitle.orEmpty(),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -94,6 +104,18 @@ internal fun WearGraphHeader(
     }
 }
 
+private val TIME_RANGE_HOURS = intArrayOf(1, 3, 6, 12)
+
+/**
+ * One formatter for the whole process, rather than one per header. Compose headers recompose on every
+ * inspected-point change, and a `SimpleDateFormat` per pass - plus the `Date` it formats - is pure
+ * churn on a watch. Formatter construction is expensive enough that it is worth hoisting even though
+ * the call itself is now memoised.
+ */
+private val headerTimeFormatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+private fun timeLabel(timestamp: Long): String = headerTimeFormatter.format(Date(timestamp))
+
 @Composable
 internal fun WearTimeRangeSelector(
     selectedHours: Int,
@@ -108,7 +130,7 @@ internal fun WearTimeRangeSelector(
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        listOf(1, 3, 6, 12).forEach { hours ->
+        for (hours in TIME_RANGE_HOURS) {
             WearTimeRangePill(
                 hours = hours,
                 isSelected = selectedHours == hours,

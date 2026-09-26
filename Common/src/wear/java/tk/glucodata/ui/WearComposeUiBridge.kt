@@ -19,12 +19,21 @@ object WearComposeUiBridge {
     @JvmField
     var repository: GlucoseRepository? = null
 
+    private var repositoryInitialized = false
+
     @JvmStatic
     fun setupWearComposeUi(activity: MainActivity): GlucoseRepository {
         isWearComposeUiActive = true
 
-        val repo = GlucoseRepository(activity.lifecycleScope)
-        repository = repo
+        // Reuse the existing repository when coming back from the legacy view. Building a second one
+        // started a second heartbeat loop, and the first one is bound to the activity lifecycle so
+        // it kept running: every round trip between the two views permanently doubled the polling
+        // and the garbage it produced.
+        val repo = repository ?: GlucoseRepository(activity.lifecycleScope).also { repository = it }
+        if (repositoryInitialized) {
+            activity.lifecycleScope.launch(Dispatchers.IO) { repo.refreshAll() }
+        }
+        repositoryInitialized = true
         tk.glucodata.alerts.AlertStore.ensureLoaded(activity)
         tk.glucodata.alerts.AlertSync.requestConfig()
 

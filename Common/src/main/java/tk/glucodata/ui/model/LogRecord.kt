@@ -56,4 +56,19 @@ data class LogRecord(
             LogType.NOTE -> note
         }
     }
+
+    companion object {
+        /**
+         * Stable identifier for an entry that came from a native log store.
+         *
+         * The default [id] mints a fresh value on every construction, which meant a reload produced a
+         * list that could never compare equal to the previous one - so every collector of the
+         * logbook recomposed each time it was refreshed, and the fingerprint check that is supposed
+         * to make that a no-op could never fire. Entries sourced from (store, position) instead get
+         * an id derived from that pair, so a reload is value-equal to its predecessor. Locally
+         * created entries still use the generator, because those are genuinely new rows.
+         */
+        fun nativeId(store: NumberStore, position: Int): Long =
+            (store.nativeIndex.toLong() + 1L) * 1_000_000_000_000L + position
+    }
 }

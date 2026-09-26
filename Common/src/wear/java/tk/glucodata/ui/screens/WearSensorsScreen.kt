@@ -242,8 +242,10 @@ fun WearSensorsScreen(
     }
 }
 
+private val MARKUP_PATTERN = Regex("<[^>]+>")
+
 private fun MirrorConnection.hasLivePhoneCarrier(): Boolean {
-    val normalized = status.replace(Regex("<[^>]+>"), "")
+    val normalized = status.replace(MARKUP_PATTERN, "")
     return (normalized.contains("TCP/IP live socket: true", ignoreCase = true) &&
         normalized.contains("receive=true", ignoreCase = true)) ||
         normalized.contains("Direct Bluetooth (BLE GATT)=true", ignoreCase = true) ||
