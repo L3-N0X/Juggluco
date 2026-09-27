@@ -43,6 +43,7 @@ import kotlin.math.roundToInt
 object AlertPlayer {
     private const val LOG_ID = "AlertPlayer"
     const val CHANNEL_ID = "glucoseAlerts"
+    private const val WEAR_CHANNEL_ID = "glucoseAlertsWear"
     const val NOTIFICATION_ID = 81450
     private const val RAMP_STEP_MS = 200L
     private const val ANNOUNCE_LEAD_MS = 2500L
@@ -288,32 +289,45 @@ object AlertPlayer {
     private fun startVibration(rule: AlertRule) {
         val vib = vibrator() ?: return
         if (!vib.hasVibrator()) return
-        val asAlarm = rule.output == AlertOutput.ALARM || rule.overrideDnd
-        if (!asAlarm && audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) return
-        vibrate(vib, rule, loop = true, asAlarm = asAlarm)
+        val overridesQuiet = rule.output == AlertOutput.ALARM || rule.overrideDnd
+        if (!overridesQuiet && quietModeOn()) {
+            Log.i(LOG_ID, "quiet mode on, vibration skipped")
+            return
+        }
+        // Always alarm usage: Android drops notification vibrations from apps in the
+        // background, which is where the watch app is when a phone alert arrives.
+        vibrate(vib, rule, loop = true)
         vibrating = true
+    }
+
+    /** Silent ringer or Do Not Disturb, which alarm-usage vibrations would pass. */
+    private fun quietModeOn(): Boolean {
+        if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) return true
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
+        val filter = notificationManager.currentInterruptionFilter
+        return filter != NotificationManager.INTERRUPTION_FILTER_ALL && filter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
     }
 
     /** One pass of [rule]'s pattern, for previews in the editor. */
     fun previewVibration(rule: AlertRule) {
         val vib = vibrator() ?: return
-        vibrate(vib, rule, loop = false, asAlarm = true)
+        vibrate(vib, rule, loop = false)
     }
 
     @SuppressLint("MissingPermission")
-    private fun vibrate(vib: Vibrator, rule: AlertRule, loop: Boolean, asAlarm: Boolean) {
+    private fun vibrate(vib: Vibrator, rule: AlertRule, loop: Boolean) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val effect = vibrationEffect(rule, loop) ?: return
                 val attributes = VibrationAttributes.Builder()
-                    .setUsage(if (asAlarm) VibrationAttributes.USAGE_ALARM else VibrationAttributes.USAGE_NOTIFICATION)
+                    .setUsage(VibrationAttributes.USAGE_ALARM)
                     .build()
                 val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
                 manager.vibrate(CombinedVibration.createParallel(effect), attributes)
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val effect = vibrationEffect(rule, loop) ?: return
                 @Suppress("DEPRECATION")
-                vib.vibrate(effect, audioAttributes(if (asAlarm) AlertOutput.ALARM else AlertOutput.NOTIFICATION))
+                vib.vibrate(effect, audioAttributes(AlertOutput.ALARM))
             } else {
                 @Suppress("DEPRECATION")
                 vib.vibrate(rule.effectiveVibrationTimings, if (loop) 0 else -1)
@@ -482,16 +496,30 @@ object AlertPlayer {
 
     // --- Notification ----------------------------------------------------------------
 
+    /**
+     * Wear OS only pops a notification up and wakes the screen when it alerts, so the
+     * watch channel "vibrates" with an empty pattern while this player does the real
+     * vibration. Channel settings are fixed once created, hence the separate id.
+     */
+    private val channelId: String
+        get() = if (Applic.isWearable) WEAR_CHANNEL_ID else CHANNEL_ID
+
     private fun ensureChannel() {
         if (channelCreated || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (Applic.isWearable) runCatching { notificationManager.deleteNotificationChannel(CHANNEL_ID) }
         val channel = NotificationChannel(
-            CHANNEL_ID,
+            channelId,
             context.getString(R.string.alert_channel_title),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = context.getString(R.string.alert_channel_description)
             setSound(null, null)
-            enableVibration(false)
+            if (Applic.isWearable) {
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0L)
+            } else {
+                enableVibration(false)
+            }
             setBypassDnd(true)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
@@ -586,9 +614,11 @@ object AlertPlayer {
         return power?.isInteractive == false
     }
 
-    /** Puts the alert over whatever the device is showing, for the global active-screen option. */
+    /** Puts the alert over whatever the device is showing: on the watch, or with the active-screen option. */
     private fun openFullScreenWhileInUse() {
-        if (fullScreenShowing || systemOpensFullScreen()) return
+        // Without the full-screen permission (often the case on Wear OS, which has no
+        // screen to grant it) nothing opens by itself, so try in every state.
+        if (fullScreenShowing || (canUseFullScreen() && systemOpensFullScreen())) return
         try {
             context.startActivity(alertActivityIntent())
         } catch (th: Throwable) {
@@ -600,7 +630,7 @@ object AlertPlayer {
         try {
             ensureChannel()
             val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Notification.Builder(context, CHANNEL_ID)
+                Notification.Builder(context, channelId)
             } else {
                 @Suppress("DEPRECATION")
                 Notification.Builder(context).setPriority(Notification.PRIORITY_MAX)
@@ -631,10 +661,12 @@ object AlertPlayer {
                 builder.setContentIntent(fullScreenIntent())
                 if (!silentUpdate) builder.setFullScreenIntent(fullScreenIntent(), true)
             } else {
-                builder.setContentIntent(Notify.mkpending())
+                builder.setContentIntent(if (fullScreen) fullScreenIntent() else Notify.mkpending())
             }
             notificationManager.notify(NOTIFICATION_ID, builder.build())
-            if (fullScreen && !silentUpdate && AlertStore.settings.value.fullScreenOnActiveScreen) {
+            // A watch has no lock screen to wait behind: open the alert whenever it can be.
+            val openNow = Applic.isWearable || AlertStore.settings.value.fullScreenOnActiveScreen
+            if (fullScreen && !silentUpdate && openNow) {
                 openFullScreenWhileInUse()
             }
         } catch (th: Throwable) {

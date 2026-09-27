@@ -224,6 +224,12 @@ override fun onCapabilityChanged(cap: CapabilityInfo) {
                 Log.d(LOG_ID, "sendmessage nodes=null")
                 scope.launch {
                 findWearDevicesWithApp()
+                // An alert must not be lost while the nodes are still unknown.
+                if(path==ALERTS_PATH)
+                    nodes?.forEach { node ->
+                        if(node.id !in bleTargets)
+                            nameSendMessage(node.id,path,data)
+                        }
                 }
             }
             nodes?.isEmpty() == true -> {
@@ -273,6 +279,10 @@ private fun nameSendMessage(name:String, path:String, data:ByteArray) {
                 else mirrorLabelForNode(name)?.takeIf { available(it) }
             if(bleLabel!=null)
                 return BleMirror.send(bleLabel,path,data)
+            // Alerts cannot wait for the data carrier: when BLE is not ready,
+            // Play services is the only way to reach the other device now.
+            if(path==ALERTS_PATH)
+                return nameSendMessageResultDirect(mirrorNodes[name]?:name,path,data)
         }
         if(BleMirror.isPeer(name)) {
             if(BleMirror.isConfiguredPeer(name)) {
