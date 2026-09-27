@@ -1001,6 +1001,10 @@
     <string name="log_short_basal">Basal</string>
     <string name="log_short_carbs">Kohlenhydrate</string>
     <string name="log_short_bg">BZ</string>
+    <string name="log_pick_carbs">KH</string>
+    <string name="log_pick_bolus">Bolus</string>
+    <string name="log_pick_basal">Basal</string>
+    <string name="log_pick_bg">BZ</string>
     <string name="log_all">Alle</string>
     <string name="log_value_insulin">%1$s U</string>
     <string name="log_value_carbs">%1$s g</string>
