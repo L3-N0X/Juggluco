@@ -36,6 +36,7 @@ object WearComposeUiBridge {
         repositoryInitialized = true
         tk.glucodata.alerts.AlertStore.ensureLoaded(activity)
         tk.glucodata.alerts.AlertSync.requestConfig()
+        tk.glucodata.ui.sync.DisplaySync.request()
 
         activity.setContent {
             WearApp(

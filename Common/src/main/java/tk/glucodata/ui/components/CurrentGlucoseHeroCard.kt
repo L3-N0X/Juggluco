@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import tk.glucodata.R
-import tk.glucodata.ui.model.DeltaCalculation
+import tk.glucodata.ui.model.DeltaReference
 import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
@@ -46,13 +46,12 @@ import tk.glucodata.ui.theme.LocalClinicalColors
 @Composable
 fun CurrentGlucoseHeroCard(
     currentReading: GlucosePoint?,
-    previousReading: GlucosePoint?,
+    deltaReference: DeltaReference?,
     unit: GlucoseUnit,
     sensorName: String? = null,
     targetLow: Float = 70f,
     targetHigh: Float = 180f,
     minimalistUnits: Boolean = true,
-    deltaCalculation: DeltaCalculation = DeltaCalculation.ONE_MINUTE,
     modifier: Modifier = Modifier
 ) {
     val clinicalColors = LocalClinicalColors.current
@@ -85,19 +84,16 @@ fun CurrentGlucoseHeroCard(
         stringResource(R.string.waiting_for_readings)
     }
 
-    // Delta from previous reading (clean number, omitting redundant unit)
-    val deltaText = if (currentReading != null && previousReading != null && currentReading != previousReading) {
-        val deltaMgDl = currentReading.valueMgDl - previousReading.valueMgDl
+    // Delta from the reference reading (clean number, omitting redundant unit). The label carries
+    // the window the comparison really spans, so the number can never be read as a different one.
+    val deltaText = if (currentReading != null && deltaReference != null) {
+        val deltaMgDl = currentReading.valueMgDl - deltaReference.reading.valueMgDl
         val sign = if (deltaMgDl >= 0) "+" else ""
         val numStr = when (unit) {
             GlucoseUnit.MG_DL -> "$sign${deltaMgDl.toInt()}"
             GlucoseUnit.MMOL_L -> "$sign${String.format(java.util.Locale.getDefault(), "%.1f", unit.toDisplay(deltaMgDl))}"
         }
-        val intervalSuffix = if (deltaCalculation == DeltaCalculation.FIVE_MINUTES) {
-            stringResource(R.string.delta_five_minutes_suffix)
-        } else {
-            ""
-        }
+        val intervalSuffix = stringResource(R.string.delta_interval_suffix, deltaReference.minutes)
         if (!minimalistUnits) "$numStr ${stringResource(unit.labelRes)}$intervalSuffix" else "$numStr$intervalSuffix"
     } else null
 

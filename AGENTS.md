@@ -10,6 +10,13 @@
 - **Logbook & Graph Aesthetics:**
   - Log events (Bolus, Basal, Carbs, Blood Glucose checks, Notes) use centralized, dark-mode adaptive theme tokens in `tk.glucodata.ui.theme.LogbookColors` (`MaterialTheme.logbookColors`).
   - Graph curves, markers, and axis elements must respect dynamic theme tokens and avoid visual clutter or overlapping labels.
+  - Type hues (bolus azure, carbs tangerine, basal violet, finger-prick teal) must stay clear of the glucose range hues (sage, amber, coral) so an event marker never reads as a reading's status.
+
+## Logbook Entry
+- **One editor:** `ui/components/LogEntryEditor.kt` is a full-screen editor in its own window (so it also opens above the logbook sheet). It handles new entries, edits and deletes; list rows and graph markers open it on tap instead of carrying edit/delete icons.
+- **Built around real usage:** carbs + bolus sit side by side and save together at one timestamp; basal and finger-pricks are one tap away. When basal is usually taken around the current time, the usual dose is offered as a one-tap chip.
+- **No fixed presets:** quick values and note suggestions come from the user's own history (computed on `Dispatchers.Default`). Never add hardcoded amounts.
+- **Wear keeps the dial** (`WearQuickLogScreen`), tinted with the same type colors and starting from the last logged amount.
 
 ---
 

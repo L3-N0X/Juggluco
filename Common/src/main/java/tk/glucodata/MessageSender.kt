@@ -450,9 +450,10 @@ companion object {
     const val MIRROR_TRANSPORT_PATH = "/mirrortransport"
     const val MIRROR_TRANSPORT_ACK_PATH = "/mirrortransportack"
     const val ALERTS_PATH = tk.glucodata.alerts.AlertSync.PATH
+    const val DISPLAY_SETTINGS_PATH = tk.glucodata.ui.sync.DisplaySync.PATH
     fun isWearControlPath(path:String):Boolean = when(path) {
         START_PATH, ASKFORSTART_PATH, DEFAULTS_PATH, SETTINGS_PATH,
-        BLUETOOTH_PATH, UNPAIR_PATH, ALERTS_PATH -> true
+        BLUETOOTH_PATH, UNPAIR_PATH, ALERTS_PATH, DISPLAY_SETTINGS_PATH -> true
         else -> false
     }
     val scope = CoroutineScope(Dispatchers.IO+SupervisorJob()  )
@@ -584,6 +585,14 @@ companion object {
     public fun sendAlerts(data: ByteArray): Boolean {
         val sender = messagesender ?: return false
         sender.sendmessage(ALERTS_PATH, data)
+        return true
+    }
+
+    /** Display settings that must be identical on the phone and the watch. */
+    @JvmStatic
+    public fun sendDisplaySettings(data: ByteArray): Boolean {
+        val sender = messagesender ?: return false
+        sender.sendmessage(DISPLAY_SETTINGS_PATH, data)
         return true
     }
 

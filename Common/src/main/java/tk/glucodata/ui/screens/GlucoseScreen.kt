@@ -25,7 +25,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
@@ -36,7 +35,6 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,7 +72,7 @@ import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.alerts.AlertStore
 import tk.glucodata.ui.components.CurrentGlucoseHeroCard
-import tk.glucodata.ui.components.EditEntryDialog
+import tk.glucodata.ui.components.LogEntryEditor
 import tk.glucodata.ui.components.GlucoseStatsCard
 import tk.glucodata.ui.components.SearchGlucoseDialog
 import tk.glucodata.ui.data.GlucoseRepository
@@ -125,8 +123,8 @@ fun GlucoseScreen(
     val context = LocalContext.current
 
     val sensorName = sensorDetails.firstOrNull()?.name
-    val previousReading = remember(currentReading, readings, displayConfig.deltaCalculation) {
-        DeltaCalculation.findDeltaReading(currentReading, readings, displayConfig.deltaCalculation)
+    val deltaReference = remember(currentReading, readings, displayConfig.deltaCalculation) {
+        DeltaCalculation.findDeltaReference(currentReading, readings, displayConfig.deltaCalculation)
     }
 
     // 1. Unified Graph Viewport State
@@ -319,7 +317,7 @@ fun GlucoseScreen(
                     targetHigh = targetHigh,
                     displayConfig = displayConfig,
                     alertEvents = alertEvents,
-                    onLogEntryClicked = { selectedLogForDetail = it },
+                    onLogEntryClicked = { if (it.nativeSource != null) selectedLogForDetail = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -362,13 +360,12 @@ fun GlucoseScreen(
                     // Always show current real-time sensor reading
                     CurrentGlucoseHeroCard(
                         currentReading = currentReading,
-                        previousReading = previousReading,
+                        deltaReference = deltaReference,
                         unit = unit,
                         sensorName = sensorName,
                         targetLow = targetLow,
                         targetHigh = targetHigh,
-                        minimalistUnits = displayConfig.minimalistUnits,
-                        deltaCalculation = displayConfig.deltaCalculation
+                        minimalistUnits = displayConfig.minimalistUnits
                     )
                     GlucoseStatsCard(
                         stats = visibleStats,
@@ -440,7 +437,7 @@ fun GlucoseScreen(
                         targetHigh = targetHigh,
                         displayConfig = displayConfig,
                         alertEvents = alertEvents,
-                        onLogEntryClicked = { selectedLogForDetail = it },
+                        onLogEntryClicked = { if (it.nativeSource != null) selectedLogForDetail = it },
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
@@ -481,13 +478,12 @@ fun GlucoseScreen(
                 // 1. Current Glucose Reading at top (ALWAYS real-time reading)
                 CurrentGlucoseHeroCard(
                     currentReading = currentReading,
-                    previousReading = previousReading,
+                    deltaReference = deltaReference,
                     unit = unit,
                     sensorName = sensorName,
                     targetLow = targetLow,
                     targetHigh = targetHigh,
-                    minimalistUnits = displayConfig.minimalistUnits,
-                    deltaCalculation = displayConfig.deltaCalculation
+                    minimalistUnits = displayConfig.minimalistUnits
                 )
 
                 Spacer(modifier = Modifier.height(28.dp))
@@ -543,7 +539,7 @@ fun GlucoseScreen(
                     targetHigh = targetHigh,
                     displayConfig = displayConfig,
                     alertEvents = alertEvents,
-                    onLogEntryClicked = { selectedLogForDetail = it },
+                    onLogEntryClicked = { if (it.nativeSource != null) selectedLogForDetail = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(310.dp)
@@ -752,57 +748,12 @@ fun GlucoseScreen(
             }
         }
 
-        // 8. Amount Log Entry Detail Dialog (Inspection / Deletion)
-        if (selectedLogForDetail != null) {
-            val log = selectedLogForDetail!!
-            val timeFmt = SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "yMMMd, Hm"), Locale.getDefault())
-            AlertDialog(
-                onDismissRequest = { selectedLogForDetail = null },
-                title = {
-                    Text(
-                        text = stringResource(
-                            R.string.log_detail_title,
-                            stringResource(log.type.labelRes),
-                            log.value.toString()
-                        ),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                text = {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.log_detail_time, timeFmt.format(Date(log.timestamp))),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        if (!log.note.isNullOrEmpty()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.log_detail_note, log.note),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { selectedLogForDetail = null }) {
-                        Text(stringResource(R.string.closename))
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            repository.deleteLogEntry(log)
-                            selectedLogForDetail = null
-                            Toast.makeText(context, context.getString(R.string.log_entry_deleted), Toast.LENGTH_SHORT).show()
-                        }
-                    ) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
-                    }
-                }
+        // 8. Log entry tapped on the graph: opens straight in the editor
+        selectedLogForDetail?.let { log ->
+            LogEntryEditor(
+                repository = repository,
+                entry = log,
+                onDismiss = { selectedLogForDetail = null }
             )
         }
 
@@ -1296,11 +1247,7 @@ fun LogbookSection(
                         record = logItem,
                         unit = unit,
                         minimalistUnits = minimalistUnits,
-                        onEdit = if (logItem.nativeSource != null) ({ editingEntry = logItem }) else null,
-                        onDelete = {
-                            repository.deleteLogEntry(logItem)
-                            Toast.makeText(context, context.getString(R.string.log_entry_deleted), Toast.LENGTH_SHORT).show()
-                        }
+                        onClick = if (logItem.nativeSource != null) ({ editingEntry = logItem }) else null
                     )
                 }
             }
@@ -1308,13 +1255,10 @@ fun LogbookSection(
     }
 
     editingEntry?.let { entry ->
-        EditEntryDialog(
+        LogEntryEditor(
+            repository = repository,
             entry = entry,
-            unit = unit,
-            onDismiss = { editingEntry = null },
-            onSave = { value, note ->
-                repository.updateLogEntry(entry, entry.type, value, note = note)
-            }
+            onDismiss = { editingEntry = null }
         )
     }
 }

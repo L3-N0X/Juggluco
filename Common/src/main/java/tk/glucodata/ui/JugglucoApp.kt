@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -15,7 +19,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,13 +29,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import tk.glucodata.R
-import tk.glucodata.ui.components.AddEntryBottomSheet
+import tk.glucodata.ui.components.LogEntryEditor
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.NavigationTab
 import tk.glucodata.ui.navigation.JugglucoBottomNavBar
@@ -61,7 +63,6 @@ import tk.glucodata.ui.screens.settings.WatchSettingsScreen
 import tk.glucodata.ui.screens.settings.WebServerSettingsScreen
 import tk.glucodata.ui.components.AlertIndicatorAction
 import tk.glucodata.ui.theme.JugglucoTheme
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,8 +78,6 @@ fun JugglucoApp(
     var selectedMirrorIndex by rememberSaveable { mutableStateOf(-1) }
     var showAddEntrySheet by rememberSaveable { mutableStateOf(false) }
     var isFullscreenGraph by rememberSaveable { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -87,7 +86,6 @@ fun JugglucoApp(
 
     val systemDark = isSystemInDarkTheme()
     val displayConfig by repository.displayConfig.collectAsState()
-    val unit by repository.unit.collectAsState()
     var isDarkThemeOverride by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val darkTheme = isDarkThemeOverride ?: if (displayConfig.invertColors) true else systemDark
 
@@ -191,6 +189,7 @@ fun JugglucoApp(
             val showTopBar = !isFullscreenGraph && (!isLandscape || selectedTab != NavigationTab.GLUCOSE)
             val showBottomBar = !isFullscreenGraph && !isLandscape
             val showNavRail = !isFullscreenGraph && isLandscape
+            val showAddEntryFab = !isFullscreenGraph && selectedTab == NavigationTab.GLUCOSE
 
             Scaffold(
                 topBar = {
@@ -226,6 +225,20 @@ fun JugglucoApp(
                 },
                 snackbarHost = {
                     SnackbarHost(hostState = snackbarHostState)
+                },
+                floatingActionButton = {
+                    if (showAddEntryFab) {
+                        FloatingActionButton(
+                            onClick = { showAddEntrySheet = true },
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = stringResource(R.string.logbook_add_description)
+                            )
+                        }
+                    }
                 }
             ) { innerPadding ->
                 val contentPadding = if (isFullscreenGraph) PaddingValues(0.dp) else innerPadding
@@ -290,26 +303,11 @@ fun JugglucoApp(
                 }
 
                 if (showAddEntrySheet) {
-                    AddEntryBottomSheet(
-                        sheetState = sheetState,
-                        unit = unit,
+                    LogEntryEditor(
+                        repository = repository,
                         onDismiss = { showAddEntrySheet = false },
-                        onSave = { type, value, note ->
-                            if (repository.addLogEntry(type, value, note)) {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        context.getString(
-                                            R.string.app_log_saved,
-                                            context.getString(type.labelRes),
-                                             if (type == tk.glucodata.ui.model.LogType.BLOOD_GLUCOSE) {
-                                                 unit.format(value)
-                                             } else {
-                                                 String.format(Locale.getDefault(), "%.1f", value)
-                                             }
-                                        )
-                                    )
-                                }
-                            }
+                        onSaved = { message ->
+                            coroutineScope.launch { snackbarHostState.showSnackbar(message) }
                         }
                     )
                 }

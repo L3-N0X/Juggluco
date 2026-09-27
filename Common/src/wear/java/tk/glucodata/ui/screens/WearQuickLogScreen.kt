@@ -64,6 +64,7 @@ import tk.glucodata.ui.components.WearQuickLogDial
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogType
+import tk.glucodata.ui.theme.LocalLogbookColors
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -102,10 +103,21 @@ fun WearQuickLogScreen(
     onSaved: () -> Unit
 ) {
     val unit by repository.unit.collectAsState()
+    val logs by repository.logs.collectAsState()
 
     var selectedType by remember { mutableStateOf(LogType.CARBS) }
     val spec = remember(selectedType, unit) { specFor(selectedType, unit) }
-    var value by remember(spec) { mutableFloatStateOf(spec.initial) }
+    // Starts from the amount last logged for this type, which is far more likely to be close
+    // than any fixed default; the spec's default only covers a fresh logbook.
+    var value by remember(spec) {
+        val last = logs.firstOrNull { it.type == selectedType }?.value
+            ?.let { if (selectedType == LogType.BLOOD_GLUCOSE) unit.toDisplay(it) else it }
+        val start = last?.let {
+            (spec.min + ((it - spec.min) / spec.smallStep).roundToInt() * spec.smallStep).coerceIn(spec.min, spec.max)
+        }
+        mutableFloatStateOf(start?.takeIf { it > spec.min } ?: spec.initial)
+    }
+    val typeColors = LocalLogbookColors.current.forType(selectedType)
 
     fun adjust(delta: Float) {
         val steps = ((value + delta - spec.min) / spec.smallStep).roundToInt()
@@ -177,19 +189,14 @@ fun WearQuickLogScreen(
                     onValueChange = { value = it },
                     displayText = displayText,
                     labelText = labelText,
-                    contentDescription = when (selectedType) {
-                        LogType.CARBS -> "Carbohydrates in grams"
-                        LogType.RAPID_INSULIN -> "Rapid insulin in units"
-                        LogType.BASAL_INSULIN -> "Basal insulin in units"
-                        LogType.BLOOD_GLUCOSE -> "Blood glucose"
-                        else -> "Value"
-                    }
+                    accentColor = typeColors.primary,
+                    contentDescription = stringResource(selectedType.labelRes)
                 )
             }
 
             item {
                 Text(
-                    text = "Turn crown or spin ring",
+                    text = stringResource(R.string.log_dial_hint),
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -284,6 +291,11 @@ fun WearQuickLogScreen(
                         onSaved()
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = typeColors.primary,
+                        contentColor = typeColors.container,
+                        iconColor = typeColors.container
+                    ),
                     icon = {
                         Icon(
                             imageVector = Icons.Default.Check,
@@ -292,7 +304,7 @@ fun WearQuickLogScreen(
                         )
                     },
                     label = {
-                        Text("Save")
+                        Text(stringResource(R.string.save))
                     }
                 )
             }
@@ -329,6 +341,7 @@ private fun SemicircleCategoryPicker(
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
     val colors = MaterialTheme.colorScheme
+    val selectedColor = LocalLogbookColors.current.forType(selected).primary
     val baseStyle = MaterialTheme.typography.labelMedium
 
     BoxWithConstraints(
@@ -403,13 +416,13 @@ private fun SemicircleCategoryPicker(
                 val center = Offset(anchorX(index), railYAt(anchorX(index)))
                 if (label.category.type == selected) {
                     drawCircle(
-                        color = colors.primary.copy(alpha = 0.28f),
+                        color = selectedColor.copy(alpha = 0.28f),
                         radius = dotRadiusPx * 2.1f,
                         center = center
                     )
                 }
                 drawCircle(
-                    color = if (label.category.type == selected) colors.primary else colors.outline,
+                    color = if (label.category.type == selected) selectedColor else colors.outline,
                     radius = dotRadiusPx,
                     center = center
                 )
@@ -442,7 +455,7 @@ private fun SemicircleCategoryPicker(
                     text = label.category.label,
                     fontSize = label.fontSize,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) colors.primary else colors.onSurfaceVariant,
+                    color = if (isSelected) selectedColor else colors.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     maxLines = 1
                 )

@@ -54,6 +54,7 @@ fun WearHomeScreen(
     val unit by repository.unit.collectAsState()
     val targetLow by repository.targetLow.collectAsState()
     val targetHigh by repository.targetHigh.collectAsState()
+    val displayConfig by repository.displayConfig.collectAsState()
 
     val listState = rememberScalingLazyListState(
         initialCenterItemIndex = 0,
@@ -83,6 +84,7 @@ fun WearHomeScreen(
                         currentReading = currentReading,
                         readings = readings,
                         unit = unit,
+                        deltaCalculation = displayConfig.deltaCalculation,
                         targetLow = targetLow,
                         targetHigh = targetHigh,
                         onClick = onNavigateToGraph

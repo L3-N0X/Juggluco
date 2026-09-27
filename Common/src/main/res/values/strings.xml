@@ -875,7 +875,7 @@
     <string name="settings_fullscreen">Fullscreen System UI</string>
     <string name="settings_fullscreen_desc">Hide Android status and navigation bars for immersive curve</string>
     <string name="settings_delta_calculation">Delta Calculation</string>
-    <string name="settings_delta_calculation_desc">Calculate glucose rate of change over 1 or 5 minutes on the home screen</string>
+    <string name="settings_delta_calculation_desc">Show the glucose change over 1 or 5 minutes. The time in brackets is the window the number really covers. Synced with your watch</string>
     <string name="settings_delta_1min">1 min</string>
     <string name="settings_delta_5min">5 min</string>
 
@@ -1214,7 +1214,7 @@
     <string name="search_notes_food">Notes or food name</string>
     <string name="search_food_examples">e.g. Pizza, Coffee, Exercise</string>
     <string name="agp_hour_inspection">Median: %1$s • IQR: %2$s–%3$s</string>
-    <string name="delta_five_minutes_suffix"> (5 min)</string>
+    <string name="delta_interval_suffix"> (%1$d min)</string>
     <string name="graph_delta_minutes">Δ%1$s%2$s · %3$d min</string>
     <string name="duration_label">Duration</string>
     <string name="duration_hours">Hours</string>
@@ -1682,4 +1682,19 @@
     <string name="loc_model_warming_up">Warming up</string>
     <string name="loc_model_expired">Expired</string>
     <string name="loc_model_ended">Ended</string>
+    <string name="log_entry_new_title">New entry</string>
+    <string name="log_entry_edit_title">Edit entry</string>
+    <string name="log_entry_time_now">Now</string>
+    <string name="log_entry_time_today">Today, %1$s</string>
+    <string name="log_entry_time_yesterday">Yesterday, %1$s</string>
+    <string name="log_entry_time_reset">Back to now</string>
+    <string name="log_entry_usual_basal">Usual basal · %1$s</string>
+    <string name="log_entry_remove_type">Remove %1$s</string>
+    <string name="log_entry_note_hint">Add a note</string>
+    <string name="log_entry_save_summary">Log %1$s</string>
+    <string name="log_entry_saved">Logged %1$s</string>
+    <string name="log_entry_out_of_range">Between %1$s and %2$s</string>
+    <string name="log_entry_backspace">Delete digit, hold to clear</string>
+    <string name="log_entry_delete_question">Delete this entry?</string>
+    <string name="log_dial_hint">Turn the crown or spin the ring</string>
 </resources>

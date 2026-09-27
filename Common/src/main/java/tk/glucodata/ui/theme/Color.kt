@@ -169,58 +169,62 @@ data class LogbookColors(
     fun onContainerColorFor(type: LogType): Color = forType(type).onContainer
 }
 
+// Type palette. Each type owns a hue that none of the glucose range colours use (sage, amber,
+// coral), so an event marker is never mistaken for a reading's status: blue for the bolus and a
+// complementary tangerine for carbs - the pair logged together most often - violet for the slow
+// basal insulin and teal for the occasional finger-prick.
 val LightLogbookColors = LogbookColors(
     bolus = LogTypeColors(
-        primary = Color(0xFF0277BD), // Cerulean blue
-        container = Color(0xFFE1F0F8),
-        onContainer = Color(0xFF00384E)
+        primary = Color(0xFF2F62D6), // Azure
+        container = Color(0xFFDDE6FF),
+        onContainer = Color(0xFF0B245E)
     ),
     basal = LogTypeColors(
-        primary = Color(0xFF564AB1), // Slate violet
-        container = Color(0xFFECE8F8),
-        onContainer = Color(0xFF2C2263)
+        primary = Color(0xFF7443D1), // Violet
+        container = Color(0xFFEDE3FF),
+        onContainer = Color(0xFF2B1162)
     ),
     carbs = LogTypeColors(
-        primary = Color(0xFFB45309), // Warm amber
-        container = Color(0xFFFEF3C7),
-        onContainer = Color(0xFF78350F)
+        primary = Color(0xFFC2410C), // Tangerine
+        container = Color(0xFFFFE4D4),
+        onContainer = Color(0xFF571B02)
     ),
     bloodGlucose = LogTypeColors(
-        primary = Color(0xFFB91C1C), // Crimson
-        container = Color(0xFFFEE2E2),
-        onContainer = Color(0xFF7F1D1D)
+        primary = Color(0xFF0B7A73), // Teal
+        container = Color(0xFFCDF1EC),
+        onContainer = Color(0xFF033A36)
     ),
     note = LogTypeColors(
-        primary = Color(0xFF63567A), // Slate plum
-        container = Color(0xFFEFEBF3),
-        onContainer = Color(0xFF322846)
+        primary = Color(0xFF5E6470), // Graphite
+        container = Color(0xFFE6E8EE),
+        onContainer = Color(0xFF22262E)
     )
 )
 
 val DarkLogbookColors = LogbookColors(
     bolus = LogTypeColors(
-        primary = Color(0xFF67B5E8), // Soft sky blue, never blinding
-        container = Color(0xFF12344D), // Dark slate blue container, blends into dark surface
-        onContainer = Color(0xFFBAE6FD)
+        primary = Color(0xFF8DB2FF),
+        container = Color(0xFF1B2F5C),
+        onContainer = Color(0xFFD9E3FF)
     ),
     basal = LogTypeColors(
-        primary = Color(0xFFA594F9), // Soft muted periwinkle
-        container = Color(0xFF2A244E), // Dark slate violet container
-        onContainer = Color(0xFFE2DCFB)
+        primary = Color(0xFFC4A8FF),
+        container = Color(0xFF34245E),
+        onContainer = Color(0xFFEBDDFF)
     ),
     carbs = LogTypeColors(
-        primary = Color(0xFFE0A34E), // Soft warm gold
-        container = Color(0xFF452E10), // Dark warm amber container
-        onContainer = Color(0xFFFDE68A)
+        primary = Color(0xFFFFA66E),
+        container = Color(0xFF4D2511),
+        onContainer = Color(0xFFFFDCC8)
     ),
     bloodGlucose = LogTypeColors(
-        primary = Color(0xFFE57373), // Soft muted coral
-        container = Color(0xFF4C1D24), // Dark wine container
-        onContainer = Color(0xFFFECDD6)
+        primary = Color(0xFF5BD5C8),
+        container = Color(0xFF113E3A),
+        onContainer = Color(0xFFC4F3EC)
     ),
     note = LogTypeColors(
-        primary = Color(0xFFBFAFD9), // Soft muted mauve
-        container = Color(0xFF332A42), // Dark slate mauve container
-        onContainer = Color(0xFFEDE5F6)
+        primary = Color(0xFFB9BEC9),
+        container = Color(0xFF2E323A),
+        onContainer = Color(0xFFE2E5EC)
     )
 )

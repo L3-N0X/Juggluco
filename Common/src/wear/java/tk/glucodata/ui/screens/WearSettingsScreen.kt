@@ -45,6 +45,7 @@ import androidx.wear.compose.material3.SwitchButtonDefaults
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.material3.TitleCard
+import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.GlucoseUnit
@@ -418,7 +419,7 @@ fun WearSettingsScreen(
             // Delta Interval Section
             item {
                 ListSubHeader {
-                    Text("Delta Interval")
+                    Text(stringResource(R.string.settings_delta_calculation))
                 }
             }
             item {
@@ -426,7 +427,7 @@ fun WearSettingsScreen(
                     selected = displayConfig.deltaCalculation == DeltaCalculation.ONE_MINUTE,
                     onSelect = { repository.setDeltaCalculation(DeltaCalculation.ONE_MINUTE) },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("1 Minute") }
+                    label = { Text(stringResource(R.string.settings_delta_1min)) }
                 )
             }
             item {
@@ -434,7 +435,7 @@ fun WearSettingsScreen(
                     selected = displayConfig.deltaCalculation == DeltaCalculation.FIVE_MINUTES,
                     onSelect = { repository.setDeltaCalculation(DeltaCalculation.FIVE_MINUTES) },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("5 Minutes") }
+                    label = { Text(stringResource(R.string.settings_delta_5min)) }
                 )
             }
 

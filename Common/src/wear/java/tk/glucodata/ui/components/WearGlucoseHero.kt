@@ -19,12 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import tk.glucodata.R
 import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.GlucoseStatus
@@ -37,6 +39,7 @@ fun WearGlucoseHero(
     currentReading: GlucosePoint?,
     readings: List<GlucosePoint>,
     unit: GlucoseUnit,
+    deltaCalculation: DeltaCalculation = DeltaCalculation.ONE_MINUTE,
     targetLow: Float = 70f,
     targetHigh: Float = 180f,
     onClick: (() -> Unit)? = null,
@@ -55,19 +58,25 @@ fun WearGlucoseHero(
         currentReading?.let { TrendArrow.fromRate(it.rate) } ?: TrendArrow.UNKNOWN
     }
 
-    // Delta calculation
-    val deltaReading = remember(currentReading, readings) {
-        DeltaCalculation.findDeltaReading(currentReading, readings, DeltaCalculation.FIVE_MINUTES)
+    // Delta calculation, using the window the user selected rather than a fixed five minutes.
+    val deltaReference = remember(currentReading, readings, deltaCalculation) {
+        DeltaCalculation.findDeltaReference(currentReading, readings, deltaCalculation)
     }
-    val deltaText = remember(currentReading, deltaReading, unit) {
-        if (currentReading != null && deltaReading != null) {
-            val diff = currentReading.valueMgDl - deltaReading.valueMgDl
+    val deltaText = remember(currentReading, deltaReference, unit) {
+        if (currentReading != null && deltaReference != null) {
+            val diff = currentReading.valueMgDl - deltaReference.reading.valueMgDl
             val prefix = if (diff > 0) "+" else ""
             when (unit) {
                 GlucoseUnit.MG_DL -> "$prefix${diff.toInt()}"
                 GlucoseUnit.MMOL_L -> "$prefix${String.format(java.util.Locale.US, "%.1f", unit.toDisplay(diff))}"
             }
         } else null
+    }
+    // Label the window the number really covers, so a delta is never mistaken for a shorter one.
+    val deltaSuffix = if (deltaReference != null) {
+        stringResource(R.string.delta_interval_suffix, deltaReference.minutes)
+    } else {
+        ""
     }
 
     // Time elapsed string
@@ -133,7 +142,7 @@ fun WearGlucoseHero(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "Δ $deltaText",
+                        text = "Δ $deltaText$deltaSuffix",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface

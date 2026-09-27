@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -57,6 +58,7 @@ fun WearQuickLogDial(
     displayText: String,
     labelText: String,
     modifier: Modifier = Modifier,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
     contentDescription: String = labelText
 ) {
     val haptic = LocalHapticFeedback.current
@@ -94,9 +96,9 @@ fun WearQuickLogDial(
     val degreesPerStep = (3f * 360f / totalSteps).coerceIn(4f, 25f)
 
     val trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
-    val progressColor = MaterialTheme.colorScheme.primary
-    val knobOuter = MaterialTheme.colorScheme.primary
-    val knobInner = MaterialTheme.colorScheme.onPrimary
+    val progressColor = accentColor
+    val knobOuter = accentColor
+    val knobInner = MaterialTheme.colorScheme.surfaceContainerLow
     val valueColor = MaterialTheme.colorScheme.onSurface
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
 

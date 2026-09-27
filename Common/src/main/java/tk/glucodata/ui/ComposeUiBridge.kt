@@ -29,6 +29,7 @@ object ComposeUiBridge {
         repository = repo
         tk.glucodata.alerts.AlertStore.ensureLoaded(activity)
         tk.glucodata.alerts.AlertSync.pushConfig()
+        tk.glucodata.ui.sync.DisplaySync.request()
 
         activity.setContent {
             JugglucoApp(

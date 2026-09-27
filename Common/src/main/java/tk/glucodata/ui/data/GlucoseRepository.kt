@@ -64,6 +64,7 @@ import tk.glucodata.ui.model.TimeRange
 import tk.glucodata.ui.model.WatchConfig
 import tk.glucodata.ui.model.WearDiagnosticInfo
 import tk.glucodata.ui.model.WearWatchDevice
+import tk.glucodata.ui.sync.DisplaySync
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
@@ -230,6 +231,7 @@ class GlucoseRepository(
     val wearDiagnosticInfo: StateFlow<WearDiagnosticInfo> = _wearDiagnosticInfo.asStateFlow()
 
     init {
+        DisplaySync.install(this)
         bloodLabelHistory += readBloodLabelHistory().filterNot { it in RESERVED_COMPOSE_LABELS }
         // Never touch JNI or SharedPreferences from whatever thread constructs the repository:
         // on Wear that is the main thread, during activity creation.
@@ -2560,7 +2562,11 @@ class GlucoseRepository(
         }
     }
 
-    fun setDeltaCalculation(calculation: DeltaCalculation) {
+    /**
+     * @param fromRemote true when the change arrived from the paired device, so it is not sent
+     *   back out again.
+     */
+    fun setDeltaCalculation(calculation: DeltaCalculation, fromRemote: Boolean = false) {
         _displayConfig.value = _displayConfig.value.copy(deltaCalculation = calculation)
         scope.launch(Dispatchers.IO) {
             try {
@@ -2569,6 +2575,11 @@ class GlucoseRepository(
                     .putInt(KEY_DELTA_CALCULATION, calculation.minutes)
                     .apply()
             } catch (_: Throwable) {}
+            if (!fromRemote) {
+                try {
+                    DisplaySync.onLocalDeltaChange(calculation)
+                } catch (_: Throwable) {}
+            }
         }
     }
 

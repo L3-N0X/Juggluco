@@ -1,7 +1,8 @@
 package tk.glucodata.ui.screens
 
-import android.widget.Toast
+import android.text.format.DateUtils
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,16 +21,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Fastfood
-import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -55,14 +49,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.R
-import tk.glucodata.ui.components.EditEntryDialog
+import tk.glucodata.ui.components.LogEntryEditor
+import tk.glucodata.ui.components.icon
+import tk.glucodata.ui.components.shortLabelRes
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogRecord
@@ -91,7 +87,6 @@ fun LogbookScreen(
     val logs by repository.logs.collectAsState()
     val unit by repository.unit.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
-    val context = LocalContext.current
 
     var selectedTypeFilter by remember { mutableStateOf<LogType?>(null) }
     var selectedTimeFilter by remember { mutableStateOf(LogbookTimeFilter.TODAY) }
@@ -354,11 +349,7 @@ fun LogbookScreen(
                             record = item,
                             unit = unit,
                             minimalistUnits = displayConfig.minimalistUnits,
-                            onEdit = if (item.nativeSource != null) ({ editingEntry = item }) else null,
-                            onDelete = {
-                                repository.deleteLogEntry(item)
-                                Toast.makeText(context, context.getString(R.string.log_entry_deleted), Toast.LENGTH_SHORT).show()
-                            }
+                            onClick = if (item.nativeSource != null) ({ editingEntry = item }) else null
                         )
                     }
                 }
@@ -389,13 +380,10 @@ fun LogbookScreen(
     }
 
     editingEntry?.let { entry ->
-        EditEntryDialog(
+        LogEntryEditor(
+            repository = repository,
             entry = entry,
-            unit = unit,
-            onDismiss = { editingEntry = null },
-            onSave = { value, note ->
-                repository.updateLogEntry(entry, entry.type, value, note = note)
-            }
+            onDismiss = { editingEntry = null }
         )
     }
 }
@@ -409,34 +397,26 @@ fun DailyTotalPill(label: String, value: String, color: Color) {
     }
 }
 
+/**
+ * One logbook row. Tapping it opens the entry in the editor, which is also where it is deleted,
+ * so a stray tap in the list can never remove anything.
+ */
 @Composable
 fun LogItemCard(
     record: LogRecord,
     unit: GlucoseUnit,
     minimalistUnits: Boolean = true,
-    onEdit: (() -> Unit)? = null,
-    onDelete: () -> Unit
+    onClick: (() -> Unit)? = null
 ) {
     val locale = Locale.getDefault()
     val timeFormat: DateFormat = remember(locale) { DateFormat.getTimeInstance(DateFormat.SHORT, locale) }
-    val dateFormat = remember(locale) { SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "yMMMd"), locale) }
+    val dateFormat = remember(locale) { SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale) }
+    val itemColors = LocalLogbookColors.current.forType(record.type)
 
-    val logbookColors = LocalLogbookColors.current
-    val itemColors = logbookColors.forType(record.type)
-
-    val icon = when (record.type) {
-        LogType.RAPID_INSULIN -> Icons.Default.Medication
-        LogType.BASAL_INSULIN -> Icons.Default.Vaccines
-        LogType.CARBS, LogType.MEAL -> Icons.Default.Fastfood
-        LogType.BLOOD_GLUCOSE -> Icons.Default.Bloodtype
-        LogType.NOTE -> Icons.AutoMirrored.Filled.Notes
-    }
-
-    // Clean value display without repetitive cluttered units
     val valueDisplay = when (record.type) {
         LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> stringResource(
             R.string.log_value_insulin,
-            String.format(Locale.getDefault(), "%.1f", record.value)
+            String.format(locale, "%.1f", record.value)
         )
         LogType.CARBS, LogType.MEAL -> stringResource(R.string.log_value_carbs, record.value.toInt().toString())
         LogType.BLOOD_GLUCOSE -> if (minimalistUnits) {
@@ -447,11 +427,21 @@ fun LogItemCard(
         LogType.NOTE -> if (record.value > 0) record.value.toString() else ""
     }
 
+    val time = timeFormat.format(Date(record.timestamp))
+    val isToday = remember(record.timestamp) { DateUtils.isToday(record.timestamp) }
+    val whenText = if (isToday) time else stringResource(
+        R.string.logbook_date_at_time,
+        dateFormat.format(Date(record.timestamp)),
+        time
+    )
+    val subtitle = if (record.note.isBlank()) whenText else "$whenText · ${record.note}"
+
     // Flat M3 list row placed directly on the page: no Card container, no
     // elevation. Parents separate rows with HorizontalDivider.
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -462,84 +452,40 @@ fun LogItemCard(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = icon,
-                contentDescription = stringResource(record.type.labelRes),
-                tint = itemColors.onContainer,
-                modifier = Modifier.size(24.dp)
+                imageVector = record.type.icon,
+                contentDescription = null,
+                tint = itemColors.primary,
+                modifier = Modifier.size(22.dp)
             )
         }
 
         Spacer(modifier = Modifier.width(14.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(record.type.labelRes),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = valueDisplay,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = itemColors.primary
-                )
-            }
-
+            Text(
+                text = stringResource(record.type.shortLabelRes),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             Spacer(modifier = Modifier.height(2.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(
-                        R.string.logbook_date_at_time,
-                        dateFormat.format(Date(record.timestamp)),
-                        timeFormat.format(Date(record.timestamp))
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                if (!record.note.isNullOrEmpty()) {
-                    Text(
-                        text = record.note,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.width(6.dp))
-
-        if (onEdit != null) {
-            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.edit),
-                    tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-
-        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = stringResource(R.string.delete),
-                tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                modifier = Modifier.size(18.dp)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Text(
+            text = valueDisplay,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = itemColors.primary
+        )
     }
 }
 
