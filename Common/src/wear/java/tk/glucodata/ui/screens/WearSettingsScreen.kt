@@ -1,17 +1,21 @@
 package tk.glucodata.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -37,6 +41,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.RadioButton
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.SwitchButton
+import androidx.wear.compose.material3.SwitchButtonDefaults
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.material3.TitleCard
@@ -45,6 +50,7 @@ import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.theme.WearColorPreset
 import tk.glucodata.ui.theme.WearThemePreferences
+import tk.glucodata.ui.theme.wearAccentColor
 import kotlin.math.roundToInt
 
 internal data class ThresholdSpec(
@@ -108,12 +114,21 @@ internal fun AlarmSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    // A whole width SwitchButton filled with `primary` is a huge, fully saturated block on a small
+    // screen, and a custom accent makes it worse. The container pair keeps the row on the muted
+    // scale while the filled buttons around it stay the loud, primary coloured elements.
     SwitchButton(
         checked = checked,
         onCheckedChange = onCheckedChange,
         modifier = Modifier.fillMaxWidth(),
         label = { Text(title) },
-        secondaryLabel = { Text(summary) }
+        secondaryLabel = { Text(summary) },
+        colors = SwitchButtonDefaults.switchButtonColors(
+            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            uncheckedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            uncheckedContentColor = MaterialTheme.colorScheme.onSurface
+        )
     )
 }
 
@@ -337,7 +352,22 @@ fun WearSettingsScreen(
                         selected = colorPreset == preset,
                         onSelect = { tap { WearThemePreferences.setColorPreset(preset) } },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text(preset.label) }
+                        label = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            wearAccentColor(preset, MaterialTheme.colorScheme.primary)
+                                        )
+                                )
+                                Text(preset.label)
+                            }
+                        }
                     )
                 }
             }

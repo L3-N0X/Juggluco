@@ -563,7 +563,7 @@ internal class WearGraphChartRenderer(
     }
 }
 
-private fun wearStatusColor(status: GlucoseStatus, colors: ClinicalColors): Color = when (status) {
+internal fun wearStatusColor(status: GlucoseStatus, colors: ClinicalColors): Color = when (status) {
     GlucoseStatus.VERY_LOW -> colors.veryLow
     GlucoseStatus.LOW -> colors.low
     GlucoseStatus.IN_RANGE -> colors.inRange

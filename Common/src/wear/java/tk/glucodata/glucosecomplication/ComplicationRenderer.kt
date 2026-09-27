@@ -85,6 +85,14 @@ object ComplicationRenderer {
     /** Icon bitmap edge length for SHORT_TEXT icons (matches ~32dp @ 3x). */
     const val ICON_SIZE = 96
 
+    /**
+     * Placeholder shown whenever no current reading is available (no sensor data
+     * yet, or the reading is older than the glucose timeout). Never substitute a
+     * plausible number here: a fabricated value is indistinguishable from a real
+     * measurement on a watch face.
+     */
+    const val NO_VALUE = "---"
+
     // Material 3 Dark Clinical Tokens (from tk.glucodata.ui.theme.DarkClinicalColors)
     const val COLOR_IN_RANGE = 0xFF7CB69D.toInt()        // Soft sage green, never neon
     const val COLOR_WARNING = 0xFFF59E0B.toInt()         // Radiant amber (Low & High)
@@ -122,11 +130,10 @@ object ComplicationRenderer {
         val now = System.currentTimeMillis()
         val isMmol = Applic.unit == 1
         val unit = if (isMmol) GlucoseUnit.MMOL_L else GlucoseUnit.MG_DL
-        val defaultVal = if (isMmol) "5.6" else "108"
 
         if (strGl == null || strGl.time <= 0) {
             return ComplicationGlucose(
-                value = defaultVal,
+                value = NO_VALUE,
                 isOld = true,
                 rate = Float.NaN,
                 status = GlucoseStatus.IN_RANGE,
@@ -149,7 +156,7 @@ object ComplicationRenderer {
         val status = GlucoseStatus.fromValue(valMgDl, targetLow, targetHigh)
 
         return ComplicationGlucose(
-            value = if (isOld) "---" else strGl.value,
+            value = if (isOld) NO_VALUE else strGl.value,
             isOld = isOld,
             rate = strGl.rate,
             status = status,
@@ -160,11 +167,14 @@ object ComplicationRenderer {
 
     /**
      * Sample glucose data used for complication previews in the watch face customizer.
+     *
+     * Never invents a reading: the placeholder keeps the preview honest while the
+     * layout, arrow and signal colors are still visible to the user.
      */
     fun getPreviewGlucose(): ComplicationGlucose {
         val isMmol = Applic.unit == 1
         return ComplicationGlucose(
-            value = if (isMmol) "5.6" else "108",
+            value = NO_VALUE,
             isOld = false,
             rate = 0.8f,
             status = GlucoseStatus.IN_RANGE,
@@ -191,7 +201,7 @@ object ComplicationRenderer {
     /**
      * Shrink-to-fit text sizing: starts at [baseSize] and only ever shrinks so
      * the text fits [maxWidth]. Small values are never stretched up, which keeps
-     * digit sizes consistent ("55" renders at the same size as "108").
+     * digit sizes consistent ("55" renders at the same size as "555").
      */
     private fun fitTextSize(paint: Paint, text: String, baseSize: Float, maxWidth: Float): Float {
         var size = baseSize
@@ -525,10 +535,16 @@ object ComplicationRenderer {
         pendingIntent: PendingIntent?
     ): ComplicationData? {
         val glucose = if (isPreview) getPreviewGlucose() else getLatestGlucose()
+        val hasValue = !glucose.isOld && glucose.value != NO_VALUE
         val trend = if (glucose.isOld) TrendArrow.UNKNOWN else TrendArrow.fromRate(glucose.rate)
-        val descText = PlainComplicationText.Builder(
-            "${Applic.getContext().getString(R.string.glucose)} ${glucose.value}, ${Applic.getContext().getString(trend.labelRes)}"
-        ).build()
+        val descText = if (hasValue) {
+            PlainComplicationText.Builder(
+                "${Applic.getContext().getString(R.string.glucose)} ${glucose.value}, ${Applic.getContext().getString(trend.labelRes)}"
+            ).build()
+        } else {
+            // No reading: announce it as unknown instead of reading out the placeholder.
+            PlainComplicationText.Builder(Applic.getContext().getString(R.string.unknown)).build()
+        }
         val valueText = PlainComplicationText.Builder(glucose.value).build()
 
         // Monochrome arrow asset any watch face can tint; signal arrow asset
