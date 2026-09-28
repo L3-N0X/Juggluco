@@ -1,6 +1,7 @@
 package tk.glucodata.ui.screens.settings
 
 import android.app.Activity
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import tk.glucodata.Applic
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.DeltaCalculation
@@ -306,6 +309,17 @@ fun DisplaySettingsScreen(
 
         // ADVANCED TOOLS
         SettingsSection(title = stringResource(R.string.loc_advanced_tools)) {
+            if (!Applic.isWearable) {
+                SettingsNavRow(
+                    title = stringResource(R.string.widget_settings_title),
+                    subtitle = stringResource(R.string.widget_settings_desc),
+                    icon = Icons.Default.Widgets,
+                    onClick = {
+                        // Lives in the mobile source set, so it is started by name.
+                        context.startActivity(Intent().setClassName(context, "tk.glucodata.widgets.WidgetConfigActivity"))
+                    }
+                )
+            }
             SettingsNavRow(
                 title = stringResource(R.string.settings_floating_widget),
                 subtitle = stringResource(R.string.settings_floating_widget_desc),

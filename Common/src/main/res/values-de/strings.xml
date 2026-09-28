@@ -1573,4 +1573,7 @@
     <string name="log_entry_backspace">Ziffer löschen, halten zum Leeren</string>
     <string name="log_entry_delete_question">Diesen Eintrag löschen?</string>
     <string name="log_dial_hint">Krone oder Ring drehen</string>
+    <!-- Home screen widgets -->
+    <string name="widget_settings_title">Startbildschirm-Widgets</string>
+    <string name="widget_settings_desc">Widgets auswählen, gestalten und hinzufügen</string>
 </resources>

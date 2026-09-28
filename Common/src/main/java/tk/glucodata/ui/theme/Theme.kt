@@ -208,6 +208,23 @@ private fun seedColorScheme(seed: Color, darkTheme: Boolean): ColorScheme {
     )
 }
 
+/**
+ * The app's color scheme outside of composition: the custom accent when one is set, otherwise the
+ * wallpaper colors on Android 12+, otherwise the built-in palette. Home screen widgets use this so
+ * they match the app.
+ */
+fun jugglucoColorScheme(
+    context: Context,
+    darkTheme: Boolean,
+    customColorArgb: Int? = AppThemePreferences.also { it.ensureLoaded(context) }.customColorArgb.value,
+    dynamicColor: Boolean = true
+): ColorScheme = when {
+    customColorArgb != null -> seedColorScheme(Color(customColorArgb), darkTheme)
+    dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    else -> if (darkTheme) DarkColorScheme else LightColorScheme
+}
+
 @Composable
 fun JugglucoTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -217,15 +234,8 @@ fun JugglucoTheme(
     val context = LocalContext.current
     AppThemePreferences.ensureLoaded(context)
     val customColorArgb by AppThemePreferences.customColorArgb.collectAsState()
-    val customSeed = customColorArgb?.let { Color(it) }
-    val colorScheme = when {
-        customSeed != null ->
-            remember(customSeed, darkTheme) { seedColorScheme(customSeed, darkTheme) }
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            remember(context, darkTheme) {
-                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            }
-        else -> if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = remember(context, customColorArgb, darkTheme, dynamicColor) {
+        jugglucoColorScheme(context, darkTheme, customColorArgb, dynamicColor)
     }
 
     val clinicalColors = if (darkTheme) DarkClinicalColors else LightClinicalColors

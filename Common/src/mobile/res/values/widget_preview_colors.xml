@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Colors for the widget picker previews. Android 12+ maps them to the wallpaper palette (values-v31). -->
+<resources>
+    <color name="widget_preview_surface">#FFEEF2F5</color>
+    <color name="widget_preview_on_surface">#FF181C1F</color>
+    <color name="widget_preview_variant">#FF40484D</color>
+    <color name="widget_preview_track">#2440484D</color>
+    <color name="widget_preview_in_range">#FF2E6B4F</color>
+    <color name="widget_preview_in_range_container">#FFE2EFE7</color>
+    <color name="widget_preview_warning">#FFB45309</color>
+</resources>

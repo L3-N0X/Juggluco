@@ -39,6 +39,14 @@
 
 ---
 
+## Home Screen Widgets
+- **Drawn, not inflated:** the widgets in `Common/src/mobile/java/tk/glucodata/widgets/` (Minimal, Compact, Trend graph, Dial, Time in range) are painted by `WidgetRenderer` onto a bitmap per launcher size and shown through `layout/home_widget.xml`. The configuration screen (`WidgetConfigActivity`, also the in-app gallery under Display settings) previews with the same renderer, so preview and home screen always match.
+- **Colors come from the app theme:** `WidgetPalette` uses `jugglucoColorScheme()` (custom accent / Material You / fallback) and the `ClinicalColors` range hues, picking light or dark by what is behind the content (system mode, custom color luminance, or the wallpaper for transparent widgets).
+- **Per-widget settings** live in `WidgetConfigStore` (JSON per app widget id). Add new options to `WidgetConfig` with a default so stored widgets keep working.
+- **Updates** go through `WidgetUpdater.requestUpdateAll()` (hooked in `GlucoseWidget.update()/oldvalue()`), which reads one `WidgetSnapshot` off the main thread for all widgets. The old `GlucoseWidget` stays registered as "Classic" so placed instances keep working.
+
+---
+
 ## Screen Layout & Headers
 - **Shared layout module:** `Common/src/main/java/tk/glucodata/ui/screens/ScreenLayout.kt` owns the spacing scale (`Gutter` / `CardPadding` 16.dp, `SectionSpacing`, `TopPadding`, `BottomPadding` 96.dp) plus `ScreenContent { }` (standard scrolling tab body) and `SectionTitle(...)`. Use these instead of ad-hoc dp values.
 - **One title per screen:** the persistent app bar supplies it — `JugglucoApp`'s `TopAppBar` for every tab, `SettingsDetailScaffold` for detail screens. Never repeat the page title in the content, and leave descriptions out unless they earn their space.

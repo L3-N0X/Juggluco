@@ -1697,4 +1697,7 @@
     <string name="log_entry_backspace">Delete digit, hold to clear</string>
     <string name="log_entry_delete_question">Delete this entry?</string>
     <string name="log_dial_hint">Turn the crown or spin the ring</string>
+    <!-- Home screen widgets -->
+    <string name="widget_settings_title">Home screen widgets</string>
+    <string name="widget_settings_desc">Pick, style and add widgets</string>
 </resources>

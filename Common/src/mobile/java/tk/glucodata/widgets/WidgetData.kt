@@ -1,0 +1,269 @@
+package tk.glucodata.widgets
+
+import android.content.Context
+import tk.glucodata.Applic
+import tk.glucodata.Natives
+import tk.glucodata.Notify
+import tk.glucodata.ui.model.DeltaCalculation
+import tk.glucodata.ui.model.GlucosePoint
+import tk.glucodata.ui.model.GlucoseStatus
+import tk.glucodata.ui.model.GlucoseUnit
+import java.util.Calendar
+import kotlin.math.PI
+import kotlin.math.max
+import kotlin.math.sin
+
+/** Share of readings per glucose range, plus the average, over one period. */
+class RangeStats(
+    val veryLow: Float,
+    val low: Float,
+    val inRange: Float,
+    val high: Float,
+    val veryHigh: Float,
+    val averageMgDl: Float
+)
+
+/**
+ * Everything the widgets draw, read once per update and shared by every widget on the home screen.
+ *
+ * [times] (epoch milliseconds) and [values] (mg/dL) are sorted by time and hold one sensor's
+ * readings at any moment: where two sensors overlap only the newer one is kept, so the graph never
+ * zigzags between them.
+ */
+class WidgetSnapshot(
+    val now: Long,
+    val currentTime: Long,
+    val currentMgDl: Float,
+    val rate: Float,
+    val deltaMgDl: Float?,
+    val times: LongArray,
+    val values: FloatArray,
+    val unit: GlucoseUnit,
+    val targetLowMgDl: Float,
+    val targetHighMgDl: Float
+) {
+    val hasReading: Boolean get() = currentTime > 0L && currentMgDl > 0f
+    val isStale: Boolean get() = !hasReading || now - currentTime > Notify.glucosetimeout
+    val status: GlucoseStatus? get() = if (hasReading) statusOf(currentMgDl) else null
+
+    fun statusOf(mgDl: Float): GlucoseStatus = GlucoseStatus.fromValue(mgDl, targetLowMgDl, targetHighMgDl)
+
+    fun stats(period: WidgetStatsPeriod): RangeStats? {
+        val from = periodStart(period, now)
+        var veryLow = 0
+        var low = 0
+        var inRange = 0
+        var high = 0
+        var veryHigh = 0
+        var sum = 0.0
+        for (i in times.indices) {
+            if (times[i] < from) continue
+            val value = values[i]
+            sum += value
+            when (statusOf(value)) {
+                GlucoseStatus.VERY_LOW -> veryLow++
+                GlucoseStatus.LOW -> low++
+                GlucoseStatus.IN_RANGE -> inRange++
+                GlucoseStatus.HIGH -> high++
+                GlucoseStatus.VERY_HIGH -> veryHigh++
+            }
+        }
+        val count = veryLow + low + inRange + high + veryHigh
+        if (count == 0) return null
+        val total = count.toFloat()
+        return RangeStats(
+            veryLow = veryLow / total,
+            low = low / total,
+            inRange = inRange / total,
+            high = high / total,
+            veryHigh = veryHigh / total,
+            averageMgDl = (sum / count).toFloat()
+        )
+    }
+
+    companion object {
+        fun periodStart(period: WidgetStatsPeriod, now: Long): Long =
+            if (period == WidgetStatsPeriod.TODAY) {
+                Calendar.getInstance().apply {
+                    timeInMillis = now
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+            } else {
+                now - period.hours * HOUR
+            }
+    }
+}
+
+private const val MINUTE = 60_000L
+private const val HOUR = 60 * MINUTE
+
+object WidgetDataSource {
+    private const val UI_PREFS = "ui_prefs"
+    private const val KEY_DELTA_CALCULATION = "delta_calculation_minutes"
+
+    /** Reads the current reading plus [historyMillis] of history from the native store. Call off the main thread. */
+    fun load(context: Context, historyMillis: Long): WidgetSnapshot {
+        val now = System.currentTimeMillis()
+        val unit = GlucoseUnit.fromNative(Applic.unit)
+        var targetLow = 70f
+        var targetHigh = 180f
+        var currentTime = 0L
+        var currentMgDl = 0f
+        var rate = Float.NaN
+        var times = LongArray(0)
+        var values = FloatArray(0)
+        if (Applic.Nativesloaded) {
+            try {
+                Natives.targetlow().takeIf { it > 0f }?.let { targetLow = unit.toMgDl(it) }
+                Natives.targethigh().takeIf { it > 0f }?.let { targetHigh = unit.toMgDl(it) }
+            } catch (_: Throwable) {
+            }
+            try {
+                Natives.lastglucose()?.takeIf { it.time > 0L }?.let { last ->
+                    val shown = last.value?.replace(',', '.')?.toFloatOrNull()
+                    if (shown != null && shown > 0f) {
+                        currentTime = last.time * 1000L
+                        currentMgDl = unit.toMgDl(shown)
+                        rate = last.rate
+                    }
+                }
+            } catch (_: Throwable) {
+            }
+            try {
+                val history = readHistory(now - max(historyMillis, 30 * MINUTE))
+                times = history.first
+                values = history.second
+            } catch (_: Throwable) {
+            }
+        }
+        if (currentTime == 0L && times.isNotEmpty()) {
+            currentTime = times.last()
+            currentMgDl = values.last()
+        }
+        // The last reading may be newer than the stream (a scan, a mirror), and the graph should end on it.
+        if (currentTime > 0L && (times.isEmpty() || currentTime > times.last() + 30_000L)) {
+            times = times + currentTime
+            values = values + currentMgDl
+        }
+        return WidgetSnapshot(
+            now = now,
+            currentTime = currentTime,
+            currentMgDl = currentMgDl,
+            rate = rate,
+            deltaMgDl = delta(context, currentTime, currentMgDl, times, values),
+            times = times,
+            values = values,
+            unit = unit,
+            targetLowMgDl = targetLow,
+            targetHighMgDl = targetHigh
+        )
+    }
+
+    private fun delta(context: Context, time: Long, mgDl: Float, times: LongArray, values: FloatArray): Float? {
+        if (time == 0L) return null
+        val minutes = try {
+            context.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE).getInt(KEY_DELTA_CALCULATION, 1)
+        } catch (_: Throwable) {
+            1
+        }
+        // Only the last quarter of an hour can matter, so there is no point wrapping the whole history.
+        val points = ArrayList<GlucosePoint>()
+        for (i in times.indices) {
+            if (times[i] >= time - 20 * MINUTE && times[i] <= time) points.add(GlucosePoint(times[i], values[i]))
+        }
+        val reference = DeltaCalculation.findDeltaReference(
+            GlucosePoint(time, mgDl),
+            points,
+            DeltaCalculation.fromMinutes(minutes)
+        ) ?: return null
+        return mgDl - reference.reading.valueMgDl
+    }
+
+    private class SensorRun(val times: LongArray, val values: FloatArray)
+
+    /**
+     * Walks only the tail of each sensor's stream. Stream positions are roughly one per minute, so
+     * starting [from] minutes before the end is enough, and sensors that ended before [from] are
+     * skipped after a single probe.
+     */
+    private fun readHistory(from: Long): Pair<LongArray, FloatArray> {
+        val fromSec = from / 1000L
+        val spanPositions = ((System.currentTimeMillis() - from) / MINUTE).toInt() + 90
+        val ptrs = (try { Natives.allSensorPtrs() } catch (_: Throwable) { null })
+            ?.takeIf { it.isNotEmpty() }
+            ?: Natives.activeSensorPtrs()
+            ?: LongArray(0)
+        val runs = ArrayList<SensorRun>()
+        for (ptr in ptrs) {
+            if (ptr == 0L) continue
+            // Past the end the native call returns the stream length in the position field.
+            val length = ((Natives.streamfromSensorptr(ptr, Int.MAX_VALUE) ushr 48) and 0xFFFF).toInt()
+            if (length == 0) continue
+            val probe = Natives.streamfromSensorptr(ptr, max(0, length - 5))
+            val probeTime = probe and 0xFFFFFFFFL
+            if (probeTime != 0L && probeTime < fromSec) continue
+            val runTimes = ArrayList<Long>()
+            val runValues = ArrayList<Float>()
+            var pos = max(0, length - spanPositions)
+            var guard = spanPositions + 10
+            while (guard-- > 0) {
+                val res = Natives.streamfromSensorptr(ptr, pos)
+                val time = res and 0xFFFFFFFFL
+                val next = ((res ushr 48) and 0xFFFF).toInt()
+                if (time == 0L || next <= pos) break
+                val mgDl = ((res ushr 32) and 0xFFFF).toInt()
+                if (time >= fromSec && mgDl in 20..600) {
+                    runTimes.add(time * 1000L)
+                    runValues.add(mgDl.toFloat())
+                }
+                pos = next
+            }
+            if (runTimes.isNotEmpty()) runs.add(SensorRun(runTimes.toLongArray(), runValues.toFloatArray()))
+        }
+        if (runs.isEmpty()) return LongArray(0) to FloatArray(0)
+        runs.sortByDescending { it.times.last() }
+        val mergedTimes = ArrayList<Long>()
+        val mergedValues = ArrayList<Float>()
+        var cutoff = Long.MAX_VALUE
+        for (run in runs) {
+            for (i in run.times.indices) {
+                if (run.times[i] < cutoff - 30_000L) {
+                    mergedTimes.add(run.times[i])
+                    mergedValues.add(run.values[i])
+                }
+            }
+            cutoff = minOf(cutoff, run.times.first())
+        }
+        val order = mergedTimes.indices.sortedBy { mergedTimes[it] }
+        return LongArray(order.size) { mergedTimes[order[it]] } to FloatArray(order.size) { mergedValues[order[it]] }
+    }
+
+    /** A plausible day of readings, for previews when there is no real data yet. */
+    fun sample(unit: GlucoseUnit = GlucoseUnit.fromNative(Applic.unit)): WidgetSnapshot {
+        val now = System.currentTimeMillis()
+        val count = 24 * 12
+        val times = LongArray(count) { now - (count - 1 - it) * 5 * MINUTE }
+        val values = FloatArray(count) { index ->
+            val hours = (count - 1 - index) * 5f / 60f
+            val meal = 55f * sin((hours / 5.5f) * 2f * PI.toFloat()).coerceAtLeast(0f)
+            val drift = 18f * sin((hours / 9f) * 2f * PI.toFloat())
+            val dip = if (hours in 13f..14.5f) -52f * sin(((hours - 13f) / 1.5f) * PI.toFloat()) else 0f
+            (112f + meal + drift + dip).coerceIn(48f, 280f)
+        }
+        return WidgetSnapshot(
+            now = now,
+            currentTime = times.last(),
+            currentMgDl = values.last(),
+            rate = 0.7f,
+            deltaMgDl = values.last() - values[count - 2],
+            times = times,
+            values = values,
+            unit = unit,
+            targetLowMgDl = 70f,
+            targetHighMgDl = 180f
+        )
+    }
+}
