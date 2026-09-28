@@ -43,6 +43,10 @@ import kotlin.math.min
  *
  * The [Path]s, the stroke and the gradient brush are remembered rather than rebuilt inside the draw
  * lambda, so redrawing costs geometry only.
+ *
+ * It is prepared from a two hour window rather than the whole published history - six figures of
+ * points, of which this draws about thirty - and the result is memoised process wide, so scrolling
+ * this card out of the viewport and back does not rebuild anything. See [rememberWearSeriesTail].
  */
 @Composable
 fun WearMiniGraph(
@@ -56,7 +60,7 @@ fun WearMiniGraph(
     surfaceColor: Color = MaterialTheme.colorScheme.surfaceContainerLow
 ) {
     val clinical = LocalClinicalColors.current
-    val series by rememberWearSeries(readings)
+    val series by rememberWearSeriesTail(readings, hoursToShow)
 
     val now = remember(series) { series.lastTime }
     val windowMillis = remember(hoursToShow) { hoursToShow * 3600 * 1000L }
