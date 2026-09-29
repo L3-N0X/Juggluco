@@ -63,11 +63,10 @@ import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.theme.LocalLogbookColors
-import kotlin.math.PI
 import kotlin.math.roundToInt
-import kotlin.math.sin
+import kotlin.math.sqrt
 
-private val CategoryPickerHeight = 42.dp
+private val CategoryPickerHeight = 60.dp
 
 // Leaves the bottom of the ring open for the Save edge button.
 private const val DialSweepAngle = 230f
@@ -342,15 +341,20 @@ private fun SemicircleCategoryPicker(
         val railEndX = widthPx - railStartX
         val railSpanX = (railEndX - railStartX).coerceAtLeast(1f)
 
-        // Rail sits lowest at the outer labels and arcs up towards the middle ones.
+        // Rail is a true circular arc: lowest at the outer labels, rising to the middle ones,
+        // so it echoes the round watch face instead of reading as a flat wave.
         val railLowestY = heightPx - textBottomPadPx - tallestTextPx - dotGapPx -
             dotRadiusPx - railStrokePx / 2f
-        val amplitudePx = with(density) { 12.dp.toPx() }
-            .coerceAtMost((railLowestY - railStrokePx).coerceAtLeast(0f))
+        val sagittaPx = with(density) { 28.dp.toPx() }
+            .coerceAtMost((railLowestY - railStrokePx).coerceAtLeast(1f))
+        val halfChordPx = railSpanX / 2f
+        val railRadiusPx = (halfChordPx * halfChordPx + sagittaPx * sagittaPx) / (2f * sagittaPx)
+        val railCenterX = railStartX + halfChordPx
+        val railCenterY = railLowestY - sagittaPx + railRadiusPx
 
         fun railYAt(x: Float): Float {
-            val t = ((x - railStartX) / railSpanX).coerceIn(0f, 1f)
-            return railLowestY - amplitudePx * sin(PI * t).toFloat()
+            val dx = (x - railCenterX).coerceIn(-halfChordPx, halfChordPx)
+            return railCenterY - sqrt(railRadiusPx * railRadiusPx - dx * dx)
         }
 
         val anchorX = { index: Int -> slotWidthPx * (index + 0.5f) }
@@ -361,7 +365,7 @@ private fun SemicircleCategoryPicker(
             for (step in 0..steps) {
                 val t = step / steps.toFloat()
                 val x = railStartX + railSpanX * t
-                val y = railLowestY - amplitudePx * sin(PI * t).toFloat()
+                val y = railYAt(x)
                 if (step == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             drawPath(

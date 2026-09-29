@@ -71,7 +71,7 @@ data class AgpProfile(
             var counts = IntArray(24)
             val overall = FloatArray(readings.size)
             var total = 0
-            var minutesEast = TimeZone.getDefault().getOffset(readings[0].timestamp)
+            var offsetMillis = TimeZone.getDefault().getOffset(readings[0].timestamp)
 
             for (pt in readings) {
                 val value = pt.valueMgDl
@@ -79,10 +79,10 @@ data class AgpProfile(
                 if ((total and 0x3FF) == 0) {
                     // Re-derive the offset occasionally so a DST change or a zone change mid-history
                     // does not leave every later bucket an hour out.
-                    minutesEast = TimeZone.getDefault().getOffset(pt.timestamp)
+                    offsetMillis = TimeZone.getDefault().getOffset(pt.timestamp)
                 }
-                val local = pt.timestamp + minutesEast
-                val hour = (((local / 60_000L) % 24L) + 24L).toInt() % 24
+                val local = pt.timestamp + offsetMillis
+                val hour = Math.floorMod(Math.floorDiv(local, 3_600_000L), 24L).toInt()
                 var bucket = buckets[hour]
                 if (counts[hour] == bucket.size) bucket = bucket.copyOf(bucket.size * 2)
                 buckets[hour] = bucket
