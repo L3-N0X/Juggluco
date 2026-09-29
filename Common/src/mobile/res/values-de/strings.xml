@@ -37,9 +37,7 @@
     <string name="widget_period_7d">7 Tage</string>
     <string name="widget_period">Zeitraum</string>
     <string name="widget_in_range">Im Zielbereich</string>
-    <string name="widget_stat_low">Niedrig %1$s</string>
-    <string name="widget_stat_high">Hoch %1$s</string>
-    <string name="widget_stat_average">Ø %1$s</string>
+    <string name="widget_in_range_size">Größe Zielbereich</string>
     <string name="widget_backdrop_colorful">Farbig</string>
     <string name="widget_backdrop_dark">Dunkel</string>
     <string name="widget_backdrop_light">Hell</string>

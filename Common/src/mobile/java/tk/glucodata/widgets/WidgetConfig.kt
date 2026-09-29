@@ -95,6 +95,8 @@ data class WidgetConfig(
     val font: WidgetFont = WidgetFont.MODERN,
     /** Text size in percent of the size that fits the widget. */
     val textScale: Int = 100,
+    /** Time in range percentage size, separate from the glucose reading and in percent of the space that fits. */
+    val rangeScale: Int = 70,
     val rangeColors: Boolean = true,
     val showArrow: Boolean = true,
     val showDelta: Boolean = true,
@@ -118,6 +120,7 @@ data class WidgetConfig(
         .put("content", content.name)
         .put("font", font.name)
         .put("textScale", textScale)
+        .put("rangeScale", rangeScale)
         .put("rangeColors", rangeColors)
         .put("showArrow", showArrow)
         .put("showDelta", showDelta)
@@ -141,6 +144,7 @@ data class WidgetConfig(
             content = json.enumOr("content", defaults.content),
             font = json.enumOr("font", defaults.font),
             textScale = json.optInt("textScale", defaults.textScale).coerceIn(70, 140),
+            rangeScale = json.optInt("rangeScale", defaults.rangeScale).coerceIn(50, 100),
             rangeColors = json.optBoolean("rangeColors", defaults.rangeColors),
             showArrow = json.optBoolean("showArrow", defaults.showArrow),
             showDelta = json.optBoolean("showDelta", defaults.showDelta),
