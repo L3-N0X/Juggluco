@@ -158,6 +158,23 @@ struct mirrorhoststate {
     bool haspass=false;
     };
 
+inline static int android_user_id() {
+    static constexpr int PER_USER_RANGE = 100000;
+    uid_t uid = getuid();
+    return static_cast<int>(uid) / PER_USER_RANGE;
+   }
+inline std::string_view getDefaultPort() {
+        static constexpr const int defaultportnumber=
+        #ifdef MIRRORPORT
+        MIRRORPORT
+        #else
+        9996
+        #endif
+        ;
+        static char buf[7];
+        static const size_t len=snprintf(buf,6, "%d",defaultportnumber+android_user_id());
+        return {buf,len};
+        }
 
 #include "inout.hpp"
 #include "net/backup.hpp"
@@ -432,7 +449,7 @@ void startactivereceivers() {
             }
         }
     }
-
+/*
 void resetindices() {
     LOGGER("resetindices hostnr=%d sendnr=%d\n",getupdatedata()->hostnr, getupdatedata()->sendnr);
     int maxsend=-1;
@@ -447,6 +464,39 @@ void resetindices() {
     getupdatedata()->sendnr=maxsend+1;
     LOGGER("sendnr=%d\n", getupdatedata()->sendnr);
     }
+*/
+void resetindices() {
+    auto *data=getupdatedata();
+
+    LOGGER("resetindices hostnr=%d sendnr=%d\n", data->hostnr,data->sendnr);
+
+    if(data->hostnr < 0 || data->hostnr > maxallhosts) {
+        LOGGER("resetindices: invalid hostnr=%d, resetting network configuration\n", data->hostnr);
+        data->hostnr=0;
+        data->sendnr=0;
+        return;
+    }
+
+    int maxsend=-1;
+    for(int i=0;i<data->hostnr;i++) {
+        int si=data->allhosts[i].index;
+
+        if(si < -1 || si >= maxsendtohost) {
+            LOGGER("resetindices: invalid allhosts[%d].index=%d\n",i,si);
+            data->allhosts[i].index=-1;
+            continue;
+           }
+
+        if(si>=0) {
+            data->tosend[si].setindex(si,i);
+            if(si>maxsend)
+                maxsend=si;
+          }
+        }
+
+    data->sendnr=maxsend+1;
+    LOGGER("sendnr=%d\n",data->sendnr);
+   }
 
 Backup(std::string_view base);
 
@@ -529,8 +579,10 @@ const std::array<char,17> getpass(int pos) const {
 void getport(int pos,char *buf) {
     auto &host=getupdatedata()->allhosts[pos];
     const auto port=host.getport();
-    if(port==0&&!host.getActive())
-        strcpy(buf,defaultport);
+    if(port==0&&!host.getActive()) {
+        std::string_view port=getDefaultPort();
+        memcpy(buf,port.data(),port.size()+1);
+        }
     else
         snprintf(buf,6, "%d",port);
     }
@@ -599,7 +651,9 @@ void setindices(int start) {
     }
 
 void deletehost(int index) {
-    if(index>=getupdatedata()->hostnr)
+   const std::lock_guard<std::mutex> lock(change_host_mutex);
+
+    if(index<0||index>=getupdatedata()->hostnr)
         return;
     bool wasnet=networkpresent;
      networkpresent=false;
@@ -998,7 +1052,8 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
         }
     const bool receiveactive=receive&&activeonly;
     if(port.data()==nullptr||port.size()==0) {
-        port={defaultport,sizeof(defaultport)-1};
+      //  port={defaultport,sizeof(defaultport)-1};
+        port=getDefaultPort();
         }
     int portint=0;
     if(const int porterror=portnumber(port,&portint)) {

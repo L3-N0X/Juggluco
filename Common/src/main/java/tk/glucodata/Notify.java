@@ -845,10 +845,8 @@ static public boolean alertseparate=false;
             }
         {if(doLog) {Log.i(LOG_ID,"makearrownotification setOnlyAlertOnce("+once+") "+glucose.value);};};
 
-        //var draw= GlucoseDraw.getgludraw(glvalue);
 
           setIcon(GluNotBuilder,glvalue,glucose.sensorgen2);
-//        GluNotBuilder.setSmallIcon(draw). 
         GluNotBuilder.setContentTitle(message).setOnlyAlertOnce(once);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -856,10 +854,9 @@ static public boolean alertseparate=false;
             }
         final boolean glucosealarm=kind<2||kind>4;
         if(!isWearable) {
-              if(Build.VERSION.SDK_INT  >= 24) {
+            if(Build.VERSION.SDK_INT  >= 24) {
                 GluNotBuilder.setStyle(new Notification.DecoratedCustomViewStyle());
-        //    GluNotBuilder.setStyle( new Notification.DecoratedMediaCustomViewStyle());
-            }
+                }
             GluNotBuilder.setShowWhen(true);
             RemoteViews remoteViews=arrowNotify.arrowremote(kind,glucose,glucosealarm&&!once);
             if(whiteonblack) {
@@ -882,9 +879,7 @@ static public boolean alertseparate=false;
     if(once)
         GluNotBuilder.setPriority(Notification.PRIORITY_DEFAULT);
     else  {
-    //    GluNotBuilder.setPriority(Notification.PRIORITY_DEFAULT);
         GluNotBuilder.setPriority(Notification.PRIORITY_HIGH);
-//        GluNotBuilder.setPriority(Notification.PRIORITY_MAX);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             GluNotBuilder.setCategory(Notification.CATEGORY_ALARM);
         }

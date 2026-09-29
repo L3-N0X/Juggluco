@@ -1,5 +1,5 @@
 // GENERATED FILE - DO NOT EDIT
-// Source: /home/lenox/coding/kotlin/Juggluco/Common/src/main/cpp/curve/arjugglucotext.cpp
+// Source: /home/lenox/coding/Juggluco/Common/src/main/cpp/curve/arjugglucotext.cpp
 
 #include "jugglucotext.hpp"
 #ifdef INJUGGLUCO

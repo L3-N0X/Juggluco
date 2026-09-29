@@ -58,9 +58,9 @@ inline constexpr std::uint32_t kRc4KeyLen         = 0x10;
 
 // Status codes returned by v120_spilt_data
 //inline constexpr jint kStatusOk            =  1;
-inline constexpr jint kStatusEmpty         =  -1;   // valid header, zero records
-inline constexpr jint kStatusBadArgs       = -2;
-inline constexpr jint kStatusBadPacket     = -3;
+inline constexpr jint kStatusEmpty         =  2;   // valid header, zero records
+inline constexpr jint kStatusBadArgs       = 2;
+inline constexpr jint kStatusBadPacket     = 2;
 
 // Magic bypass header: param==5 and data[0..3] = {0x04, 0, 0, 0} and data[4]==0xFC
 inline constexpr std::uint8_t kBypassParam   = 5;
@@ -165,14 +165,16 @@ struct glucoseItem {
 
 struct glucoseRecordsEnd {
         uint16_t reindex;
-        uint8_t sign;
+    //    uint8_t sign;
         }__attribute__ ((packed));
         /*
         uint8_t trend;
         uint8_t gwarn;
         uint8_t twarn;
         uint8_t cwarn; */
-
+static_assert(sizeof(glucoseRecordsStart) == 6);
+static_assert(sizeof(glucoseItem) == 8);
+static_assert(sizeof(glucoseRecordsEnd) == 2);
 
  
 
@@ -262,11 +264,9 @@ jlong SiContext::interpret_data(SensorGlucoseData *sens,int sensorindex,uint32_t
            }
         const std::size_t record_count = pkt.status();
         const std::size_t decoded_size = std::size_t(pkt.length()) - 3u;
-        const std::size_t required_size = sizeof(glucoseRecordsStart) +
-                record_count * sizeof(glucoseItem) + sizeof(glucoseRecordsEnd);
+        const std::size_t required_size = sizeof(glucoseRecordsStart) + record_count * sizeof(glucoseItem) + sizeof(glucoseRecordsEnd);
         if (required_size > decoded_size) {
-            LOGGER("glucose packet too short: length=%u records=%zu decoded=%zu required=%zu\n",
-                   pkt.length(), record_count, decoded_size, required_size);
+            LOGGER("glucose packet too short: length=%u records=%zu decoded=%zu required=%zu\n", pkt.length(), record_count, decoded_size, required_size);
             return kStatusBadPacket;
         }
         // glouse_info_t is 20 bytes (uint16 index, temp, current, dump,
