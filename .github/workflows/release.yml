@@ -1,0 +1,132 @@
+name: Release
+
+# Builds the phone app (Libre 3 + SiBionics + DexCom, Google flavor) and attaches
+# the APKs to a GitHub pre-release when a version tag is pushed.
+#
+# Release a version with:
+#   git checkout primary && git pull
+#   git tag v11.2.0-fork.1 && git push origin v11.2.0-fork.1
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  MAIN_BRANCH: primary
+  VARIANT: MobileLibre3SiDexGoogle
+
+jobs:
+  # Tags don't belong to a branch, so refuse anything that isn't on the main branch.
+  check-branch:
+    name: Check tag is on main branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: false
+      - name: Verify tagged commit is reachable from ${{ env.MAIN_BRANCH }}
+        run: |
+          git fetch origin "${MAIN_BRANCH}"
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" "origin/${MAIN_BRANCH}"; then
+            echo "::error::Tag ${GITHUB_REF_NAME} (${GITHUB_SHA}) is not on ${MAIN_BRANCH}; not building."
+            exit 1
+          fi
+
+  build:
+    name: Build ${{ matrix.type }}
+    needs: check-branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive # Common/src/main/cpp/libjuice
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Android SDK packages
+        run: |
+          yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" \
+            "ndk;30.0.16248370" \
+            "cmake;4.1.2"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
+
+      # Release builds are signed with Common/everyone.keystore (the same fallback
+      # key local builds use when thekeypassword & co. aren't set).
+      - name: Assemble ${{ matrix.type }}
+        run: >
+          ./gradlew
+          "assemble${VARIANT}${{ matrix.type }}"
+          --no-daemon
+          --stacktrace
+          -Dorg.gradle.jvmargs="-Xmx5g -Dfile.encoding=UTF-8"
+
+      - name: Collect APKs
+        run: |
+          mkdir -p dist
+          shopt -s globstar nullglob
+          type_lower="$(echo "${{ matrix.type }}" | tr '[:upper:]' '[:lower:]')"
+          found=0
+          for apk in Common/build/outputs/apk/**/*.apk; do
+            name="Juggluco-${GITHUB_REF_NAME}-google-${type_lower}.apk"
+            cp "${apk}" "dist/${name}"
+            echo "Collected ${apk} -> dist/${name}"
+            found=$((found + 1))
+          done
+          if [ "${found}" -ne 1 ]; then
+            echo "::error::Expected exactly one APK, found ${found}"
+            find Common/build/outputs -type f
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: apk-${{ matrix.type }}
+          path: dist/*.apk
+          if-no-files-found: error
+
+  release:
+    name: Publish pre-release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          pattern: apk-*
+          merge-multiple: true
+
+      - name: Create pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -l dist
+          gh release create "${GITHUB_REF_NAME}" dist/*.apk \
+            --prerelease \
+            --verify-tag \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
