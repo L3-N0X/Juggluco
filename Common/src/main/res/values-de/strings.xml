@@ -1513,6 +1513,7 @@
     <string name="log_entry_edit_title">Eintrag bearbeiten</string>
     <string name="log_entry_time_now">Jetzt</string>
     <string name="log_entry_time_today">Heute, %1$s</string>
+    <string name="log_entry_date_yesterday">Gestern</string>
     <string name="log_entry_time_yesterday">Gestern, %1$s</string>
     <string name="log_entry_time_reset">Zurück zu jetzt</string>
     <string name="log_entry_usual_basal">Übliches Basal · %1$s</string>

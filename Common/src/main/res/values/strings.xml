@@ -1788,6 +1788,7 @@
     <string name="log_entry_time_now">Now</string>
     <string name="log_entry_time_today">Today, %1$s</string>
     <string name="log_entry_time_yesterday">Yesterday, %1$s</string>
+    <string name="log_entry_date_yesterday">Yesterday</string>
     <string name="log_entry_time_reset">Back to now</string>
     <string name="log_entry_usual_basal">Usual basal · %1$s</string>
     <string name="log_entry_remove_type">Remove %1$s</string>
