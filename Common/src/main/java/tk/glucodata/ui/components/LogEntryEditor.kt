@@ -1,6 +1,7 @@
 package tk.glucodata.ui.components
 
 import android.graphics.Color as AndroidColor
+import android.os.Build
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Schedule
@@ -56,6 +58,9 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,6 +74,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -90,6 +96,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -121,12 +128,19 @@ import java.math.RoundingMode
 import java.text.DateFormat
 import java.text.DecimalFormatSymbols
 import java.util.Calendar
+import java.util.TimeZone
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.min
 
 private const val HOUR_MS = 3_600_000L
 private const val DAY_MS = 24 * HOUR_MS
+
+private val SAVE_BLOCK_HEIGHT = 56.dp + 12.dp
+private val FORM_MIN_HEIGHT = 300.dp
+private val KEYPAD_GAPS = 8.dp * 3 + 12.dp
+private val MIN_KEY_HEIGHT = 40.dp
+private val MAX_KEY_HEIGHT = 52.dp
 
 /** The pair most meals are logged with, shown side by side on every new entry. */
 private val PrimaryTypes = listOf(LogType.CARBS, LogType.RAPID_INSULIN)
@@ -178,7 +192,14 @@ fun LogEntryEditor(
     }
 }
 
-/** Makes the dialog window edge to edge, with system bar icons that match the surface. */
+/**
+ * Makes the dialog window edge to edge, with system bar icons that match the surface.
+ *
+ * From Android 15 the screen height Compose sizes a full-width dialog to includes the system bars,
+ * while a dialog window is still kept clear of them, so the bottom of the editor (the save button)
+ * would hang off the screen. The window is therefore allowed to cover the bars as well; the
+ * content keeps clear of them through its own safe-drawing padding.
+ */
 @Suppress("DEPRECATION")
 @Composable
 private fun EditorWindowSetup() {
@@ -187,6 +208,14 @@ private fun EditorWindowSetup() {
     SideEffect {
         val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+            window.attributes = window.attributes.apply {
+                fitInsetsTypes = 0
+                fitInsetsSides = 0
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
+        }
         window.statusBarColor = AndroidColor.TRANSPARENT
         window.navigationBarColor = AndroidColor.TRANSPARENT
         WindowCompat.getInsetsController(window, view).apply {
@@ -225,6 +254,7 @@ private fun EditorContent(
     var note by remember { mutableStateOf(entry?.note.orEmpty()) }
     var noteFocused by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     val history by produceState(LogHistory(), logs, unit) {
@@ -334,7 +364,8 @@ private fun EditorContent(
         ) {
             EntryTimeRow(
                 customTime = customTime,
-                onPick = { showTimePicker = true },
+                onPickDate = { showDatePicker = true },
+                onPickTime = { showTimePicker = true },
                 onReset = { customTime = null }.takeIf { !editing && customTime != null }
             )
             Spacer(Modifier.height(12.dp))
@@ -407,10 +438,10 @@ private fun EditorContent(
         }
     }
 
-    val inputPanel: @Composable (Modifier, Dp) -> Unit = { modifier, keyHeight ->
-        Column(modifier = modifier.padding(horizontal = ScreenLayout.Gutter)) {
+    val keypadPanel: @Composable (Modifier, Dp, Boolean) -> Unit = { modifier, keyHeight, showQuickValues ->
+        Column(modifier = modifier) {
             if (keypadVisible) {
-                if (quickValues.isNotEmpty()) {
+                if (showQuickValues && quickValues.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -445,22 +476,24 @@ private fun EditorContent(
                 )
                 Spacer(Modifier.height(12.dp))
             }
-            Button(
-                onClick = ::save,
-                enabled = canSave,
-                shape = CircleShape,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-            ) {
-                Text(
-                    text = saveLabel,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Spacer(Modifier.height(12.dp))
+        }
+    }
+
+    val saveButton: @Composable () -> Unit = {
+        Button(
+            onClick = ::save,
+            enabled = canSave,
+            shape = CircleShape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Text(
+                text = saveLabel,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 
@@ -494,19 +527,49 @@ private fun EditorContent(
         )
 
         BoxWithConstraints(modifier = Modifier.weight(1f)) {
-            val keyHeight = if (maxHeight < 560.dp) 44.dp else 52.dp
             if (maxWidth > maxHeight && maxWidth >= 600.dp) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     form(Modifier.weight(1f).fillMaxHeight())
-                    inputPanel(Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()), 48.dp)
+                    Column(
+                        modifier = Modifier
+                            .width(360.dp)
+                            .fillMaxHeight()
+                            .padding(horizontal = ScreenLayout.Gutter)
+                    ) {
+                        keypadPanel(Modifier.weight(1f).verticalScroll(rememberScrollState()), 48.dp, true)
+                        saveButton()
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
             } else {
+                // The save button is never squeezed out: what is left after it and the form's
+                // minimum height is what the keypad gets, down to a floor where the form yields.
+                val fontScale = LocalDensity.current.fontScale
+                val reserved = SAVE_BLOCK_HEIGHT + FORM_MIN_HEIGHT * fontScale + KEYPAD_GAPS
+                val quickRow = 40.dp
+                val roomForQuick = maxHeight - reserved - quickRow > MIN_KEY_HEIGHT * 4f
+                val quickSpace = if (roomForQuick) quickRow else 0.dp
+                val keyHeight = ((maxHeight - reserved - quickSpace) / 4f)
+                    .coerceIn(MIN_KEY_HEIGHT, MAX_KEY_HEIGHT)
                 Column(modifier = Modifier.fillMaxSize()) {
                     form(Modifier.weight(1f).fillMaxWidth())
-                    inputPanel(Modifier.fillMaxWidth(), keyHeight)
+                    keypadPanel(Modifier.fillMaxWidth().padding(horizontal = ScreenLayout.Gutter), keyHeight, roomForQuick)
+                    Box(modifier = Modifier.padding(horizontal = ScreenLayout.Gutter)) { saveButton() }
+                    Spacer(Modifier.height(12.dp))
                 }
             }
         }
+    }
+
+    if (showDatePicker) {
+        EntryDatePickerDialog(
+            initial = customTime ?: System.currentTimeMillis(),
+            onDismiss = { showDatePicker = false },
+            onConfirm = { picked ->
+                customTime = picked
+                showDatePicker = false
+            }
+        )
     }
 
     if (showTimePicker) {
@@ -557,13 +620,35 @@ private sealed interface AmountState {
 @Composable
 private fun EntryTimeRow(
     customTime: Long?,
-    onPick: () -> Unit,
+    onPickDate: () -> Unit,
+    onPickTime: () -> Unit,
     onReset: (() -> Unit)?
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    val locale = Locale.getDefault()
+    val time = customTime ?: System.currentTimeMillis()
+    val dateLabel = when (val days = remember(time) { daysBeforeToday(time) }) {
+        0 -> stringResource(R.string.logbook_time_today)
+        1 -> stringResource(R.string.log_entry_date_yesterday)
+        else -> remember(time, locale) {
+            DateFormat.getDateInstance(if (days < 300) DateFormat.MEDIUM else DateFormat.LONG, locale).format(time)
+        }
+    }
+    val timeLabel = if (customTime == null) {
+        stringResource(R.string.log_entry_time_now)
+    } else {
+        remember(customTime, locale) { DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(customTime) }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         AssistChip(
-            onClick = onPick,
-            label = { Text(entryTimeLabel(customTime)) },
+            onClick = onPickDate,
+            label = { Text(dateLabel) },
+            leadingIcon = {
+                Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
+            }
+        )
+        AssistChip(
+            onClick = onPickTime,
+            label = { Text(timeLabel) },
             leadingIcon = {
                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
             }
@@ -580,23 +665,6 @@ private fun EntryTimeRow(
     }
 }
 
-@Composable
-private fun entryTimeLabel(time: Long?): String {
-    if (time == null) return stringResource(R.string.log_entry_time_now)
-    val locale = Locale.getDefault()
-    val clock = remember(time, locale) { DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(time) }
-    val days = remember(time) { daysBeforeToday(time) }
-    return when (days) {
-        0 -> stringResource(R.string.log_entry_time_today, clock)
-        1 -> stringResource(R.string.log_entry_time_yesterday, clock)
-        else -> stringResource(
-            R.string.logbook_date_at_time,
-            remember(time, locale) { DateFormat.getDateInstance(DateFormat.MEDIUM, locale).format(time) },
-            clock
-        )
-    }
-}
-
 private fun daysBeforeToday(time: Long): Int {
     fun dayStart(millis: Long) = Calendar.getInstance().apply {
         timeInMillis = millis
@@ -606,6 +674,54 @@ private fun daysBeforeToday(time: Long): Int {
         set(Calendar.MILLISECOND, 0)
     }.timeInMillis
     return ((dayStart(System.currentTimeMillis()) - dayStart(time) + DAY_MS / 2) / DAY_MS).toInt()
+}
+
+/**
+ * Picks the day of an entry, keeping the time of day of [initial]. Days in the future cannot be
+ * chosen, so a forgotten entry can be logged back to any earlier day.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EntryDatePickerDialog(
+    initial: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    val start = remember(initial) { Calendar.getInstance().apply { timeInMillis = initial } }
+    // The picker works in UTC midnights, so the local calendar day is carried over as such.
+    val today = remember { Calendar.getInstance() }
+    fun utcMidnight(calendar: Calendar) = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+        clear()
+        set(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
+    }.timeInMillis
+    val latest = remember { utcMidnight(today) }
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = utcMidnight(start),
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= latest
+            override fun isSelectableYear(year: Int) = year <= today.get(Calendar.YEAR)
+        }
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = state.selectedDateMillis != null,
+                onClick = {
+                    val selected = state.selectedDateMillis ?: return@TextButton
+                    val day = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = selected }
+                    val picked = (start.clone() as Calendar).apply {
+                        set(day.get(Calendar.YEAR), day.get(Calendar.MONTH), day.get(Calendar.DAY_OF_MONTH))
+                    }
+                    // Today's date with a time that has not happened yet falls back to now.
+                    onConfirm(minOf(picked.timeInMillis, System.currentTimeMillis()))
+                }
+            ) { Text(stringResource(R.string.ok)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
+    ) {
+        DatePicker(state = state)
+    }
 }
 
 /**
