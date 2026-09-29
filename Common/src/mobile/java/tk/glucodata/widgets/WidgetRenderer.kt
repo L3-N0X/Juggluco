@@ -346,31 +346,48 @@ class WidgetRenderer(private val context: Context) {
             val delta = deltaLine()
             val time = timeLine()
             val lines = listOfNotNull(delta?.let { it to palette.contentVariant }, time?.let { it to timeColor })
-            val detailSize = (inner * (if (lines.size > 1) 0.25f else 0.3f)).coerceIn(dp(10f), dp(18f))
-            val detailPaint = textPaint(labelTypeface, palette.contentVariant, detailSize)
-            val detailWidth = lines.maxOfOrNull { detailPaint.measureText(it.first) } ?: 0f
+            var detailSize = (inner * (if (lines.size > 1) 0.25f else 0.3f)).coerceIn(dp(10f), dp(18f))
             val available = w - 2 * padH
-            var chip = if (trend != null) inner else 0f
-            var showDetails = lines.isNotEmpty()
             var digitHeight = inner * 0.6f * config.textScale / 100f
             val ratio = digitRatio(valueTypeface)
-            fun valueWidth() = measure(valueText, valueTypeface, digitHeight / ratio)
-            fun needed() = chip + (if (chip > 0f) inner * 0.3f else 0f) + valueWidth() +
-                (if (showDetails) inner * 0.35f + detailWidth else 0f)
-            if (needed() > available) digitHeight *= max(0.75f, (available - (needed() - valueWidth())) / valueWidth())
-            if (needed() > available) showDetails = false
-            if (needed() > available) chip = 0f
-            if (needed() > available) digitHeight *= available / needed()
 
-            var x = padH
+            /** The chip belongs to the value, so it is sized from it and not from the full height. */
+            fun chipFor(digits: Float) = if (trend != null) min(digits * 1.3f, inner * 0.92f) else 0f
+
+            fun valueWidth(digits: Float) = measure(valueText, valueTypeface, digits / ratio)
+
+            fun detailWidth(details: Float) =
+                lines.maxOfOrNull { measure(it.first, labelTypeface, details) } ?: 0f
+
+            fun rowWidth(digits: Float, details: Float, withDetails: Boolean) =
+                chipFor(digits) * 1.32f + valueWidth(digits) +
+                    (if (withDetails) inner * 0.3f + detailWidth(details) else 0f)
+
+            // Fit the row by scaling it as a whole, so the arrow never costs the value or the
+            // details their place; the details go first if that is still not enough.
+            var showDetails = lines.isNotEmpty()
+            if (rowWidth(digitHeight, detailSize, showDetails) > available) {
+                val scale = available / rowWidth(digitHeight, detailSize, showDetails)
+                digitHeight *= scale.coerceAtLeast(0.6f)
+                detailSize = (detailSize * scale).coerceAtLeast(dp(9f))
+                if (rowWidth(digitHeight, detailSize, showDetails) > available) showDetails = false
+            }
+            if (rowWidth(digitHeight, detailSize, showDetails) > available) {
+                digitHeight *= (available / rowWidth(digitHeight, detailSize, showDetails)).coerceAtLeast(0.4f)
+            }
+
+            val chip = chipFor(digitHeight)
             val cy = h / 2f
+            // Without details to balance, the value and its chip sit in the middle of the pill.
+            var x = if (showDetails) padH else (w - rowWidth(digitHeight, detailSize, false)) / 2f
             if (chip > 0f) {
                 drawChip(x + chip / 2f, cy, chip, trend!!)
-                x += chip + inner * 0.3f
+                x += chip * 1.32f
             }
             val valuePaint = textPaint(valueTypeface, valueColor, digitHeight / ratio)
             canvas.drawText(valueText, x, cy + digitHeight / 2f, valuePaint)
             if (!showDetails) return
+            val detailPaint = textPaint(labelTypeface, palette.contentVariant, detailSize)
             val cap = capHeight(labelTypeface, detailSize)
             val lineGap = cap * 0.7f
             val blockHeight = lines.size * cap + (lines.size - 1) * lineGap
