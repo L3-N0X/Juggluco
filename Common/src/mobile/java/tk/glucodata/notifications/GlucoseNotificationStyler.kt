@@ -32,11 +32,13 @@ object GlucoseNotificationStyler {
     private const val LOG_ID = "GlucoseNotification"
     const val STATUS_ICON_CHANNEL = "statusBarIcons"
     private val STATUS_ICON_IDS = intArrayOf(81441, 81442)
+    private val STATUS_ICON_SUMMARY_IDS = intArrayOf(81451, 81452)
 
     private class Cached(val key: String, val made: Long, val snapshot: WidgetSnapshot)
 
     private var cached: Cached? = null
     private var channelCreated = false
+    private var statusIconsReposted = false
 
     @Synchronized
     fun snapshot(context: Context, config: NotificationConfig, time: Long, mgDl: Float, rate: Float): WidgetSnapshot {
@@ -116,37 +118,56 @@ object GlucoseNotificationStyler {
         val input = if (snapshot != null && snapshot.hasReading && !snapshot.isStale) iconInput(context, snapshot, valueText) else null
         config.extraIcons.forEachIndexed { slot, kind ->
             val id = STATUS_ICON_IDS[slot]
+            val summaryId = STATUS_ICON_SUMMARY_IDS[slot]
             if (kind == null || !canShow) {
                 manager.cancel(id)
+                manager.cancel(summaryId)
                 return@forEachIndexed
             }
             if (input == null || snapshot == null) return@forEachIndexed
             try {
                 val icon = icon(context, kind, config, input) ?: return@forEachIndexed
                 ensureChannel(context, manager)
-                @Suppress("DEPRECATION")
-                val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, STATUS_ICON_CHANNEL)
-                else Notification.Builder(context).setPriority(Notification.PRIORITY_DEFAULT)
-                builder.setSmallIcon(icon)
-                    .setContentTitle(statusIconTitle(context, kind, snapshot, input))
-                    .setContentIntent(Notify.mkpending())
-                    .setOngoing(true)
-                    .setOnlyAlertOnce(true)
-                    .setShowWhen(true)
-                    // A millisecond apart, so the system keeps the icons in the order of the slots.
-                    .setWhen(snapshot.currentTime - slot)
-                    .setCategory(Notification.CATEGORY_STATUS)
-                    .setVisibility(Notification.VISIBILITY_PUBLIC)
+                val group = "juggluco_status_icon_$slot"
+                val title = statusIconTitle(context, kind, snapshot, input)
+                // Posted afresh once per process, so an icon Android had already bundled is let go.
+                if (!statusIconsReposted) manager.cancel(id)
+                manager.notify(id, statusIconBuilder(context, icon, title, snapshot.currentTime - slot)
                     // Its own group each, or Android bundles the icons into one.
-                    .setGroup("juggluco_status_icon_$slot")
-                    // Watches get the glucose notification already.
-                    .setLocalOnly(true)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) builder.setTimeoutAfter(Notify.glucosetimeout)
-                manager.notify(id, builder.build())
+                    .setGroup(group)
+                    .build())
+                // Android 16 bundles group children without a summary like ungrouped ones. With a
+                // summary and a single child the shade shows only the child, so the summary is never seen.
+                val summary = statusIconBuilder(context, icon, title, snapshot.currentTime - slot)
+                    .setGroup(group)
+                    .setGroupSummary(true)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) summary.setGroupAlertBehavior(Notification.GROUP_ALERT_CHILDREN)
+                manager.notify(summaryId, summary.build())
             } catch (th: Throwable) {
                 Log.stack(LOG_ID, "postStatusIcons", th)
             }
         }
+        if (input != null) statusIconsReposted = true
+    }
+
+    private fun statusIconBuilder(context: Context, icon: Icon, title: String, time: Long): Notification.Builder {
+        @Suppress("DEPRECATION")
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, STATUS_ICON_CHANNEL)
+        else Notification.Builder(context).setPriority(Notification.PRIORITY_DEFAULT)
+        builder.setSmallIcon(icon)
+            .setContentTitle(title)
+            .setContentIntent(Notify.mkpending())
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(true)
+            // A millisecond apart, so the system keeps the icons in the order of the slots.
+            .setWhen(time)
+            .setCategory(Notification.CATEGORY_STATUS)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            // Watches get the glucose notification already.
+            .setLocalOnly(true)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) builder.setTimeoutAfter(Notify.glucosetimeout)
+        return builder
     }
 
     private fun statusIconTitle(context: Context, kind: StatusIconKind, snapshot: WidgetSnapshot, input: StatusIconInput): String {
