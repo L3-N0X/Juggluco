@@ -692,6 +692,8 @@
     <string name="layer_amounts_desc">Show logged insulin doses &amp; numbers on curve</string>
     <string name="layer_meals">Meals &amp; Food</string>
     <string name="layer_meals_desc">Display meal carbs and food indicators</string>
+    <string name="layer_alerts">Alert Lines</string>
+    <string name="layer_alerts_desc">Mark the moments an alert fired on the graph</string>
 
     <string name="fullscreen_graph">Fullscreen Graph</string>
     <string name="exit_fullscreen">Exit Fullscreen</string>

@@ -464,6 +464,10 @@ class GlucoseRepository(
                     Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
                         .getInt(KEY_DELTA_CALCULATION, 1)
                 } catch (_: Throwable) { 1 }
+                val savedShowAlertLines = try {
+                    Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                        .getBoolean(KEY_SHOW_ALERT_LINES, false)
+                } catch (_: Throwable) { false }
                 val deltaCalculation = DeltaCalculation.fromMinutes(savedDeltaMinutes)
                 val nativeLabels = Natives.getLabels().toList()
                 _bloodLabels.value = nativeLabels
@@ -493,6 +497,7 @@ class GlucoseRepository(
                     showCalibratedHistory = Natives.getshowcalibratedhistories(),
                     showAmounts = Natives.getshownumbers(),
                     showMeals = Natives.getshowmeals(),
+                    showAlertLines = savedShowAlertLines,
                     minimalistUnits = savedMinimalistUnits,
                     deltaCalculation = deltaCalculation,
                     calibrationEnabled = try { Natives.getDoCalibrate() } catch (_: Throwable) { false },
@@ -2587,10 +2592,19 @@ class GlucoseRepository(
             "calibratedhistory" -> current.copy(showCalibratedHistory = enabled)
             "amounts" -> current.copy(showAmounts = enabled)
             "meals" -> current.copy(showMeals = enabled)
+            "alerts" -> current.copy(showAlertLines = enabled)
             else -> current
         }
         _displayConfig.value = updated
         scope.launch(Dispatchers.IO) {
+            if (layer == "alerts") {
+                try {
+                    Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean(KEY_SHOW_ALERT_LINES, enabled)
+                        .apply()
+                } catch (_: Throwable) {}
+            }
             try {
                 if (Applic.Nativesloaded) {
                     when (layer) {
@@ -2967,6 +2981,7 @@ class GlucoseRepository(
         const val UI_PREFS = "ui_prefs"
         const val KEY_DELTA_CALCULATION = "delta_calculation_minutes"
         const val KEY_MINIMALIST_UNITS = "minimalist_units"
+        const val KEY_SHOW_ALERT_LINES = "show_alert_lines"
         const val KEY_BLOOD_LABELS = "blood_label_indices"
         const val DEFAULT_BLOOD_LABEL = 6
         const val LEGACY_COMPOSE_BLOOD_LABEL = 3

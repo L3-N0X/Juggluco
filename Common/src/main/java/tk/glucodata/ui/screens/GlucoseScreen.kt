@@ -682,6 +682,15 @@ fun GlucoseScreen(
                         checked = displayConfig.showMeals,
                         onCheckedChange = { repository.toggleGraphLayer("meals", it) }
                     )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    LayerToggleItem(
+                        title = stringResource(R.string.layer_alerts),
+                        subtitle = stringResource(R.string.layer_alerts_desc),
+                        checked = displayConfig.showAlertLines,
+                        onCheckedChange = { repository.toggleGraphLayer("alerts", it) }
+                    )
                 }
             }
         }

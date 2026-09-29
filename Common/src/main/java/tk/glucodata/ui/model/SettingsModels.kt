@@ -98,6 +98,7 @@ data class DisplayConfig(
     val showCalibratedHistory: Boolean = false,
     val showAmounts: Boolean = true,
     val showMeals: Boolean = true,
+    val showAlertLines: Boolean = false,
     val minimalistUnits: Boolean = true,
     val deltaCalculation: DeltaCalculation = DeltaCalculation.ONE_MINUTE,
     val calibrationEnabled: Boolean = false,

@@ -271,13 +271,15 @@ fun GlucoseGraph(
                 if (displayConfig.showCalibratedScans) {
                     drawScanLayer(chart, data.calibratedScans, CALIBRATED_COLOR, surfaceColor, scratch)
                 }
-                drawAlertIndicators(
-                    chart = chart,
-                    events = data.alertEvents,
-                    alertColor = alertColor,
-                    markerColor = alertMarkerColor,
-                    markerContentColor = alertMarkerContentColor
-                )
+                if (displayConfig.showAlertLines) {
+                    drawAlertIndicators(
+                        chart = chart,
+                        events = data.alertEvents,
+                        alertColor = alertColor,
+                        markerColor = alertMarkerColor,
+                        markerContentColor = alertMarkerContentColor
+                    )
+                }
                 if (displayConfig.showAmounts) {
                     drawEventStrip(chart, data.events, unit, surfaceColor, paints, logbookColors)
                 }
