@@ -112,8 +112,7 @@ fun GlucoseScreen(
     val readings by repository.readings.collectAsState()
     val logs by repository.logs.collectAsState()
     val unit by repository.unit.collectAsState()
-    val targetLow by repository.targetLow.collectAsState()
-    val targetHigh by repository.targetHigh.collectAsState()
+    val glucoseRange by repository.range.collectAsState()
     val selectedRange by repository.selectedTimeRange.collectAsState()
     val screenStats by repository.screenStats.collectAsState()
     val sensorDetails by repository.sensorDetails.collectAsState()
@@ -167,8 +166,7 @@ fun GlucoseScreen(
         readings,
         settledWindow,
         displayConfig,
-        targetLow,
-        targetHigh
+        glucoseRange
     ) {
         value = withContext(Dispatchers.Default) {
             if (readings.isEmpty()) return@withContext tk.glucodata.ui.model.GlucoseStats()
@@ -189,7 +187,7 @@ fun GlucoseScreen(
             val pointsToUse = if (filtered.isNotEmpty()) filtered else {
                 readings.subList(range.first, range.last + 1)
             }
-            tk.glucodata.ui.model.GlucoseStats.calculate(pointsToUse, targetLow, targetHigh)
+            tk.glucodata.ui.model.GlucoseStats.calculate(pointsToUse, glucoseRange)
         }
     }
 
@@ -313,8 +311,7 @@ fun GlucoseScreen(
                     logs = logs,
                     viewportState = viewportState,
                     unit = unit,
-                    targetLow = targetLow,
-                    targetHigh = targetHigh,
+                    range = glucoseRange,
                     displayConfig = displayConfig,
                     alertEvents = alertEvents,
                     onLogEntryClicked = { if (it.nativeSource != null) selectedLogForDetail = it },
@@ -363,8 +360,6 @@ fun GlucoseScreen(
                         deltaReference = deltaReference,
                         unit = unit,
                         sensorName = sensorName,
-                        targetLow = targetLow,
-                        targetHigh = targetHigh,
                         minimalistUnits = displayConfig.minimalistUnits
                     )
                     GlucoseStatsCard(
@@ -433,8 +428,7 @@ fun GlucoseScreen(
                         logs = logs,
                         viewportState = viewportState,
                         unit = unit,
-                        targetLow = targetLow,
-                        targetHigh = targetHigh,
+                        range = glucoseRange,
                         displayConfig = displayConfig,
                         alertEvents = alertEvents,
                         onLogEntryClicked = { if (it.nativeSource != null) selectedLogForDetail = it },
@@ -481,8 +475,6 @@ fun GlucoseScreen(
                     deltaReference = deltaReference,
                     unit = unit,
                     sensorName = sensorName,
-                    targetLow = targetLow,
-                    targetHigh = targetHigh,
                     minimalistUnits = displayConfig.minimalistUnits
                 )
 
@@ -535,8 +527,7 @@ fun GlucoseScreen(
                     logs = logs,
                     viewportState = viewportState,
                     unit = unit,
-                    targetLow = targetLow,
-                    targetHigh = targetHigh,
+                    range = glucoseRange,
                     displayConfig = displayConfig,
                     alertEvents = alertEvents,
                     onLogEntryClicked = { if (it.nativeSource != null) selectedLogForDetail = it },
@@ -761,6 +752,7 @@ fun GlucoseScreen(
         if (showSearchDialog) {
             SearchGlucoseDialog(
                 unit = unit,
+                range = glucoseRange,
                 onDismiss = { showSearchDialog = false },
                 onExecuteSearch = { under, above, label, keyword ->
                     showSearchDialog = false

@@ -31,7 +31,10 @@ struct jugglucotext;
 struct JCurve;
 struct stats {
 	typedef unsigned tottype;
-static constexpr const	int levels[] {250,180,69,53};
+	/* Descending band edges, in mg/dL: above levels[0] is very high, above levels[1] is high,
+	   above levels[2] is in range, above levels[3] is low and the rest is very low. Filled from
+	   the user's configured range in the constructor. */
+	int levels[4]{};
 	int Nr{};
 	int count{};
 	int totid{};
@@ -52,6 +55,10 @@ static constexpr const	int levels[] {250,180,69,53};
 template <typename GlucoseIterator> stats( std::vector<GlucoseDataType<GlucoseIterator>> &polldata) {
 		auto targetlow=settings->targetlow()/10-1;
 		auto targethigh=settings->targethigh()/10;
+		levels[0]=settings->veryhigh()/10;
+		levels[1]=targethigh;
+		levels[2]=targetlow;
+		levels[3]=settings->verylow()/10;
 		border[0]=targethigh;
 		border[1]=targetlow;
 		int intarget=0;
@@ -94,7 +101,7 @@ template <typename GlucoseIterator> stats( std::vector<GlucoseDataType<GlucoseIt
                     }
 				total+=glu;
 				int i=0;
-				for(;i<std::size(levels);i++) {
+				for(;i<static_cast<int>(std::size(levels));i++) {
 					if(glu>levels[i]) {
 						break;
 						}

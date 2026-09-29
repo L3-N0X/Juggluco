@@ -90,6 +90,12 @@ extern "C" JNIEXPORT jfloat  JNICALL   fromjava(targetlow)(JNIEnv *env, jclass c
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(targethigh)(JNIEnv *env, jclass cl) {
     return gconvert(settings->data()->thigh);
     }
+extern "C" JNIEXPORT jfloat  JNICALL   fromjava(verylow)(JNIEnv *env, jclass cl) {
+    return gconvert(settings->verylow());
+    }
+extern "C" JNIEXPORT jfloat  JNICALL   fromjava(veryhigh)(JNIEnv *env, jclass cl) {
+    return gconvert(settings->veryhigh());
+    }
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(alarmlow)(JNIEnv *env, jclass cl) {
     return gconvert(settings->data()->alowget());
     }
@@ -209,6 +215,9 @@ extern "C" JNIEXPORT void  JNICALL   fromjava(setGraphRange)(JNIEnv *env, jclass
 extern "C" JNIEXPORT void  JNICALL   fromjava(setTargetRange)(JNIEnv *env, jclass cl,jfloat tlow,jfloat thigh) {
     settings->data()->tlow=settings->tomgperL(tlow);
     settings->data()->thigh=settings->tomgperL(thigh);
+    }
+extern "C" JNIEXPORT void  JNICALL   fromjava(setVeryRange)(JNIEnv *env, jclass cl,jfloat vlow,jfloat vhigh) {
+    settings->setveryrange(roundf(settings->tomgperL(vlow)), roundf(settings->tomgperL(vhigh)));
     }
 /*
 extern "C" JNIEXPORT void  JNICALL   fromjava(setGraphhigh)(JNIEnv *env, jclass cl,jfloat value) {

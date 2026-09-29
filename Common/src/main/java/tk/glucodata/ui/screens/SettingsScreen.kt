@@ -179,8 +179,7 @@ fun SettingsScreen(
     }
 
     val unit by repository.unit.collectAsState()
-    val targetLow by repository.targetLow.collectAsState()
-    val targetHigh by repository.targetHigh.collectAsState()
+    val glucoseRange by repository.range.collectAsState()
     val alertRules by tk.glucodata.alerts.AlertStore.rules.collectAsState()
     val alertSettings by tk.glucodata.alerts.AlertStore.settings.collectAsState()
     val alertsOn = alertSettings.enabled && alertRules.any { it.enabled }
@@ -226,7 +225,13 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = stringResource(R.string.settings_summary_target_range_value, unit.format(targetLow), unit.format(targetHigh)),
+                        text = stringResource(
+                            R.string.settings_summary_target_range_four,
+                            unit.format(glucoseRange.veryLowMgDl),
+                            unit.format(glucoseRange.lowMgDl),
+                            unit.format(glucoseRange.highMgDl),
+                            unit.format(glucoseRange.veryHighMgDl)
+                        ),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

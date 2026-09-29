@@ -64,8 +64,7 @@ fun WearGraphScreen(
 ) {
     val readings by repository.readings.collectAsState()
     val unit by repository.unit.collectAsState()
-    val targetLow by repository.targetLow.collectAsState()
-    val targetHigh by repository.targetHigh.collectAsState()
+    val glucoseRange by repository.range.collectAsState()
 
     var selectedHours by remember { mutableIntStateOf(3) }
 
@@ -264,8 +263,7 @@ fun WearGraphScreen(
                     chartSpec.windowEnd = windowEnd
                     chartSpec.selectedHours = selectedHours
                     chartSpec.unit = unit
-                    chartSpec.targetLow = targetLow
-                    chartSpec.targetHigh = targetHigh
+                    chartSpec.range = glucoseRange
                     chartSpec.clinicalColors = clinicalColors
                     chartSpec.gridColor = graphGridColor
                     chartSpec.surfaceColor = graphSurfaceColor
@@ -273,7 +271,7 @@ fun WearGraphScreen(
                     chartSpec.highlightColor = graphHighlightColor
                     chartSpec.selectedIndex = scrubIndex
                     chartSpec.axisMax = renderer.axisCeiling(
-                        data.maxValueBetween(windowStart, windowEnd).coerceAtLeast(targetHigh)
+                        data.maxValueBetween(windowStart, windowEnd).coerceAtLeast(glucoseRange.veryHighMgDl)
                     )
                     renderer.draw(this, chartSpec)
                 }

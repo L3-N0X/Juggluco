@@ -417,13 +417,13 @@ class WidgetRenderer(private val context: Context) {
                 dataMin = min(dataMin, snapshot.values[i])
                 dataMax = max(dataMax, snapshot.values[i])
             }
-            val low = min(snapshot.targetLowMgDl - 25f, if (first >= 0) dataMin - 10f else Float.MAX_VALUE).coerceAtLeast(30f)
-            val high = max(snapshot.targetHighMgDl + 35f, if (first >= 0) dataMax + 10f else 0f).coerceAtMost(420f)
+            val low = min(snapshot.range.veryLowMgDl - 20f, if (first >= 0) dataMin - 10f else Float.MAX_VALUE).coerceAtLeast(30f)
+            val high = max(snapshot.range.veryHighMgDl + 30f, if (first >= 0) dataMax + 10f else 0f).coerceAtMost(430f)
             fun x(time: Long) = plot.left + (time - start).toFloat() / (end - start) * plot.width()
             fun y(value: Float) = plot.bottom - (value - low) / (high - low) * plot.height()
 
             if (config.showTargetBand) {
-                val band = RectF(plot.left, y(snapshot.targetHighMgDl), area.right, y(snapshot.targetLowMgDl))
+                val band = RectF(plot.left, y(snapshot.range.highMgDl), area.right, y(snapshot.range.lowMgDl))
                 val bandColor = if (config.rangeColors && config.background != WidgetBackground.RANGE)
                     ColorUtils.setAlphaComponent(palette.rangeColor(GlucoseStatus.IN_RANGE), 0x24)
                 else palette.subtle
@@ -508,10 +508,10 @@ class WidgetRenderer(private val context: Context) {
         fun zoneGradient(plot: RectF, low: Float, high: Float, alpha: Int): LinearGradient {
             fun at(value: Float) = ((high - value) / (high - low)).coerceIn(0f, 1f)
             fun color(status: GlucoseStatus) = ColorUtils.setAlphaComponent(palette.rangeColor(status), alpha)
-            val veryHigh = at(250f)
-            val targetHigh = at(snapshot.targetHighMgDl).coerceAtLeast(veryHigh)
-            val targetLow = at(snapshot.targetLowMgDl).coerceAtLeast(targetHigh)
-            val veryLow = at(54f).coerceAtLeast(targetLow)
+            val veryHigh = at(snapshot.range.veryHighMgDl)
+            val targetHigh = at(snapshot.range.highMgDl).coerceAtLeast(veryHigh)
+            val targetLow = at(snapshot.range.lowMgDl).coerceAtLeast(targetHigh)
+            val veryLow = at(snapshot.range.veryLowMgDl).coerceAtLeast(targetLow)
             return LinearGradient(
                 0f, plot.top, 0f, plot.bottom,
                 intArrayOf(
@@ -566,7 +566,7 @@ class WidgetRenderer(private val context: Context) {
             val radius = side / 2f - pad - stroke * 0.95f
             if (radius <= 0f) return
             val scaleLow = 40f
-            val scaleHigh = max(300f, snapshot.targetHighMgDl + 60f)
+            val scaleHigh = max(300f, snapshot.range.veryHighMgDl + 50f)
             fun angle(value: Float) = 135f + (value.coerceIn(scaleLow, scaleHigh) - scaleLow) / (scaleHigh - scaleLow) * 270f
             val oval = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
             val degreesPerPx = (180f / Math.PI.toFloat()) / radius
@@ -574,11 +574,11 @@ class WidgetRenderer(private val context: Context) {
             val cap = stroke / 2f * degreesPerPx
             val useZones = config.rangeColors && config.background != WidgetBackground.RANGE
             val zones = listOf(
-                Triple(scaleLow, 54f, GlucoseStatus.VERY_LOW),
-                Triple(54f, snapshot.targetLowMgDl, GlucoseStatus.LOW),
-                Triple(snapshot.targetLowMgDl, snapshot.targetHighMgDl, GlucoseStatus.IN_RANGE),
-                Triple(snapshot.targetHighMgDl, 250f, GlucoseStatus.HIGH),
-                Triple(250f, scaleHigh, GlucoseStatus.VERY_HIGH)
+                Triple(scaleLow, snapshot.range.veryLowMgDl, GlucoseStatus.VERY_LOW),
+                Triple(snapshot.range.veryLowMgDl, snapshot.range.lowMgDl, GlucoseStatus.LOW),
+                Triple(snapshot.range.lowMgDl, snapshot.range.highMgDl, GlucoseStatus.IN_RANGE),
+                Triple(snapshot.range.highMgDl, snapshot.range.veryHighMgDl, GlucoseStatus.HIGH),
+                Triple(snapshot.range.veryHighMgDl, scaleHigh, GlucoseStatus.VERY_HIGH)
             ).filter { it.second > it.first }
             val arcPaint = strokePaint(0, stroke).apply { clearShadowLayer() }
             zones.forEachIndexed { index, (from, to, zone) ->

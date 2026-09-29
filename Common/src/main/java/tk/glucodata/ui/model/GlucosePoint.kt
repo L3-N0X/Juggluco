@@ -7,7 +7,7 @@ data class GlucosePoint(
     val isScan: Boolean = false,
     val isHistory: Boolean = false,
     val isCalibrated: Boolean = false,
-    val status: GlucoseStatus = GlucoseStatus.fromValue(valueMgDl)
+    val status: GlucoseStatus = GlucoseStatus.fromValue(valueMgDl, GlucoseRange.DEFAULT)
 ) {
     fun valueIn(unit: GlucoseUnit): Float = unit.toDisplay(valueMgDl)
 

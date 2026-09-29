@@ -191,6 +191,7 @@ public static native float getPrecision(int i);
 //public static native void setranges(float glow, float ghigh, float tlow, float thigh);
 public static native void setGraphRange(float glow,float ghigh);
 public static native void setTargetRange(float tlow,float thigh);
+public static native void setVeryRange(float vlow,float vhigh);
 
 public static native void setalarms(float alow, float ahigh, boolean lowalarm, boolean highalarm, boolean availablealarm,boolean lossalarm);
 
@@ -206,6 +207,8 @@ public static native float graphlow( );
 public static native float graphhigh( );
 public static native float targetlow( );
 public static native float targethigh( );
+public static native float verylow( );
+public static native float veryhigh( );
 public static native float alarmlow( );
 public static native float alarmhigh( );
 public static native boolean hasalarmhigh( );

@@ -31,6 +31,7 @@ import tk.glucodata.Applic
 import tk.glucodata.R
 import tk.glucodata.Natives
 import tk.glucodata.Notify
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.TrendArrow
@@ -151,9 +152,13 @@ object ComplicationRenderer {
         }
         val valMgDl = unit.toMgDl(rawVal)
 
-        val targetLow = unit.toMgDl(Natives.targetlow()).takeIf { it > 0f } ?: 70f
-        val targetHigh = unit.toMgDl(Natives.targethigh()).takeIf { it > 0f } ?: 180f
-        val status = GlucoseStatus.fromValue(valMgDl, targetLow, targetHigh)
+        val range = GlucoseRange(
+            veryLowMgDl = unit.toMgDl(Natives.verylow()),
+            lowMgDl = unit.toMgDl(Natives.targetlow()),
+            highMgDl = unit.toMgDl(Natives.targethigh()),
+            veryHighMgDl = unit.toMgDl(Natives.veryhigh())
+        ).normalized()
+        val status = range.statusOf(valMgDl)
 
         return ComplicationGlucose(
             value = if (isOld) NO_VALUE else strGl.value,

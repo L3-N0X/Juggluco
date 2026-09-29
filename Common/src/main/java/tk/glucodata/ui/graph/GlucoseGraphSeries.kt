@@ -1,5 +1,6 @@
 package tk.glucodata.ui.graph
 
+import tk.glucodata.ui.model.GlucoseRange
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -21,8 +22,7 @@ internal fun DrawScope.drawCurveLayer(
     chart: ChartTransform,
     series: GraphSeries,
     clinicalColors: ClinicalColors,
-    targetLow: Float,
-    targetHigh: Float,
+    range: GlucoseRange,
     surfaceColor: Color,
     scratch: GraphScratch,
     showHead: Boolean
@@ -32,7 +32,7 @@ internal fun DrawScope.drawCurveLayer(
     val to = (series.lastIndexAtOrBefore(chart.endTime) + 1).coerceAtMost(series.size - 1)
     if (to < from) return
 
-    val brushes = scratch.zoneBrushes(chart, clinicalColors, targetLow, targetHigh)
+    val brushes = scratch.zoneBrushes(chart, clinicalColors, range)
     val visibleCount = to - from + 1
 
     if (visibleCount > chart.metrics.chartWidth * 1.2f) {

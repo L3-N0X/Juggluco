@@ -608,7 +608,7 @@
     <string name="help_active_title">Active CGM Time</string>
     <string name="help_active_desc" formatted="false">Percentage of time sensor data was actively recorded. International consensus requires at least 70% wear time over 14 days for a statistically robust and clinically valid Ambulatory Glucose Profile.</string>
     <string name="help_tir_title">Time in Range (TIR)</string>
-    <string name="help_tir_desc" formatted="false">The percentage of time your glucose stays within your target range (70–180 mg/dL or 3.9–10.0 mmol/L). Clinical consensus recommends aiming for &gt; 70% in range, &lt; 4% low, and &lt; 1% very low.</string>
+    <string name="help_tir_desc" formatted="false">The percentage of time your glucose stays within the target range you set, split into very low, low, in range, high and very high. Clinical consensus recommends aiming for &gt; 70% in range, &lt; 4% low, and &lt; 1% very low.</string>
     <string name="help_gmi_title">Glucose Management Indicator (GMI)</string>
     <string name="help_gmi_desc" formatted="false">Calculates an estimated laboratory HbA1c based on your continuous glucose average over recent weeks. Target is typically &lt; 7.0% for most adults.</string>
     <string name="help_cv_title" formatted="false">Glycemic Variability (%CV)</string>
@@ -1013,6 +1013,7 @@
     <string name="settings_summary_unit">Unit</string>
     <string name="settings_summary_target_range">Target Range</string>
     <string name="settings_summary_target_range_value">%1$s–%2$s</string>
+    <string name="settings_summary_target_range_four">%1$s / %2$s – %3$s / %4$s</string>
     <string name="settings_summary_role">Role</string>
     <string name="settings_role_receiver">Receiver</string>
     <string name="settings_role_sender">Sender</string>
@@ -1642,6 +1643,8 @@
     <string name="loc_low_target">Low target</string>
     <string name="loc_high_target">High target</string>
     <string name="loc_default_value">Default: %1$s</string>
+    <string name="loc_range_desc">%1$s</string>
+    <string name="loc_reset">Reset</string>
 
     <string name="loc_mirror_edit_add">Add mirror connection</string>
     <string name="loc_mirror_edit_title">Edit mirror connection</string>

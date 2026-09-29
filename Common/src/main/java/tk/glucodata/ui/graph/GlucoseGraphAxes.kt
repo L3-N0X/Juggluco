@@ -1,5 +1,6 @@
 package tk.glucodata.ui.graph
 
+import tk.glucodata.ui.model.GlucoseRange
 import android.graphics.Paint
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -18,12 +19,11 @@ private const val HOUR_MILLIS = 3600 * 1000L
 
 internal fun DrawScope.drawTargetBand(
     chart: ChartTransform,
-    targetLow: Float,
-    targetHigh: Float,
+    range: GlucoseRange,
     bandColor: Color
 ) {
-    val topY = chart.y(targetHigh)
-    val bottomY = chart.y(targetLow)
+    val topY = chart.y(range.highMgDl)
+    val bottomY = chart.y(range.lowMgDl)
     drawRect(
         color = bandColor,
         topLeft = Offset(chart.metrics.chartLeft, topY),
@@ -39,8 +39,7 @@ internal fun DrawScope.drawTargetBand(
 internal fun DrawScope.drawValueAxis(
     chart: ChartTransform,
     unit: GlucoseUnit,
-    targetLow: Float,
-    targetHigh: Float,
+    range: GlucoseRange,
     gridColor: Color,
     paints: GraphPaints,
     clinicalColors: ClinicalColors
@@ -53,7 +52,7 @@ internal fun DrawScope.drawValueAxis(
     var value = ceil(chart.minValue / step) * step
     if (value == chart.minValue) value += step
     while (value < chart.maxValue) {
-        if (abs(value - targetLow) > step * 0.35f && abs(value - targetHigh) > step * 0.35f) {
+        if (abs(value - range.lowMgDl) > step * 0.35f && abs(value - range.highMgDl) > step * 0.35f) {
             val y = chart.y(value)
             val label = unit.format(value)
             val labelWidth = paints.axis.measureText(label)
@@ -65,8 +64,8 @@ internal fun DrawScope.drawValueAxis(
         value += step
     }
 
-    drawAxisTargetBoundary(chart, targetHigh, unit.format(targetHigh), paints, clinicalColors)
-    drawAxisTargetBoundary(chart, targetLow, unit.format(targetLow), paints, clinicalColors)
+    drawAxisTargetBoundary(chart, range.highMgDl, unit.format(range.highMgDl), paints, clinicalColors)
+    drawAxisTargetBoundary(chart, range.lowMgDl, unit.format(range.lowMgDl), paints, clinicalColors)
 }
 
 private fun DrawScope.drawAxisTargetBoundary(

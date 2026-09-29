@@ -58,17 +58,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tk.glucodata.R
 import tk.glucodata.ui.model.AgpProfile
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HourlyPercentiles
 import tk.glucodata.ui.theme.DarkClinicalColors
 import tk.glucodata.ui.theme.LocalClinicalColors
+import kotlin.math.max
+import kotlin.math.min
 
 @Composable
 fun AgpGraph(
     profile: AgpProfile,
     unit: GlucoseUnit = GlucoseUnit.MG_DL,
-    targetLow: Float = 70f,
-    targetHigh: Float = 180f,
+    range: GlucoseRange = GlucoseRange(),
     onHourInspected: (HourlyPercentiles?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -92,8 +94,10 @@ fun AgpGraph(
     val coroutineScope = rememberCoroutineScope()
     val hourlyData = profile.hourlyPercentiles
 
-    val minY = 40f
-    val maxY = 260f
+    // Widen the fixed AGP window only as far as the configured very low / very high edges need,
+    // so the outer bands are visible instead of being clipped into the plot border.
+    val minY = min(40f, range.veryLowMgDl - 20f)
+    val maxY = max(260f, range.veryHighMgDl + 20f)
 
     val noDataLabel = stringResource(R.string.nodata)
     val timeFormat = DateFormat.getTimeInstance(DateFormat.SHORT)
@@ -169,8 +173,8 @@ fun AgpGraph(
             }
 
             // 1. Shaded Target Range Background
-            val targetTopY = valueToY(targetHigh)
-            val targetBottomY = valueToY(targetLow)
+            val targetTopY = valueToY(range.highMgDl)
+            val targetBottomY = valueToY(range.lowMgDl)
             drawRect(
                 color = targetShade,
                 topLeft = Offset(paddingLeft, targetTopY),

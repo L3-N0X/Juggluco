@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
@@ -108,8 +109,7 @@ internal class GraphScratch {
     private var brushBottom = Float.NaN
     private var brushMin = Float.NaN
     private var brushMax = Float.NaN
-    private var brushLow = Float.NaN
-    private var brushHigh = Float.NaN
+    private var brushRange: GlucoseRange? = null
     private var brushPalette: ClinicalColors? = null
 
     /**
@@ -119,15 +119,14 @@ internal class GraphScratch {
     fun zoneBrushes(
         chart: ChartTransform,
         colors: ClinicalColors,
-        targetLow: Float,
-        targetHigh: Float
+        range: GlucoseRange
     ): ZoneBrushes {
         val top = chart.metrics.chartTop
         val bottom = chart.metrics.chartBottom
         val cached = brushes
         if (cached != null && brushTop == top && brushBottom == bottom &&
             brushMin == chart.minValue && brushMax == chart.maxValue &&
-            brushLow == targetLow && brushHigh == targetHigh && brushPalette === colors
+            brushRange == range && brushPalette === colors
         ) {
             return cached
         }
@@ -138,14 +137,14 @@ internal class GraphScratch {
         val eps = 0.0008f
         val raw = ArrayList<Pair<Float, Color>>(10)
         raw.add(0f to colors.veryHigh)
-        raw.add(stopAt(250f) to colors.veryHigh)
-        raw.add((stopAt(250f) + eps) to colors.high)
-        raw.add(stopAt(targetHigh) to colors.high)
-        raw.add((stopAt(targetHigh) + eps) to colors.inRange)
-        raw.add(stopAt(targetLow) to colors.inRange)
-        raw.add((stopAt(targetLow) + eps) to colors.low)
-        raw.add(stopAt(54f) to colors.low)
-        raw.add((stopAt(54f) + eps) to colors.veryLow)
+        raw.add(stopAt(range.veryHighMgDl) to colors.veryHigh)
+        raw.add((stopAt(range.veryHighMgDl) + eps) to colors.high)
+        raw.add(stopAt(range.highMgDl) to colors.high)
+        raw.add((stopAt(range.highMgDl) + eps) to colors.inRange)
+        raw.add(stopAt(range.lowMgDl) to colors.inRange)
+        raw.add((stopAt(range.lowMgDl) + eps) to colors.low)
+        raw.add(stopAt(range.veryLowMgDl) to colors.low)
+        raw.add((stopAt(range.veryLowMgDl) + eps) to colors.veryLow)
         raw.add(1f to colors.veryLow)
 
         var previous = 0f
@@ -169,8 +168,7 @@ internal class GraphScratch {
         brushBottom = bottom
         brushMin = chart.minValue
         brushMax = chart.maxValue
-        brushLow = targetLow
-        brushHigh = targetHigh
+        brushRange = range
         brushPalette = colors
         return result
     }

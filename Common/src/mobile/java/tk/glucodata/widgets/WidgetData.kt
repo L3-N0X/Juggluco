@@ -6,6 +6,7 @@ import tk.glucodata.Natives
 import tk.glucodata.Notify
 import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.GlucosePoint
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import java.util.Calendar
@@ -39,14 +40,13 @@ class WidgetSnapshot(
     val times: LongArray,
     val values: FloatArray,
     val unit: GlucoseUnit,
-    val targetLowMgDl: Float,
-    val targetHighMgDl: Float
+    val range: GlucoseRange
 ) {
     val hasReading: Boolean get() = currentTime > 0L && currentMgDl > 0f
     val isStale: Boolean get() = !hasReading || now - currentTime > Notify.glucosetimeout
     val status: GlucoseStatus? get() = if (hasReading) statusOf(currentMgDl) else null
 
-    fun statusOf(mgDl: Float): GlucoseStatus = GlucoseStatus.fromValue(mgDl, targetLowMgDl, targetHighMgDl)
+    fun statusOf(mgDl: Float): GlucoseStatus = range.statusOf(mgDl)
 
     fun stats(period: WidgetStatsPeriod): RangeStats? {
         val from = periodStart(period, now)
@@ -108,8 +108,7 @@ object WidgetDataSource {
     fun load(context: Context, historyMillis: Long): WidgetSnapshot {
         val now = System.currentTimeMillis()
         val unit = GlucoseUnit.fromNative(Applic.unit)
-        var targetLow = 70f
-        var targetHigh = 180f
+        var range = GlucoseRange()
         var currentTime = 0L
         var currentMgDl = 0f
         var rate = Float.NaN
@@ -117,8 +116,12 @@ object WidgetDataSource {
         var values = FloatArray(0)
         if (Applic.Nativesloaded) {
             try {
-                Natives.targetlow().takeIf { it > 0f }?.let { targetLow = unit.toMgDl(it) }
-                Natives.targethigh().takeIf { it > 0f }?.let { targetHigh = unit.toMgDl(it) }
+                range = GlucoseRange(
+                    veryLowMgDl = unit.toMgDl(Natives.verylow()),
+                    lowMgDl = unit.toMgDl(Natives.targetlow()),
+                    highMgDl = unit.toMgDl(Natives.targethigh()),
+                    veryHighMgDl = unit.toMgDl(Natives.veryhigh())
+                ).normalized()
             } catch (_: Throwable) {
             }
             try {
@@ -157,8 +160,7 @@ object WidgetDataSource {
             times = times,
             values = values,
             unit = unit,
-            targetLowMgDl = targetLow,
-            targetHighMgDl = targetHigh
+            range = range
         )
     }
 
@@ -262,8 +264,7 @@ object WidgetDataSource {
             times = times,
             values = values,
             unit = unit,
-            targetLowMgDl = 70f,
-            targetHighMgDl = 180f
+            range = GlucoseRange()
         )
     }
 }

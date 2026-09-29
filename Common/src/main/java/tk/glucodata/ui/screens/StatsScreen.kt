@@ -78,6 +78,7 @@ import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.graph.AgpGraph
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HourlyPercentiles
@@ -99,8 +100,7 @@ fun StatsScreen(
     val selectedPeriod by repository.statsPeriod.collectAsState()
     val useHistory by repository.statsUseHistory.collectAsState()
     val unit by repository.unit.collectAsState()
-    val targetLow by repository.targetLow.collectAsState()
-    val targetHigh by repository.targetHigh.collectAsState()
+    val glucoseRange by repository.range.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -217,6 +217,7 @@ fun StatsScreen(
         ClinicalKpiCards(
             stats = stats,
             unit = unit,
+            range = glucoseRange,
             onShowInfo = { title, text ->
                 infoDialogTitle = title
                 infoDialogText = text
@@ -229,8 +230,7 @@ fun StatsScreen(
         TimeInRangeBreakdownCard(
             stats = stats,
             unit = unit,
-            targetLow = targetLow,
-            targetHigh = targetHigh,
+            range = glucoseRange,
             onShowInfo = { title, text ->
                 infoDialogTitle = title
                 infoDialogText = text
@@ -285,8 +285,7 @@ fun StatsScreen(
             AgpGraph(
                 profile = agpProfile,
                 unit = unit,
-                targetLow = targetLow,
-                targetHigh = targetHigh
+                range = glucoseRange
             )
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -450,16 +449,19 @@ fun StatsScreen(
 private fun ClinicalKpiCards(
     stats: GlucoseStats,
     unit: GlucoseUnit,
+    range: GlucoseRange,
     onShowInfo: (String, String) -> Unit = { _, _ -> }
 ) {
     val clinicalColors = LocalClinicalColors.current
     val hasData = stats.readingsCount > 0 && stats.averageMgDl > 0f
 
-    // Values that miss their clinical target are tinted instead of carrying a badge
+    // Values that miss their clinical target are tinted instead of carrying a badge. The floor is
+    // the configured low edge; the ceiling stays the consensus goal average, which is a clinical
+    // target rather than a band edge.
     val onTarget = MaterialTheme.colorScheme.onSurface
     val avgColor = when {
-        !hasData || stats.averageMgDl in 70f..154f -> onTarget
-        stats.averageMgDl > 154f -> clinicalColors.high
+        !hasData || stats.averageMgDl in range.lowMgDl..GOAL_AVERAGE_MGDL -> onTarget
+        stats.averageMgDl > GOAL_AVERAGE_MGDL -> clinicalColors.high
         else -> clinicalColors.low
     }
     val gmiColor = if (!hasData || stats.estimatedA1c <= 0f || stats.estimatedA1c in 4.0f..7.0f) onTarget else clinicalColors.high
@@ -483,7 +485,7 @@ private fun ClinicalKpiCards(
             KpiCard(
                 title = stringResource(R.string.kpi_average_glucose),
                 value = if (hasData) unit.format(stats.averageMgDl) else "—",
-                subtitle = stringResource(R.string.target_average_sub, unit.format(154f)),
+                subtitle = stringResource(R.string.target_average_sub, unit.format(GOAL_AVERAGE_MGDL)),
                 valueColor = avgColor,
                 onClick = { onShowInfo(avgTitle, avgDesc) },
                 modifier = Modifier.weight(1f)
@@ -563,8 +565,7 @@ private fun KpiCard(
 private fun TimeInRangeBreakdownCard(
     stats: GlucoseStats,
     unit: GlucoseUnit,
-    targetLow: Float,
-    targetHigh: Float,
+    range: GlucoseRange,
     onShowInfo: (String, String) -> Unit = { _, _ -> }
 ) {
     val clinicalColors = LocalClinicalColors.current
@@ -649,7 +650,7 @@ private fun TimeInRangeBreakdownCard(
             TirRow(
                 icon = Icons.Default.KeyboardDoubleArrowUp,
                 label = stringResource(R.string.status_very_high),
-                rangeDesc = stringResource(R.string.tir_range_greater_than, unit.format(250f)),
+                rangeDesc = stringResource(R.string.tir_range_greater_than, unit.format(range.veryHighMgDl)),
                 percent = stats.timeVeryHighPercent,
                 target = stringResource(R.string.tir_target_very_high),
                 color = clinicalColors.veryHigh
@@ -657,7 +658,7 @@ private fun TimeInRangeBreakdownCard(
             TirRow(
                 icon = Icons.Default.ArrowUpward,
                 label = stringResource(R.string.status_high),
-                rangeDesc = stringResource(R.string.tir_range_between, unit.format(targetHigh + 1f), unit.format(250f)),
+                rangeDesc = stringResource(R.string.tir_range_between, unit.format(range.highMgDl + 1f), unit.format(range.veryHighMgDl)),
                 percent = stats.timeAbovePercent,
                 target = stringResource(R.string.tir_target_high),
                 color = clinicalColors.high
@@ -665,7 +666,7 @@ private fun TimeInRangeBreakdownCard(
             TirRow(
                 icon = Icons.Default.Check,
                 label = stringResource(R.string.status_in_range),
-                rangeDesc = stringResource(R.string.tir_range_between, unit.format(targetLow), unit.format(targetHigh)),
+                rangeDesc = stringResource(R.string.tir_range_between, unit.format(range.lowMgDl), unit.format(range.highMgDl)),
                 percent = stats.timeInRangePercent,
                 target = stringResource(R.string.tir_target_in_range),
                 color = clinicalColors.inRange,
@@ -674,7 +675,7 @@ private fun TimeInRangeBreakdownCard(
             TirRow(
                 icon = Icons.Default.ArrowDownward,
                 label = stringResource(R.string.status_low),
-                rangeDesc = stringResource(R.string.tir_range_between, unit.format(54f), unit.format(targetLow - 1f)),
+                rangeDesc = stringResource(R.string.tir_range_between, unit.format(range.veryLowMgDl), unit.format(range.lowMgDl - 1f)),
                 percent = stats.timeBelowPercent,
                 target = stringResource(R.string.tir_target_low),
                 color = clinicalColors.low
@@ -682,7 +683,7 @@ private fun TimeInRangeBreakdownCard(
             TirRow(
                 icon = Icons.Default.KeyboardDoubleArrowDown,
                 label = stringResource(R.string.status_very_low),
-                rangeDesc = stringResource(R.string.tir_range_less_than, unit.format(54f)),
+                rangeDesc = stringResource(R.string.tir_range_less_than, unit.format(range.veryLowMgDl)),
                 percent = stats.timeVeryLowPercent,
                 target = stringResource(R.string.tir_target_very_low),
                 color = clinicalColors.veryLow
@@ -885,3 +886,6 @@ fun CustomStatsPeriodDialog(
         }
     )
 }
+
+/** Consensus target average glucose (~A1C 7%), independent of the configured band edges. */
+private const val GOAL_AVERAGE_MGDL = 154f

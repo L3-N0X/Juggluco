@@ -52,8 +52,7 @@ fun WearHomeScreen(
     val currentReading by repository.currentReading.collectAsState()
     val readings by repository.readings.collectAsState()
     val unit by repository.unit.collectAsState()
-    val targetLow by repository.targetLow.collectAsState()
-    val targetHigh by repository.targetHigh.collectAsState()
+    val glucoseRange by repository.range.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
 
     val listState = rememberScalingLazyListState(
@@ -85,8 +84,6 @@ fun WearHomeScreen(
                         readings = readings,
                         unit = unit,
                         deltaCalculation = displayConfig.deltaCalculation,
-                        targetLow = targetLow,
-                        targetHigh = targetHigh,
                         onClick = onNavigateToGraph
                     )
                 }
@@ -109,8 +106,7 @@ fun WearHomeScreen(
                     ) {
                         WearMiniGraph(
                             readings = readings,
-                            targetLow = targetLow,
-                            targetHigh = targetHigh,
+                            range = glucoseRange,
                             hoursToShow = 2,
                             modifier = Modifier
                                 .fillMaxWidth()

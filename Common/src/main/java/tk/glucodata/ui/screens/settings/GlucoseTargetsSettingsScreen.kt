@@ -1,14 +1,12 @@
 package tk.glucodata.ui.screens.settings
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -17,12 +15,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,13 +32,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.ui.model.RangeLevel
+import tk.glucodata.ui.theme.LocalClinicalColors
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,11 +51,36 @@ fun GlucoseTargetsSettingsScreen(
     onNavigateBack: () -> Unit
 ) {
     val unit by repository.unit.collectAsState()
-    val targetLow by repository.targetLow.collectAsState()
-    val targetHigh by repository.targetHigh.collectAsState()
+    val range by repository.range.collectAsState()
+    val clinicalColors = LocalClinicalColors.current
 
-    var currentLowSlider by remember(targetLow) { mutableFloatStateOf(targetLow) }
-    var currentHighSlider by remember(targetHigh) { mutableFloatStateOf(targetHigh) }
+    // Local mirror so the thumb tracks the finger; the repository is only written on release.
+    var pendingVeryLow by remember(range) { mutableFloatStateOf(range.veryLowMgDl) }
+    var pendingLow by remember(range) { mutableFloatStateOf(range.lowMgDl) }
+    var pendingHigh by remember(range) { mutableFloatStateOf(range.highMgDl) }
+    var pendingVeryHigh by remember(range) { mutableFloatStateOf(range.veryHighMgDl) }
+
+    // Each slider's window is set by its neighbours, so the bounds are derived from the range the
+    // other three currently propose. Normalizing the proposal keeps the windows meaningful even in
+    // the one frame between a drag and the write that resolves it.
+    val preview = remember(pendingVeryLow, pendingLow, pendingHigh, pendingVeryHigh) {
+        GlucoseRange(
+            veryLowMgDl = pendingVeryLow,
+            lowMgDl = pendingLow,
+            highMgDl = pendingHigh,
+            veryHighMgDl = pendingVeryHigh
+        ).normalized()
+    }
+    val bounds = remember(preview) { RangeLevel.entries.associateWith { preview.sliderBoundsFor(it) } }
+
+    fun commit(level: RangeLevel, value: Float) {
+        val next = preview.withLevel(level, value)
+        pendingVeryLow = next.veryLowMgDl
+        pendingLow = next.lowMgDl
+        pendingHigh = next.highMgDl
+        pendingVeryHigh = next.veryHighMgDl
+        repository.setGlucoseRange(next)
+    }
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_card_target_range),
@@ -158,159 +185,187 @@ fun GlucoseTargetsSettingsScreen(
             }
         }
 
-        // TARGET THRESHOLDS
+        // THE FOUR CUT POINTS
         SettingsSection(title = stringResource(R.string.loc_target_range)) {
-            // Target Low Slider
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.loc_low_target),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = stringResource(R.string.loc_default_value, unit.format(70f)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Slider(
-                    value = currentLowSlider,
-                    onValueChange = { currentLowSlider = it },
-                    onValueChangeFinished = { repository.setTargetRange(currentLowSlider, currentHighSlider) },
-                    valueRange = 55f..100f,
-                    modifier = Modifier.fillMaxWidth(),
-                    thumb = {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            shadowElevation = 2.dp
-                        ) {
-                            Text(
-                                text = unit.format(currentLowSlider),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Quick presets
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    listOf(65f, 70f, 75f, 80f).forEach { preset ->
-                        FilterChip(
-                            selected = kotlin.math.abs(currentLowSlider - preset) < 0.5f,
-                            onClick = {
-                                currentLowSlider = preset
-                                repository.setTargetRange(preset, currentHighSlider)
-                            },
-                            label = { Text(unit.format(preset), fontSize = 11.sp) }
-                        )
-                    }
-                }
-            }
+            RangeSlider(
+                label = stringResource(R.string.status_very_low),
+                description = stringResource(
+                    R.string.loc_range_desc,
+                    stringResource(R.string.tir_range_less_than, unit.format(range.veryLowMgDl))
+                ),
+                value = pendingVeryLow,
+                bounds = bounds.getValue(RangeLevel.VERY_LOW),
+                defaultValue = GlucoseRange.DEFAULT_VERY_LOW,
+                unit = unit,
+                accent = clinicalColors.veryLow,
+                onValueChange = { pendingVeryLow = it },
+                onValueChangeFinished = { commit(RangeLevel.VERY_LOW, pendingVeryLow) },
+                onReset = { commit(RangeLevel.VERY_LOW, GlucoseRange.DEFAULT_VERY_LOW) }
+            )
 
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
             )
 
-            // Target High Slider
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.loc_high_target),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+            RangeSlider(
+                label = stringResource(R.string.status_low),
+                description = stringResource(
+                    R.string.loc_range_desc,
+                    stringResource(
+                        R.string.tir_range_between,
+                        unit.format(range.veryLowMgDl),
+                        unit.format(range.lowMgDl - 1f)
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = stringResource(R.string.loc_default_value, unit.format(180f)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                value = pendingLow,
+                bounds = bounds.getValue(RangeLevel.LOW),
+                defaultValue = GlucoseRange.DEFAULT_LOW,
+                unit = unit,
+                accent = clinicalColors.low,
+                onValueChange = { pendingLow = it },
+                onValueChangeFinished = { commit(RangeLevel.LOW, pendingLow) },
+                onReset = { commit(RangeLevel.LOW, GlucoseRange.DEFAULT_LOW) }
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            )
+
+            RangeSlider(
+                label = stringResource(R.string.status_high),
+                description = stringResource(
+                    R.string.loc_range_desc,
+                    stringResource(
+                        R.string.tir_range_between,
+                        unit.format(range.highMgDl + 1f),
+                        unit.format(range.veryHighMgDl)
                     )
-                }
+                ),
+                value = pendingHigh,
+                bounds = bounds.getValue(RangeLevel.HIGH),
+                defaultValue = GlucoseRange.DEFAULT_HIGH,
+                unit = unit,
+                accent = clinicalColors.high,
+                onValueChange = { pendingHigh = it },
+                onValueChangeFinished = { commit(RangeLevel.HIGH, pendingHigh) },
+                onReset = { commit(RangeLevel.HIGH, GlucoseRange.DEFAULT_HIGH) }
+            )
 
-                Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            )
 
-                Slider(
-                    value = currentHighSlider,
-                    onValueChange = { currentHighSlider = it },
-                    onValueChangeFinished = { repository.setTargetRange(currentLowSlider, currentHighSlider) },
-                    valueRange = 140f..250f,
-                    modifier = Modifier.fillMaxWidth(),
-                    thumb = {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            shadowElevation = 2.dp
-                        ) {
-                            Text(
-                                text = unit.format(currentHighSlider),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Quick presets (without 140)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    listOf(160f, 180f, 200f, 220f).forEach { preset ->
-                        FilterChip(
-                            selected = kotlin.math.abs(currentHighSlider - preset) < 0.5f,
-                            onClick = {
-                                currentHighSlider = preset
-                                repository.setTargetRange(currentLowSlider, preset)
-                            },
-                            label = { Text(unit.format(preset), fontSize = 11.sp) }
-                        )
-                    }
-                }
-            }
+            RangeSlider(
+                label = stringResource(R.string.status_very_high),
+                description = stringResource(
+                    R.string.loc_range_desc,
+                    stringResource(R.string.tir_range_greater_than, unit.format(range.veryHighMgDl))
+                ),
+                value = pendingVeryHigh,
+                bounds = bounds.getValue(RangeLevel.VERY_HIGH),
+                defaultValue = GlucoseRange.DEFAULT_VERY_HIGH,
+                unit = unit,
+                accent = clinicalColors.veryHigh,
+                onValueChange = { pendingVeryHigh = it },
+                onValueChangeFinished = { commit(RangeLevel.VERY_HIGH, pendingVeryHigh) },
+                onReset = { commit(RangeLevel.VERY_HIGH, GlucoseRange.DEFAULT_VERY_HIGH) }
+            )
         }
 
         // CLINICAL GUIDANCE
         SettingsInfoCard(
             text = stringResource(
                 R.string.target_range_consensus,
-                unit.format(70f),
-                unit.format(180f),
+                unit.format(GlucoseRange.DEFAULT_LOW),
+                unit.format(GlucoseRange.DEFAULT_HIGH),
                 stringResource(unit.labelRes)
             ),
             icon = Icons.Default.Info
+        )
+    }
+}
+
+/**
+ * One band edge: its name, the slice of values it owns, a slider tinted with that band's colour and
+ * a way back to the consensus value. The value sits in the thumb, so there is no separate readout
+ * and no pill next to the title.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RangeSlider(
+    label: String,
+    description: String,
+    value: Float,
+    bounds: ClosedFloatingPointRange<Float>,
+    defaultValue: Float,
+    unit: GlucoseUnit,
+    accent: Color,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
+    onReset: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (abs(value - defaultValue) > 0.5f) {
+                Text(
+                    text = stringResource(R.string.loc_reset),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .clickable(onClick = onReset)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Slider(
+            value = value.coerceIn(bounds.start, bounds.endInclusive),
+            onValueChange = onValueChange,
+            onValueChangeFinished = onValueChangeFinished,
+            valueRange = bounds,
+            colors = SliderDefaults.colors(
+                thumbColor = accent,
+                activeTrackColor = accent,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            thumb = {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = accent,
+                    shadowElevation = 2.dp
+                ) {
+                    Text(
+                        text = unit.format(value),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
         )
     }
 }

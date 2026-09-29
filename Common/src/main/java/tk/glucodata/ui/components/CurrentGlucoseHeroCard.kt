@@ -49,8 +49,6 @@ fun CurrentGlucoseHeroCard(
     deltaReference: DeltaReference?,
     unit: GlucoseUnit,
     sensorName: String? = null,
-    targetLow: Float = 70f,
-    targetHigh: Float = 180f,
     minimalistUnits: Boolean = true,
     modifier: Modifier = Modifier
 ) {

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import tk.glucodata.ui.model.GlucosePoint
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.theme.ClinicalColors
 import tk.glucodata.ui.theme.LocalClinicalColors
 import kotlin.math.max
@@ -51,8 +52,7 @@ import kotlin.math.min
 @Composable
 fun WearMiniGraph(
     readings: List<GlucosePoint>,
-    targetLow: Float = 70f,
-    targetHigh: Float = 180f,
+    range: GlucoseRange = GlucoseRange(),
     modifier: Modifier = Modifier
         .fillMaxWidth()
         .height(72.dp),
@@ -72,10 +72,10 @@ fun WearMiniGraph(
     // Scale to the data instead of a fixed 40..260, which used to flatten anything above 260 against
     // the top edge and made a spike indistinguishable from a plateau.
     val minGl = AXIS_MIN_MGDL
-    val maxGl = remember(series, windowStart, now, targetHigh) {
+    val maxGl = remember(series, windowStart, now, range) {
         val highest = if (series.isEmpty || toIndex < fromIndex) 0f
         else series.maxValueBetween(windowStart, now)
-        axisCeiling(max(highest, targetHigh))
+        axisCeiling(max(highest, range.veryHighMgDl))
     }
 
     val linePath = remember { Path() }
@@ -111,8 +111,8 @@ fun WearMiniGraph(
         }
 
         // 1. Shaded target range band
-        val yTargetLow = yFor(targetLow)
-        val yTargetHigh = yFor(targetHigh)
+        val yTargetLow = yFor(range.lowMgDl)
+        val yTargetHigh = yFor(range.highMgDl)
         val bandTop = yTargetHigh.coerceIn(0f, height)
         val bandBottom = yTargetLow.coerceIn(0f, height)
 
@@ -179,7 +179,7 @@ fun WearMiniGraph(
         }
         if (hasSegment) closeArea(area, previousX, segmentStartX, height)
 
-        val brush = zoneBrush(brushCache, minGl, maxGl, targetLow, targetHigh, clinical, height)
+        val brush = zoneBrush(brushCache, minGl, maxGl, range, clinical, height)
         if (hasSegment) {
             drawPath(path = area, brush = brush, alpha = AREA_ALPHA)
         }
@@ -210,14 +210,13 @@ private fun DrawScope.zoneBrush(
     cache: ZoneBrushCache,
     minGl: Float,
     maxGl: Float,
-    targetLow: Float,
-    targetHigh: Float,
+    range: GlucoseRange,
     palette: ClinicalColors,
     height: Float
 ): Brush {
     val cached = cache.brush
     if (cached != null && cache.height == height && cache.min == minGl && cache.max == maxGl &&
-        cache.low == targetLow && cache.high == targetHigh && cache.palette === palette
+        cache.range == range && cache.palette === palette
     ) {
         return cached
     }
@@ -246,14 +245,14 @@ private fun DrawScope.zoneBrush(
     }
 
     append(0f, palette.veryHigh)
-    append(stopAt(250f), palette.veryHigh)
-    append(stopAt(250f) + eps, palette.high)
-    append(stopAt(targetHigh), palette.high)
-    append(stopAt(targetHigh) + eps, palette.inRange)
-    append(stopAt(targetLow), palette.inRange)
-    append(stopAt(targetLow) + eps, palette.low)
-    append(stopAt(54f), palette.low)
-    append(stopAt(54f) + eps, palette.veryLow)
+    append(stopAt(range.veryHighMgDl), palette.veryHigh)
+    append(stopAt(range.veryHighMgDl) + eps, palette.high)
+    append(stopAt(range.highMgDl), palette.high)
+    append(stopAt(range.highMgDl) + eps, palette.inRange)
+    append(stopAt(range.lowMgDl), palette.inRange)
+    append(stopAt(range.lowMgDl) + eps, palette.low)
+    append(stopAt(range.veryLowMgDl), palette.low)
+    append(stopAt(range.veryLowMgDl) + eps, palette.veryLow)
     append(1f, palette.veryLow)
 
     val colorStops = Array(slot) { index -> positions[index] to requireNotNull(stopColors[index]) }
@@ -262,8 +261,7 @@ private fun DrawScope.zoneBrush(
     cache.height = height
     cache.min = minGl
     cache.max = maxGl
-    cache.low = targetLow
-    cache.high = targetHigh
+    cache.range = range
     cache.palette = palette
     return brush
 }
@@ -274,8 +272,7 @@ private class ZoneBrushCache {
     var height = Float.NaN
     var min = Float.NaN
     var max = Float.NaN
-    var low = Float.NaN
-    var high = Float.NaN
+    var range: GlucoseRange? = null
     var palette: ClinicalColors? = null
 }
 

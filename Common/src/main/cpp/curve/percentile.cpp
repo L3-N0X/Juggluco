@@ -1492,11 +1492,11 @@ static bool writeStatisticsJson(StatisticsWriter &writer,const stats &stat,int u
         unitlabel,statisticsGlucose(stat.mean,unit),stat.EA1Cper,stat.EA1Cmmol,
         stat.GMIper,stat.GMImmol,statisticsGlucose(stat.sd,unit),stat.vc*100.0,
         targetlow,targethigh,targetcount,stat.pertarget*100.0,
-        statisticsGlucose(stats::levels[0]+1,unit),stat.counts[0],stat.pers[0]*100.0,
-        statisticsGlucose(stats::levels[1]+1,unit),statisticsGlucose(stats::levels[0],unit),stat.counts[1],stat.pers[1]*100.0,
-        statisticsGlucose(stats::levels[2]+1,unit),statisticsGlucose(stats::levels[1],unit),stat.counts[2],stat.pers[2]*100.0,
-        statisticsGlucose(stats::levels[3]+1,unit),statisticsGlucose(stats::levels[2],unit),stat.counts[3],stat.pers[3]*100.0,
-        statisticsGlucose(stats::levels[3],unit),stat.counts[4],stat.pers[4]*100.0);
+        statisticsGlucose(stat.levels[0]+1,unit),stat.counts[0],stat.pers[0]*100.0,
+        statisticsGlucose(stat.levels[1]+1,unit),statisticsGlucose(stat.levels[0],unit),stat.counts[1],stat.pers[1]*100.0,
+        statisticsGlucose(stat.levels[2]+1,unit),statisticsGlucose(stat.levels[1],unit),stat.counts[2],stat.pers[2]*100.0,
+        statisticsGlucose(stat.levels[3]+1,unit),statisticsGlucose(stat.levels[2],unit),stat.counts[3],stat.pers[3]*100.0,
+        statisticsGlucose(stat.levels[3],unit),stat.counts[4],stat.pers[4]*100.0);
     }
 
 static bool appendBrowserStatisticsText(StatisticsWriter &writer,std::string_view value,

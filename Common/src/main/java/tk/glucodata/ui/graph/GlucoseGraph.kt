@@ -1,5 +1,6 @@
 package tk.glucodata.ui.graph
 
+import tk.glucodata.ui.model.GlucoseRange
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -35,6 +36,7 @@ import tk.glucodata.ui.theme.LocalClinicalColors
 import tk.glucodata.ui.theme.LocalLogbookColors
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Interactive glucose graph.
@@ -51,8 +53,7 @@ fun GlucoseGraph(
     logs: List<LogRecord> = emptyList(),
     viewportState: GraphViewportState,
     unit: GlucoseUnit = GlucoseUnit.MG_DL,
-    targetLow: Float = 70f,
-    targetHigh: Float = 180f,
+    range: GlucoseRange = GlucoseRange(),
     displayConfig: DisplayConfig = DisplayConfig(),
     alertEvents: List<AlertEvent> = emptyList(),
     onLogEntryClicked: (LogRecord) -> Unit = {},
@@ -86,14 +87,16 @@ fun GlucoseGraph(
     }
     val scratch = remember { GraphScratch() }
 
-    val axisTarget by remember(renderData, displayConfig, targetHigh) {
+    // Headroom has to clear the very high edge, otherwise the top band is drawn off screen and a
+    // run of very high values looks like a flat plateau against the ceiling.
+    val axisTarget by remember(renderData, displayConfig, range) {
         derivedStateOf {
             val highest = renderData.maxValueBetween(
                 viewportState.startTimeMillis,
                 viewportState.endTimeMillis,
                 displayConfig
             )
-            axisCeiling(max(highest, targetHigh + 20f))
+            axisCeiling(max(highest, range.veryHighMgDl + 20f))
         }
     }
     val axisMax = remember { Animatable(axisTarget) }
@@ -233,13 +236,13 @@ fun GlucoseGraph(
                 val windowDuration = viewportState.durationMillis
                 val data = renderData
                 val maxY = axisMax.value
-                val minY = AXIS_MIN
+                val minY = min(AXIS_MIN, range.veryLowMgDl - 10f)
 
                 val metrics = ChartMetrics(size.width, size.height, this)
                 val chart = ChartTransform(metrics, windowStart, windowEnd, minY, maxY, this)
 
-                drawTargetBand(chart, targetLow, targetHigh, targetRangeColor)
-                drawValueAxis(chart, unit, targetLow, targetHigh, gridColor, paints, clinicalColors)
+                drawTargetBand(chart, range, targetRangeColor)
+                drawValueAxis(chart, unit, range, gridColor, paints, clinicalColors)
                 drawTimeAxis(chart, windowDuration, gridColor, dayLineColor, paints)
 
                 if (displayConfig.showHistory) {
@@ -253,8 +256,7 @@ fun GlucoseGraph(
                         chart = chart,
                         series = data.stream,
                         clinicalColors = clinicalColors,
-                        targetLow = targetLow,
-                        targetHigh = targetHigh,
+                        range = range,
                         surfaceColor = surfaceColor,
                         scratch = scratch,
                         showHead = true

@@ -426,6 +426,10 @@ struct Tings {
     GlucoseMeter  glucosemeters[maxglucosemeters];
     uint8_t gs3id[12];
     uint32_t reserved32;
+    /* Outer edges of the very low / very high bands, stored like tlow/thigh as mg/dL * 10.
+       Appended at the end of the struct so existing settings.dat files keep their layout; the
+       mmap file is grown on open and a zero reads as the consensus default. */
+    uint32_t vlow,vhigh;
 
 static bool meterMatch(const struct GlucoseMeter &meter,const std::string_view deviceName,uint8_t *address)  {
     if(address) {
@@ -1081,6 +1085,20 @@ uint32_t targetlow() const {
     }
 uint32_t targethigh() const {
     return data()->thigh;
+    }
+/* Very low / very high band edges. A zero means the file predates these fields, in which case
+   the clinical consensus defaults are reported until something writes them. */
+static constexpr uint32_t defaultverylow=540;   // 54.0 mg/dL
+static constexpr uint32_t defaultveryhigh=2500; // 250.0 mg/dL
+uint32_t verylow() const {
+    return data()->vlow ? data()->vlow : defaultverylow;
+    }
+uint32_t veryhigh() const {
+    return data()->vhigh ? data()->vhigh : defaultveryhigh;
+    }
+void setveryrange(uint32_t vlow,uint32_t vhigh) {
+    data()->vlow=vlow;
+    data()->vhigh=vhigh;
     }
 bool usemmolL() const {
     return data()->unit==1;

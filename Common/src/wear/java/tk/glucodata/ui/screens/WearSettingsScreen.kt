@@ -1,21 +1,17 @@
 package tk.glucodata.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -49,9 +45,8 @@ import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.GlucoseUnit
-import tk.glucodata.ui.theme.WearColorPreset
+import tk.glucodata.ui.model.RangeLevel
 import tk.glucodata.ui.theme.WearThemePreferences
-import tk.glucodata.ui.theme.wearAccentColor
 import kotlin.math.roundToInt
 
 internal data class ThresholdSpec(
@@ -78,6 +73,13 @@ internal fun mgSpec(min: Float, max: Float, smallStep: Float, largeStep: Float, 
 }
 
 private fun round1(value: Float): Float = (value * 10).roundToInt() / 10f
+
+/** Steps that land on round numbers on the watch: 1/5 below 200, 5/10 above it. */
+private fun rangeSpec(bounds: ClosedFloatingPointRange<Float>, unit: GlucoseUnit): ThresholdSpec {
+    val smallStep = if (bounds.endInclusive > 200f) 5f else 1f
+    val largeStep = if (bounds.endInclusive > 200f) 10f else 5f
+    return mgSpec(bounds.start, bounds.endInclusive, smallStep, largeStep, unit)
+}
 
 private fun adjustThreshold(current: Float, delta: Float, spec: ThresholdSpec): Float {
     val stepped = (current + delta).coerceIn(spec.min, spec.max)
@@ -276,12 +278,12 @@ private fun ScalingLazyListScope.wearPresetStepper(
 @Composable
 fun WearSettingsScreen(
     repository: GlucoseRepository,
-    onOpenAlerts: () -> Unit
+    onOpenAlerts: () -> Unit,
+    onOpenAppearance: () -> Unit
 ) {
     val unit by repository.unit.collectAsState()
     val voiceAnnounce by repository.voiceAnnounce.collectAsState()
-    val targetLow by repository.targetLow.collectAsState()
-    val targetHigh by repository.targetHigh.collectAsState()
+    val glucoseRange by repository.range.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
     val hardwareConfig by repository.hardwareConfig.collectAsState()
     val colorPreset by WearThemePreferences.colorPreset.collectAsState()
@@ -291,8 +293,18 @@ fun WearSettingsScreen(
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         action()
     }
-    val targetLowSpec = mgSpec(60f, 110f, 1f, 5f, unit)
-    val targetHighSpec = mgSpec(140f, 250f, 5f, 10f, unit)
+    // Each stepper is bounded by its neighbours, exactly like the phone sliders, so the four cut
+    // points cannot cross no matter which one is turned.
+    val rangeBounds = RangeLevel.entries.associateWith { glucoseRange.sliderBoundsFor(it) }
+    val veryLowSpec = rangeSpec(rangeBounds.getValue(RangeLevel.VERY_LOW), unit)
+    val lowSpec = rangeSpec(rangeBounds.getValue(RangeLevel.LOW), unit)
+    val highSpec = rangeSpec(rangeBounds.getValue(RangeLevel.HIGH), unit)
+    val veryHighSpec = rangeSpec(rangeBounds.getValue(RangeLevel.VERY_HIGH), unit)
+    val targetRangeTitle = stringResource(R.string.loc_target_range)
+    val veryLowLabel = stringResource(R.string.status_very_low)
+    val lowLabel = stringResource(R.string.status_low)
+    val highLabel = stringResource(R.string.status_high)
+    val veryHighLabel = stringResource(R.string.status_very_high)
 
     val listState = rememberScalingLazyListState()
 
@@ -342,33 +354,17 @@ fun WearSettingsScreen(
                 checked = voiceAnnounce,
                 onCheckedChange = { enabled -> tap { repository.setVoiceAnnounce(enabled) } }
             )
+            // Color preset lives on its own screen to keep this list short.
             item {
-                ListSubHeader {
-                    Text("Appearance")
-                }
-            }
-            WearColorPreset.values().forEach { preset ->
-                item {
-                    RadioButton(
-                        selected = colorPreset == preset,
-                        onSelect = { tap { WearThemePreferences.setColorPreset(preset) } },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            wearAccentColor(preset, MaterialTheme.colorScheme.primary)
-                                        )
-                                )
-                                Text(preset.label)
-                            }
-                        }
+                TitleCard(
+                    onClick = onOpenAppearance,
+                    title = { Text("Appearance") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = colorPreset.label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -442,14 +438,32 @@ fun WearSettingsScreen(
             // Target Range Section (editable: drives stats and graph colors)
             item {
                 ListSubHeader {
-                    Text("Target Range")
+                    Text(targetRangeTitle)
                 }
             }
-            wearThresholdStepper(unit.toDisplay(targetLow), targetLowSpec, unit, haptic, "Low target") { value ->
-                tap { repository.setTargetRange(unit.toMgDl(value), targetHigh) }
+            wearThresholdStepper(
+                unit.toDisplay(glucoseRange.veryLowMgDl), veryLowSpec, unit, haptic,
+                veryLowLabel
+            ) { value ->
+                tap { repository.setRangeLevel(RangeLevel.VERY_LOW, unit.toMgDl(value)) }
             }
-            wearThresholdStepper(unit.toDisplay(targetHigh), targetHighSpec, unit, haptic, "High target") { value ->
-                tap { repository.setTargetRange(targetLow, unit.toMgDl(value)) }
+            wearThresholdStepper(
+                unit.toDisplay(glucoseRange.lowMgDl), lowSpec, unit, haptic,
+                lowLabel
+            ) { value ->
+                tap { repository.setRangeLevel(RangeLevel.LOW, unit.toMgDl(value)) }
+            }
+            wearThresholdStepper(
+                unit.toDisplay(glucoseRange.highMgDl), highSpec, unit, haptic,
+                highLabel
+            ) { value ->
+                tap { repository.setRangeLevel(RangeLevel.HIGH, unit.toMgDl(value)) }
+            }
+            wearThresholdStepper(
+                unit.toDisplay(glucoseRange.veryHighMgDl), veryHighSpec, unit, haptic,
+                veryHighLabel
+            ) { value ->
+                tap { repository.setRangeLevel(RangeLevel.VERY_HIGH, unit.toMgDl(value)) }
             }
 
             // Complications Section

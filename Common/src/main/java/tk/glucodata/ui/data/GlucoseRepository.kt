@@ -44,8 +44,8 @@ import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.DisplayConfig
 import tk.glucodata.ui.model.ExchangesConfig
 import tk.glucodata.ui.model.GlucosePoint
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStats
-import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HardwareConfig
 import tk.glucodata.ui.model.LogRecord
@@ -54,6 +54,7 @@ import tk.glucodata.ui.model.MirrorConnection
 import tk.glucodata.ui.model.MirrorHostEditState
 import tk.glucodata.ui.model.NumberStore
 import tk.glucodata.ui.model.NumberStoreSource
+import tk.glucodata.ui.model.RangeLevel
 import tk.glucodata.ui.model.SensorDetail
 import tk.glucodata.ui.model.SensorInfo
 import tk.glucodata.ui.model.SensorState
@@ -66,7 +67,6 @@ import tk.glucodata.ui.model.WearDiagnosticInfo
 import tk.glucodata.ui.model.WearWatchDevice
 import tk.glucodata.ui.sync.DisplaySync
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.roundToInt
 
 sealed interface SensorActivationState {
     data object Idle : SensorActivationState
@@ -157,10 +157,17 @@ class GlucoseRepository(
     private val _unit = MutableStateFlow(GlucoseUnit.MG_DL)
     val unit: StateFlow<GlucoseUnit> = _unit.asStateFlow()
 
-    private val _targetLow = MutableStateFlow(70f)
+    /**
+     * The four configurable band edges. Everything that classifies or colours a reading reads
+     * this, so changing it in settings updates graphs, statistics, widgets and the watch at once.
+     */
+    private val _range = MutableStateFlow(GlucoseRange())
+    val range: StateFlow<GlucoseRange> = _range.asStateFlow()
+
+    private val _targetLow = MutableStateFlow(GlucoseRange.DEFAULT_LOW)
     val targetLow: StateFlow<Float> = _targetLow.asStateFlow()
 
-    private val _targetHigh = MutableStateFlow(180f)
+    private val _targetHigh = MutableStateFlow(GlucoseRange.DEFAULT_HIGH)
     val targetHigh: StateFlow<Float> = _targetHigh.asStateFlow()
 
     private val _selectedTimeRange = MutableStateFlow<TimeRange?>(TimeRange.SIX_HOURS)
@@ -284,16 +291,30 @@ class GlucoseRepository(
         }
     }
 
-    fun setTargetRange(low: Float, high: Float) {
-        _targetLow.value = low
-        _targetHigh.value = high
+    /**
+     * The single write path for the four band edges. Values are sanitized before anything sees
+     * them, persisted to `settings.dat` for the legacy view and the native statistics, and pushed
+     * into every held reading so the graph, logbook and hero recolour immediately.
+     */
+    fun setGlucoseRange(newRange: GlucoseRange) {
+        val sanitized = newRange.normalized()
+        _range.value = sanitized
+        _targetLow.value = sanitized.lowMgDl
+        _targetHigh.value = sanitized.highMgDl
         try {
             if (Applic.Nativesloaded) {
                 val unit = _unit.value
-                Natives.setTargetRange(unit.toDisplay(low), unit.toDisplay(high))
+                Natives.setTargetRange(unit.toDisplay(sanitized.lowMgDl), unit.toDisplay(sanitized.highMgDl))
+                Natives.setVeryRange(unit.toDisplay(sanitized.veryLowMgDl), unit.toDisplay(sanitized.veryHighMgDl))
             }
         } catch (_: Throwable) {}
+        reclassifyReadings()
         requestStatsRecalculation()
+    }
+
+    /** Moves one band edge, keeping the four cut points ordered and separated. */
+    fun setRangeLevel(level: RangeLevel, valueMgDl: Float) {
+        setGlucoseRange(_range.value.withLevel(level, valueMgDl))
     }
 
     private fun readBloodLabelHistory(): Set<Int> {
@@ -368,10 +389,21 @@ class GlucoseRepository(
                 } else {
                     Applic.unit = nativeUnit
                 }
-                val tLow = unit.toMgDl(Natives.targetlow())
-                val tHigh = unit.toMgDl(Natives.targethigh())
-                if (tLow > 0f) _targetLow.value = tLow.roundToInt().toFloat()
-                if (tHigh > 0f) _targetHigh.value = tHigh.roundToInt().toFloat()
+                val storedRange = GlucoseRange(
+                    veryLowMgDl = unit.toMgDl(Natives.verylow()),
+                    lowMgDl = unit.toMgDl(Natives.targetlow()),
+                    highMgDl = unit.toMgDl(Natives.targethigh()),
+                    veryHighMgDl = unit.toMgDl(Natives.veryhigh())
+                ).normalized()
+                if (storedRange != _range.value) {
+                    _range.value = storedRange
+                    _targetLow.value = storedRange.lowMgDl
+                    _targetHigh.value = storedRange.highMgDl
+                    // The range can also be changed outside this process (the legacy settings
+                    // screen, a restored backup), so the held readings have to catch up here too.
+                    reclassifyReadings()
+                    requestStatsRecalculation()
+                }
 
                 // Read Alarms (native getters return display-unit values, see
                 // settings.hpp gconvert/tomgperL, so fallbacks are unit-aware)
@@ -539,6 +571,38 @@ class GlucoseRepository(
         }
     }
 
+    /**
+     * Re-stamps the status of every held reading with the current range. Readings carry their
+     * status so collectors don't have to re-derive it, which means a range change would otherwise
+     * leave the graph markers, logbook rows and hero coloured against the old cut points until the
+     * next full reload. Runs off the main thread; the list can hold six figures of points.
+     */
+    private fun reclassifyReadings() {
+        val range = _range.value
+        val current = _readings.value
+        val currentReading = _currentReading.value
+        scope.launch(Dispatchers.Default) {
+            var changed = false
+            val updated = ArrayList<GlucosePoint>(current.size)
+            for (point in current) {
+                val status = range.statusOf(point.valueMgDl)
+                if (status == point.status) {
+                    updated.add(point)
+                } else {
+                    changed = true
+                    updated.add(point.copy(status = status))
+                }
+            }
+            if (changed) publishReadings(updated)
+            if (currentReading != null) {
+                val status = range.statusOf(currentReading.valueMgDl)
+                if (status != currentReading.status) {
+                    _currentReading.value = currentReading.copy(status = status)
+                }
+            }
+        }
+    }
+
     fun beginSensorActivation() {
         _sensorActivationState.value = SensorActivationState.Waiting
     }
@@ -645,6 +709,9 @@ class GlucoseRepository(
             hash = hash * 31 + point.valueMgDl.toRawBits()
             hash = hash * 31 + (if (point.isCalibrated) 1L else 0L)
             hash = hash * 31 + (if (point.isScan) 1L else 0L)
+            // Status is part of the identity: reclassifying after a range change has to be
+            // publishable, or the graph markers and logbook keep the old colours.
+            hash = hash * 31 + point.status.ordinal.toLong()
         }
         return hash * 31 + readings.size
     }
@@ -653,8 +720,7 @@ class GlucoseRepository(
         val loadedList = ArrayList<GlucosePoint>(INITIAL_READING_CAPACITY)
         // Hoisted out of the read loops: a StateFlow read per point, over six figures of points, is
         // not free and the value cannot change halfway through a single pass.
-        val targetLow = _targetLow.value
-        val targetHigh = _targetHigh.value
+        val range = _range.value
         try {
             if (Applic.Nativesloaded) {
                 // Check latest reading first
@@ -674,7 +740,7 @@ class GlucoseRepository(
                             timestamp = strGl.time * 1000L,
                             valueMgDl = valMgDl,
                             rate = strGl.rate,
-                            status = GlucoseStatus.fromValue(valMgDl, _targetLow.value, _targetHigh.value)
+                            status = range.statusOf(valMgDl)
                         )
                     } else {
                         _currentReading.value = null
@@ -708,7 +774,7 @@ class GlucoseRepository(
                                         isScan = false,
                                         isHistory = false,
                                         isCalibrated = false,
-                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), targetLow, targetHigh)
+                                        status = range.statusOf(mgdL.toFloat())
                                     )
                                 )
                             }
@@ -732,7 +798,7 @@ class GlucoseRepository(
                                         isScan = false,
                                         isHistory = false,
                                         isCalibrated = true,
-                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), targetLow, targetHigh)
+                                        status = range.statusOf(mgdL.toFloat())
                                     )
                                 )
                             }
@@ -756,7 +822,7 @@ class GlucoseRepository(
                                         isScan = true,
                                         isHistory = false,
                                         isCalibrated = false,
-                                        status = GlucoseStatus.fromValue(mgdL.toFloat(), targetLow, targetHigh)
+                                        status = range.statusOf(mgdL.toFloat())
                                     )
                                 )
                             }
@@ -2712,8 +2778,7 @@ class GlucoseRepository(
     private fun recalculateStats() {
         val all = _readings.value
         val period = _statsPeriod.value
-        val low = _targetLow.value
-        val high = _targetHigh.value
+        val range = _range.value
         val now = System.currentTimeMillis()
 
         if (all.isEmpty()) {
@@ -2727,9 +2792,9 @@ class GlucoseRepository(
         val periodStart = lowerBound(all, now - period.durationMillis)
         val toUse = if (periodStart < all.size) all.subList(periodStart, all.size) else all
 
-        _stats.value = GlucoseStats.calculate(toUse, low, high)
+        _stats.value = GlucoseStats.calculate(toUse, range)
 
-        val agpKey = agpCacheKey(toUse, period, low, high)
+        val agpKey = agpCacheKey(toUse, period, range)
         if (agpKey != publishedAgpKey) {
             _agpProfile.value = AgpProfile.calculate(toUse, period)
             publishedAgpKey = agpKey
@@ -2739,13 +2804,12 @@ class GlucoseRepository(
         val screenDuration = _selectedTimeRange.value?.durationMillis ?: (6 * 3600 * 1000L)
         val screenStart = lowerBound(all, now - screenDuration)
         val screenToUse = if (screenStart < all.size) all.subList(screenStart, all.size) else all
-        _screenStats.value = GlucoseStats.calculate(screenToUse, low, high)
+        _screenStats.value = GlucoseStats.calculate(screenToUse, range)
     }
 
     private data class AgpCacheKey(
         val period: StatsPeriod,
-        val low: Float,
-        val high: Float,
+        val range: GlucoseRange,
         val count: Int,
         val firstTimestamp: Long,
         val lastTimestamp: Long,
@@ -2758,8 +2822,7 @@ class GlucoseRepository(
     private fun agpCacheKey(
         toUse: List<GlucosePoint>,
         period: StatsPeriod,
-        low: Float,
-        high: Float
+        range: GlucoseRange
     ): AgpCacheKey {
         var digest = 7L
         for (point in toUse) {
@@ -2767,8 +2830,7 @@ class GlucoseRepository(
         }
         return AgpCacheKey(
             period = period,
-            low = low,
-            high = high,
+            range = range,
             count = toUse.size,
             firstTimestamp = toUse.firstOrNull()?.timestamp ?: 0L,
             lastTimestamp = toUse.lastOrNull()?.timestamp ?: 0L,
@@ -2820,7 +2882,7 @@ class GlucoseRepository(
                                     timestamp = strGl.time * 1000L,
                                     valueMgDl = valMgDl,
                                     rate = strGl.rate,
-                                    status = GlucoseStatus.fromValue(valMgDl, _targetLow.value, _targetHigh.value)
+                                    status = _range.value.statusOf(valMgDl)
                                 )
                                 // A new object with the same time and value would still be unequal to
                                 // the old one, and that is enough to make every collector of

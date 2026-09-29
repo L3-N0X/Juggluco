@@ -43,11 +43,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import tk.glucodata.R
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseUnit
 
 @Composable
 fun SearchGlucoseDialog(
     unit: GlucoseUnit,
+    range: GlucoseRange = GlucoseRange(),
     onDismiss: () -> Unit,
     onExecuteSearch: (under: Float, above: Float, label: Int, keyword: String) -> Unit
 ) {
@@ -56,8 +58,8 @@ fun SearchGlucoseDialog(
     var keywordText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableIntStateOf(-1) } // -1: Any, 0: Bolus, 1: Carbs, 2: Basal, 3: BG
 
-    val defaultLow = unit.format(70f)
-    val defaultHigh = unit.format(180f)
+    val defaultLow = unit.format(range.lowMgDl)
+    val defaultHigh = unit.format(range.highMgDl)
 
     Dialog(
         onDismissRequest = onDismiss,

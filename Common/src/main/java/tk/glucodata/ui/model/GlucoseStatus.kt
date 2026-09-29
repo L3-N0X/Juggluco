@@ -14,14 +14,7 @@ enum class GlucoseStatus(
     VERY_HIGH(R.string.status_very_high, "↑↑");
 
     companion object {
-        fun fromValue(valueMgDl: Float, targetLow: Float = 70f, targetHigh: Float = 180f): GlucoseStatus {
-            return when {
-                valueMgDl < 54f -> VERY_LOW
-                valueMgDl < targetLow -> LOW
-                valueMgDl > 250f -> VERY_HIGH
-                valueMgDl > targetHigh -> HIGH
-                else -> IN_RANGE
-            }
-        }
+        fun fromValue(valueMgDl: Float, range: GlucoseRange = GlucoseRange.DEFAULT): GlucoseStatus =
+            range.statusOf(valueMgDl)
     }
 }

@@ -4,11 +4,11 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 data class GlucoseStats(
-    val timeInRangePercent: Int = 0,    // Target: 70 - 180 mg/dL (Clinical goal > 70%)
-    val timeBelowPercent: Int = 0,      // Low: 54 - 69 mg/dL (Clinical goal < 4%)
-    val timeVeryLowPercent: Int = 0,    // Very Low: < 54 mg/dL (Clinical goal < 1%)
-    val timeAbovePercent: Int = 0,      // High: 181 - 250 mg/dL (Clinical goal < 25%)
-    val timeVeryHighPercent: Int = 0,   // Very High: > 250 mg/dL (Clinical goal < 5%)
+    val timeInRangePercent: Int = 0,    // Target: low - high (Clinical goal > 70%)
+    val timeBelowPercent: Int = 0,      // Low: veryLow - (low - 1)
+    val timeVeryLowPercent: Int = 0,    // Very Low: < veryLow (Clinical goal < 1%)
+    val timeAbovePercent: Int = 0,      // High: (high + 1) - veryHigh
+    val timeVeryHighPercent: Int = 0,   // Very High: > veryHigh (Clinical goal < 5%)
     val averageMgDl: Float = 0f,
     val minMgDl: Float = 0f,
     val maxMgDl: Float = 0f,
@@ -19,7 +19,7 @@ data class GlucoseStats(
     val activeTimePercent: Float = 0f
 ) {
     companion object {
-        fun calculate(readings: List<GlucosePoint>, targetLow: Float = 70f, targetHigh: Float = 180f): GlucoseStats {
+        fun calculate(readings: List<GlucosePoint>, range: GlucoseRange = GlucoseRange.DEFAULT): GlucoseStats {
             if (readings.isEmpty()) return GlucoseStats()
 
             var count = 0
@@ -40,12 +40,12 @@ data class GlucoseStats(
                 if (v < min) min = v
                 if (v > max) max = v
 
-                when {
-                    v < 54f -> veryLowCount++
-                    v < targetLow -> lowCount++
-                    v <= targetHigh -> inRangeCount++
-                    v <= 250f -> highCount++
-                    else -> veryHighCount++
+                when (range.statusOf(v)) {
+                    GlucoseStatus.VERY_LOW -> veryLowCount++
+                    GlucoseStatus.LOW -> lowCount++
+                    GlucoseStatus.IN_RANGE -> inRangeCount++
+                    GlucoseStatus.HIGH -> highCount++
+                    GlucoseStatus.VERY_HIGH -> veryHighCount++
                 }
             }
 

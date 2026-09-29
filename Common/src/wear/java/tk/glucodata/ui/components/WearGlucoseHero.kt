@@ -40,8 +40,6 @@ fun WearGlucoseHero(
     readings: List<GlucosePoint>,
     unit: GlucoseUnit,
     deltaCalculation: DeltaCalculation = DeltaCalculation.ONE_MINUTE,
-    targetLow: Float = 70f,
-    targetHigh: Float = 180f,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {

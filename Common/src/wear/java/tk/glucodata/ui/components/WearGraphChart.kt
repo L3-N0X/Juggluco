@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.theme.ClinicalColors
@@ -49,8 +50,7 @@ internal class WearGraphChartSpec {
     var selectedHours = 3
     var axisMax = 200f
     var unit: GlucoseUnit = GlucoseUnit.MG_DL
-    var targetLow = 70f
-    var targetHigh = 180f
+    var range = GlucoseRange()
 
     /** Index of the inspected point, or -1 for none. */
     var selectedIndex = -1
@@ -162,8 +162,7 @@ internal class WearGraphChartRenderer(
     private var brushBottom = Float.NaN
     private var brushMin = Float.NaN
     private var brushMax = Float.NaN
-    private var brushLow = Float.NaN
-    private var brushHigh = Float.NaN
+    private var brushRange: GlucoseRange? = null
     private var brushPalette: ClinicalColors? = null
 
     // Ring of recently formatted tick labels. Panning advances ticks one step at a time, so this
@@ -206,7 +205,7 @@ internal class WearGraphChartRenderer(
         windowStart = spec.windowStart
         windowSpanMillis = max(1L, spec.windowEnd - spec.windowStart)
         minValue = AXIS_MIN_MGDL
-        maxValue = max(spec.axisMax, spec.targetHigh + 40f)
+        maxValue = max(spec.axisMax, spec.range.veryHighMgDl + 40f)
         valueRange = max(1f, maxValue - minValue)
     }
 
@@ -221,8 +220,8 @@ internal class WearGraphChartRenderer(
     }
 
     private fun DrawScope.drawTargetBand(spec: WearGraphChartSpec, colors: ClinicalColors) {
-        val top = yFor(spec.targetHigh)
-        val bottom = yFor(spec.targetLow)
+        val top = yFor(spec.range.highMgDl)
+        val bottom = yFor(spec.range.lowMgDl)
         drawRect(
             color = colors.targetRangeShade,
             topLeft = Offset(chartLeft, top),
@@ -236,8 +235,8 @@ internal class WearGraphChartRenderer(
         val skipMargin = step * 0.35f
         var axisValue = ceil(minValue / step) * step
         while (axisValue <= maxValue) {
-            if (abs(axisValue - spec.targetLow) > skipMargin &&
-                abs(axisValue - spec.targetHigh) > skipMargin
+            if (abs(axisValue - spec.range.lowMgDl) > skipMargin &&
+                abs(axisValue - spec.range.highMgDl) > skipMargin
             ) {
                 val y = yFor(axisValue)
                 val label = spec.unit.format(axisValue)
@@ -253,8 +252,8 @@ internal class WearGraphChartRenderer(
             axisValue += step
         }
 
-        drawTargetLine(spec, spec.targetLow, axisX)
-        drawTargetLine(spec, spec.targetHigh, axisX)
+        drawTargetLine(spec, spec.range.lowMgDl, axisX)
+        drawTargetLine(spec, spec.range.highMgDl, axisX)
     }
 
     private fun DrawScope.drawTargetLine(spec: WearGraphChartSpec, value: Float, axisX: Float) {
@@ -489,7 +488,7 @@ internal class WearGraphChartRenderer(
         val cached = cachedBrush
         if (cached != null && brushTop == chartTop && brushBottom == chartBottom &&
             brushMin == minValue && brushMax == maxValue &&
-            brushLow == spec.targetLow && brushHigh == spec.targetHigh && brushPalette === palette
+            brushRange == spec.range && brushPalette === palette
         ) {
             return cached
         }
@@ -514,14 +513,14 @@ internal class WearGraphChartRenderer(
         }
 
         append(0f, palette.veryHigh)
-        append(stopAt(250f), palette.veryHigh)
-        append(stopAt(250f) + eps, palette.high)
-        append(stopAt(spec.targetHigh), palette.high)
-        append(stopAt(spec.targetHigh) + eps, palette.inRange)
-        append(stopAt(spec.targetLow), palette.inRange)
-        append(stopAt(spec.targetLow) + eps, palette.low)
-        append(stopAt(54f), palette.low)
-        append(stopAt(54f) + eps, palette.veryLow)
+        append(stopAt(spec.range.veryHighMgDl), palette.veryHigh)
+        append(stopAt(spec.range.veryHighMgDl) + eps, palette.high)
+        append(stopAt(spec.range.highMgDl), palette.high)
+        append(stopAt(spec.range.highMgDl) + eps, palette.inRange)
+        append(stopAt(spec.range.lowMgDl), palette.inRange)
+        append(stopAt(spec.range.lowMgDl) + eps, palette.low)
+        append(stopAt(spec.range.veryLowMgDl), palette.low)
+        append(stopAt(spec.range.veryLowMgDl) + eps, palette.veryLow)
         append(1f, palette.veryLow)
 
         val colorStops = Array(slot) { index -> positions[index] to requireNotNull(stopColors[index]) }
@@ -531,8 +530,7 @@ internal class WearGraphChartRenderer(
         brushBottom = bottom
         brushMin = minValue
         brushMax = maxValue
-        brushLow = spec.targetLow
-        brushHigh = spec.targetHigh
+        brushRange = spec.range
         brushPalette = palette
         return brush
     }

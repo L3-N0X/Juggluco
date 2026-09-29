@@ -10,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import tk.glucodata.ui.screens.WearAlertEditScreen
 import tk.glucodata.ui.screens.WearAlertsScreen
+import tk.glucodata.ui.screens.WearAppearanceScreen
 import tk.glucodata.ui.screens.WearGraphScreen
 import tk.glucodata.ui.screens.WearHomeScreen
 import tk.glucodata.ui.screens.WearQuickLogScreen
@@ -25,6 +26,7 @@ object WearNavRoutes {
     const val SETTINGS = "settings"
     const val ALERTS = "alerts"
     const val ALERT_EDIT = "alertEdit"
+    const val APPEARANCE = "appearance"
 }
 
 @Composable
@@ -78,8 +80,13 @@ fun WearApp(
                 composable(WearNavRoutes.SETTINGS) {
                     WearSettingsScreen(
                         repository = repository,
-                        onOpenAlerts = { navController.navigate(WearNavRoutes.ALERTS) }
+                        onOpenAlerts = { navController.navigate(WearNavRoutes.ALERTS) },
+                        onOpenAppearance = { navController.navigate(WearNavRoutes.APPEARANCE) }
                     )
+                }
+
+                composable(WearNavRoutes.APPEARANCE) {
+                    WearAppearanceScreen()
                 }
 
                 composable(WearNavRoutes.ALERTS) {
