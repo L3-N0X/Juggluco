@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.InvertColors
 import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.RoundedCorner
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Straighten
@@ -598,6 +599,16 @@ private fun TextSection(kind: WidgetKind, config: WidgetConfig, onChange: (Widge
             onValueChange = { onChange(config.copy(textScale = (it / 5f).roundToInt() * 5)) },
             valueRange = 70f..140f
         )
+        if (kind.hasStats) {
+            SettingsSliderRow(
+                title = stringResource(R.string.widget_in_range_size),
+                valueText = "${config.rangeScale}%",
+                icon = Icons.Default.Percent,
+                value = config.rangeScale.toFloat(),
+                onValueChange = { onChange(config.copy(rangeScale = (it / 5f).roundToInt() * 5)) },
+                valueRange = 50f..100f
+            )
+        }
         if (kind == WidgetKind.MINIMAL) {
             SettingsSegmentedRow(title = stringResource(R.string.widget_alignment), icon = Icons.Default.FormatAlignCenter) {
                 Segmented(WidgetAlignment.entries, config.alignment, { onChange(config.copy(alignment = it)) }) { stringResource(it.labelRes) }

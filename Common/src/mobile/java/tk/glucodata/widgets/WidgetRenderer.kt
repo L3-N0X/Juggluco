@@ -671,7 +671,8 @@ class WidgetRenderer(private val context: Context) {
             val labelCap = capHeight(labelTypeface, labelSize)
             val barHeight = (area.height() * 0.1f).coerceIn(dp(6f), dp(12f))
             val gap = labelCap * 0.9f
-            val percentDigit = (area.height() - 2 * labelCap - barHeight - 3 * gap).coerceAtLeast(dp(12f)) * config.textScale.coerceAtMost(100) / 100f
+            val available = (area.height() - 2 * labelCap - barHeight - 3 * gap).coerceAtLeast(dp(12f))
+            val percentDigit = (available * config.rangeScale / 100f).coerceIn(dp(12f), available)
             val percentText = stats?.let { "${(it.inRange * 100f).roundToInt()}%" } ?: "—"
             val percentSize = fitSize(percentText, valueTypeface, percentDigit.coerceAtMost(dp(56f)), area.width())
             val realPercent = capHeight(valueTypeface, percentSize)
@@ -692,12 +693,11 @@ class WidgetRenderer(private val context: Context) {
             if (stats != null) {
                 val lowShare = ((stats.veryLow + stats.low) * 100f).roundToInt()
                 val highShare = ((stats.high + stats.veryHigh) * 100f).roundToInt()
-                val legend = listOf(
-                    context.getString(R.string.widget_stat_low, "$lowShare%"),
-                    context.getString(R.string.widget_stat_high, "$highShare%"),
-                    context.getString(R.string.widget_stat_average, snapshot.unit.format(stats.averageMgDl))
-                ).joinToString("  ·  ")
-                canvas.drawText(ellipsize(legend, labelPaint, area.width()), area.left, y, labelPaint)
+                val legend = "$lowShare%  ·  $highShare%  ·  ${snapshot.unit.format(stats.averageMgDl)}"
+                val legendPaint = textPaint(labelTypeface, palette.contentVariant, labelSize).apply {
+                    textAlign = Paint.Align.CENTER
+                }
+                canvas.drawText(ellipsize(legend, legendPaint, area.width()), area.centerX(), y, legendPaint)
             }
         }
 
