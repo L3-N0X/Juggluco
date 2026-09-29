@@ -569,6 +569,14 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(getSensorStartmsec)(JNIEnv *env, j
     return sdata->hist->getstarttime()*1000LL; 
     }
 
+//starttime in seconds for a sensorptr, for sensors without a streaming/gatt datatptr
+extern "C" JNIEXPORT jlong JNICALL   fromjava(getSensorStartSecs)(JNIEnv *env, jclass cl,jlong sensorptr) {
+    if(!sensorptr)
+        return 0LL;
+    const SensorGlucoseData *sens=reinterpret_cast<const SensorGlucoseData *>(sensorptr);
+    return static_cast<jlong>(sens->getstarttime());
+    }
+
 extern "C" JNIEXPORT jint JNICALL   fromjava(getSerialLength)(JNIEnv *env, jclass cl,jlong dataptr) {
     if(!dataptr)
         return 0;

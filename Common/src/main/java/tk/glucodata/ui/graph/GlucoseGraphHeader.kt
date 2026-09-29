@@ -266,7 +266,7 @@ private fun InspectionSummary(
             val delta = reading.valueMgDl - reading.previousValueMgDl
             val sign = if (delta >= 0f) "+" else "-"
             Text(
-                text = stringResource(R.string.graph_delta_minutes, sign, unit.format(abs(delta)), reading.deltaMinutes),
+                text = stringResource(R.string.graph_delta, sign, unit.format(abs(delta))),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

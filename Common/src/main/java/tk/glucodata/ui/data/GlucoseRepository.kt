@@ -849,7 +849,6 @@ class GlucoseRepository(
                                 endTime = end,
                                 lastReadingTime = if (info.isConnected) lastKnownReading else 0L,
                                 warmupMinutes = info.warmupMinutes,
-                                minWarmupMinutes = info.minWarmupMinutes,
                                 isConnected = info.isConnected,
                                 isStreaming = info.isStreaming,
                                 isHidden = info.isHidden,
@@ -884,8 +883,7 @@ class GlucoseRepository(
                             if (ptr == 0L) continue
                             val name = Natives.namefromSensorptr(ptr) ?: "Sensor"
                             val infoText = Natives.sensortextfromSensorptr(ptr) ?: ""
-                            val warmup = try { Natives.getManualWarmupMinutes(ptr) } catch (_: Throwable) { 60 }
-                            val minWarmup = try { Natives.getMinimalWarmup(ptr) } catch (_: Throwable) { 60 }
+                            val warmup = SensorBridge.warmupMinutes(ptr)
                             val isHidden = try { Natives.getHidefromSensorptr(ptr) } catch (_: Throwable) { false }
                             val hasCali = try { Natives.calibrateNR(ptr, 0) > 0 || Natives.calibrateNR(ptr, 1) > 0 } catch (_: Throwable) { false }
 
@@ -897,7 +895,15 @@ class GlucoseRepository(
                                     end = expectedSec * 1000L
                                 }
                             } catch (_: Throwable) {}
-                            val start = if (end > 0L) end - 14 * 24 * 3600 * 1000L else 0L
+                            // The real start time, never derived from the end time: sensors are 7, 10,
+                            // 14, 15 and 22 days long, so a "end minus 14 days" guess puts a fresh
+                            // 15 day sensor in the future and made the warmup countdown read ~1450 min.
+                            val start = try {
+                                val secs = Natives.getSensorStartSecs(ptr)
+                                if (secs > 0L) secs * 1000L else 0L
+                            } catch (_: Throwable) {
+                                0L
+                            }
 
                             detailsList.add(
                                 SensorDetail(
@@ -914,7 +920,6 @@ class GlucoseRepository(
                                     endTime = end,
                                     lastReadingTime = lastKnownReading,
                                     warmupMinutes = warmup,
-                                    minWarmupMinutes = minWarmup,
                                     isConnected = true,
                                     isStreaming = true,
                                     isMirrored = mirroredSensorSource,
@@ -1474,19 +1479,6 @@ class GlucoseRepository(
     }
 
     // --- SENSOR ACTIONS (UX Overhaul) ---
-
-    fun setWarmupMinutes(sensorPtr: Long, minutes: Int) {
-        _sensorDetails.value = _sensorDetails.value.map {
-            if (it.sensorPtr == sensorPtr || sensorPtr == 0L) it.copy(warmupMinutes = minutes) else it
-        }
-        scope.launch(Dispatchers.IO) {
-            try {
-                if (Applic.Nativesloaded && sensorPtr != 0L) {
-                    Natives.setManualWarmupMinutes(sensorPtr, minutes)
-                }
-            } catch (_: Throwable) {}
-        }
-    }
 
     fun setSensorHidden(sensorPtr: Long, hidden: Boolean) {
         _sensorDetails.value = _sensorDetails.value.map {

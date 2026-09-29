@@ -6,8 +6,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -29,25 +30,20 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.Text
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-private const val DIAL_START_ANGLE = 135f
-private const val DIAL_SWEEP_TOTAL = 270f
-
 /**
- * Spotify-style circular dial for Wear Quick log.
+ * Circular dial for Wear Quick log, drawn along the edge of the screen.
  *
  * - Crown (rotary encoder) adjusts [value] by [step].
- * - Touch: spin the ring with a circular drag gesture.
- * - Visual: 270-degree progress ring with a knob, themed with Material3 tokens.
+ * - Touch: spin the ring with a circular drag gesture that starts on the ring.
+ * - Visual: progress ring with a knob, open at the bottom ([sweepAngle] < 360) so an edge
+ *   button fits in the gap. Everything else on the screen goes in [content], inside the ring.
  */
 @Composable
 fun WearQuickLogDial(
@@ -55,11 +51,12 @@ fun WearQuickLogDial(
     range: ClosedFloatingPointRange<Float>,
     step: Float,
     onValueChange: (Float) -> Unit,
-    displayText: String,
-    labelText: String,
+    stateDescription: String,
+    contentDescription: String,
     modifier: Modifier = Modifier,
     accentColor: Color = MaterialTheme.colorScheme.primary,
-    contentDescription: String = labelText
+    sweepAngle: Float = 270f,
+    content: @Composable BoxScope.() -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val focusRequester = remember { FocusRequester() }
@@ -96,21 +93,22 @@ fun WearQuickLogDial(
     val degreesPerStep = (3f * 360f / totalSteps).coerceIn(4f, 25f)
 
     val trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
-    val progressColor = accentColor
-    val knobOuter = accentColor
     val knobInner = MaterialTheme.colorScheme.surfaceContainerLow
-    val valueColor = MaterialTheme.colorScheme.onSurface
-    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val startAngle = 90f + (360f - sweepAngle) / 2f
 
     val density = LocalDensity.current
-    val strokePx = with(density) { 10.dp.toPx() }
+    val strokePx = with(density) { 8.dp.toPx() }
+    val knobRadiusPx = with(density) { 9.dp.toPx() }
+    // The knob must stay on screen, so the ring sits just inside the edge by the knob's radius.
+    val ringInsetPx = knobRadiusPx + with(density) { 1.dp.toPx() }
+    // Touches this far inside the ring still grab it; anything further in belongs to [content].
+    val grabBandPx = with(density) { 22.dp.toPx() }
 
     BoxWithConstraints(
         modifier = modifier
-            .size(168.dp)
             .semantics {
                 this.contentDescription = contentDescription
-                this.stateDescription = displayText
+                this.stateDescription = stateDescription
             }
             .focusRequester(focusRequester)
             .focusable()
@@ -130,29 +128,29 @@ fun WearQuickLogDial(
                 y = maxHeight.toPx() / 2f
             )
         }
+        val ringRadiusPx = with(density) { minOf(maxWidth, maxHeight).toPx() } / 2f - ringInsetPx
 
         fun angleOf(position: Offset): Float {
             val dx = position.x - centerPx.x
             val dy = position.y - centerPx.y
-            return Math.toDegrees(atan2(dy.toDouble(), dx.toDouble()).toFloat().toDouble()).toFloat()
+            return Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
         }
 
         Box(
             modifier = Modifier
-                .size(168.dp)
-                .pointerInput(step, range, centerPx, degreesPerStep) {
+                .fillMaxSize()
+                .pointerInput(step, range, centerPx, ringRadiusPx, degreesPerStep) {
                     val touchSlopPx = with(density) { 8.dp.toPx() }
-                    val dialRadiusPx = minOf(maxWidth.toPx(), maxHeight.toPx()) / 2f
-                    val ringInnerRadiusPx = dialRadiusPx * 0.6f
 
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        focusRequester.requestFocus()
                         val downRadiusPx = kotlin.math.hypot(
                             down.position.x - centerPx.x,
                             down.position.y - centerPx.y
                         )
-                        val startedOnRing = downRadiusPx >= ringInnerRadiusPx
+                        val startedOnRing = downRadiusPx >= ringRadiusPx - grabBandPx
+                        if (!startedOnRing) return@awaitEachGesture
+                        focusRequester.requestFocus()
                         var totalDistance = 0f
                         var totalAngle = 0f
                         var isAdjusting = false
@@ -175,9 +173,9 @@ fun WearQuickLogDial(
                             totalAngle += angleDelta
                             previousPosition = change.position
 
-                            val angularDistance = kotlin.math.abs(totalAngle) * dialRadiusPx
+                            val angularDistance = Math.toRadians(kotlin.math.abs(totalAngle).toDouble())
+                                .toFloat() * ringRadiusPx
                             if (!isAdjusting &&
-                                startedOnRing &&
                                 totalDistance > touchSlopPx &&
                                 angularDistance > totalDistance * 0.6f
                             ) {
@@ -207,20 +205,18 @@ fun WearQuickLogDial(
             val fraction = ((value - range.start) / (range.endInclusive - range.start))
                 .coerceIn(0f, 1f)
 
-            Canvas(modifier = Modifier.size(168.dp)) {
-                val diameter = size.minDimension
-                val ringRadius = diameter / 2f - strokePx / 2f - 8.dp.toPx()
+            Canvas(modifier = Modifier.fillMaxSize()) {
                 val arcTopLeft = Offset(
-                    center.x - ringRadius,
-                    center.y - ringRadius
+                    center.x - ringRadiusPx,
+                    center.y - ringRadiusPx
                 )
-                val arcSize = androidx.compose.ui.geometry.Size(ringRadius * 2f, ringRadius * 2f)
+                val arcSize = Size(ringRadiusPx * 2f, ringRadiusPx * 2f)
 
                 // Track
                 drawArc(
                     color = trackColor,
-                    startAngle = DIAL_START_ANGLE,
-                    sweepAngle = DIAL_SWEEP_TOTAL,
+                    startAngle = startAngle,
+                    sweepAngle = sweepAngle,
                     useCenter = false,
                     topLeft = arcTopLeft,
                     size = arcSize,
@@ -229,9 +225,9 @@ fun WearQuickLogDial(
                 // Progress
                 if (fraction > 0f) {
                     drawArc(
-                        color = progressColor,
-                        startAngle = DIAL_START_ANGLE,
-                        sweepAngle = DIAL_SWEEP_TOTAL * fraction,
+                        color = accentColor,
+                        startAngle = startAngle,
+                        sweepAngle = sweepAngle * fraction,
                         useCenter = false,
                         topLeft = arcTopLeft,
                         size = arcSize,
@@ -239,15 +235,14 @@ fun WearQuickLogDial(
                     )
                 }
                 // Knob at the tip of the progress arc
-                val knobAngleDeg = DIAL_START_ANGLE + DIAL_SWEEP_TOTAL * fraction
-                val knobAngleRad = Math.toRadians(knobAngleDeg.toDouble())
+                val knobAngleRad = Math.toRadians((startAngle + sweepAngle * fraction).toDouble())
                 val knobCenter = Offset(
-                    x = center.x + ringRadius * cos(knobAngleRad).toFloat(),
-                    y = center.y + ringRadius * sin(knobAngleRad).toFloat()
+                    x = center.x + ringRadiusPx * cos(knobAngleRad).toFloat(),
+                    y = center.y + ringRadiusPx * sin(knobAngleRad).toFloat()
                 )
                 drawCircle(
-                    color = knobOuter,
-                    radius = 9.dp.toPx(),
+                    color = accentColor,
+                    radius = knobRadiusPx,
                     center = knobCenter
                 )
                 drawCircle(
@@ -257,22 +252,7 @@ fun WearQuickLogDial(
                 )
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = displayText,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = valueColor,
-                    maxLines = 1
-                )
-                Text(
-                    text = labelText,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = labelColor,
-                    maxLines = 1
-                )
-            }
+            content()
         }
     }
 }

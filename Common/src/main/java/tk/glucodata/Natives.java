@@ -842,6 +842,7 @@ public static native int getinterval( );
 public static native boolean getpostTreatments( );
 public static native void setpostTreatments(boolean val);
 public static native long getSensorStartmsec(long dataptr);
+public static native long getSensorStartSecs(long sensorptr);
 //public static native void setnightscoutV3(boolean val);
 public static native boolean getnightscoutV3( );
 public static native long streamfromSensorptr(long sensorptr,int pos);

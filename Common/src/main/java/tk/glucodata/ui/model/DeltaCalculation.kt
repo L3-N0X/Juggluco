@@ -145,9 +145,6 @@ enum class DeltaCalculation(
 
 /**
  * The reading a delta is measured against, plus the real distance in time to it.
- *
- * [elapsedMillis] is the truth behind the number on screen, which is why the UI labels the delta
- * with [minutes] rather than with the setting the user picked.
  */
 data class DeltaReference(
     val reading: GlucosePoint,

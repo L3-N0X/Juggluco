@@ -59,7 +59,6 @@ data class SensorDetail(
     val endTime: Long = 0L,
     val lastReadingTime: Long = 0L,
     val warmupMinutes: Int = 60,
-    val minWarmupMinutes: Int = 60,
     val isConnected: Boolean = false,
     val isStreaming: Boolean = false,
     val isHidden: Boolean = false,
@@ -82,10 +81,9 @@ data class SensorDetail(
 
     val progressPercent: Float
         get() {
-            val effectiveStart = if (startTime > 0L) startTime else if (endTime > 0L) endTime - 14 * 24 * 3600 * 1000L else 0L
-            if (endTime <= effectiveStart || effectiveStart <= 0L) return 0f
-            val total = (endTime - effectiveStart).toFloat()
-            val elapsed = (System.currentTimeMillis() - effectiveStart).toFloat()
+            if (startTime <= 0L || endTime <= startTime) return 0f
+            val total = (endTime - startTime).toFloat()
+            val elapsed = (System.currentTimeMillis() - startTime).toFloat()
             return (elapsed / total).coerceIn(0f, 1f)
         }
 
@@ -118,9 +116,8 @@ data class SensorDetail(
     val warmupRemainingMinutes: Int
         get() {
             if (startTime <= 0L) return 0
-            val elapsedMinutes = ((System.currentTimeMillis() - startTime) / (60 * 1000L)).toInt()
-            val remaining = warmupMinutes - elapsedMinutes
-            return remaining.coerceAtLeast(0)
+            val elapsedMinutes = ((System.currentTimeMillis() - startTime) / (60 * 1000L)).coerceAtLeast(0L)
+            return (warmupMinutes - elapsedMinutes).coerceIn(0L, warmupMinutes.toLong()).toInt()
         }
 
     val isCurrentlyWarmingUp: Boolean

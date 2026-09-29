@@ -1214,8 +1214,7 @@
     <string name="search_notes_food">Notes or food name</string>
     <string name="search_food_examples">e.g. Pizza, Coffee, Exercise</string>
     <string name="agp_hour_inspection">Median: %1$s • IQR: %2$s–%3$s</string>
-    <string name="delta_interval_suffix"> (%1$d min)</string>
-    <string name="graph_delta_minutes">Δ%1$s%2$s · %3$d min</string>
+    <string name="graph_delta">Δ%1$s%2$s</string>
     <string name="duration_label">Duration</string>
     <string name="duration_hours">Hours</string>
     <string name="duration_days_value">%1$s days</string>

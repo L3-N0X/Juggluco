@@ -51,14 +51,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -113,7 +111,6 @@ fun SensorsScreen(
         if (activeSensor != null) {
             OverhauledSensorCard(
                 sensor = activeSensor,
-                onWarmupChanged = { minutes -> repository.setWarmupMinutes(activeSensor.sensorPtr, minutes) },
                 onHideToggled = { hidden -> repository.setSensorHidden(activeSensor.sensorPtr, hidden) },
                 onUseAgain = {
                     repository.useSensorAgain(activeSensor.sensorPtr, context as? Activity)
@@ -339,7 +336,6 @@ private fun NfcScanBanner(onScanClick: () -> Unit) {
 @Composable
 private fun OverhauledSensorCard(
     sensor: SensorDetail,
-    onWarmupChanged: (Int) -> Unit,
     onHideToggled: (Boolean) -> Unit,
     onUseAgain: () -> Unit,
     onForgetAndRescan: () -> Unit,
@@ -349,7 +345,6 @@ private fun OverhauledSensorCard(
     val clinicalColors = LocalClinicalColors.current
     val context = LocalContext.current
     var showDiagnostics by remember { mutableStateOf(false) }
-    var warmupSliderValue by remember(sensor.warmupMinutes) { mutableFloatStateOf(sensor.warmupMinutes.toFloat()) }
 
     val statusColor = when (sensor.status) {
         SensorStatus.CONNECTED_STREAMING -> if (sensor.isMirrored) MaterialTheme.colorScheme.secondary else clinicalColors.inRange
@@ -710,47 +705,6 @@ private fun OverhauledSensorCard(
                         if (sensor.hasCalibration) R.string.sensor_user_calibrated else R.string.sensor_factory_calibration
                     )
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Warmup Period Adjuster (Advanced, kept here for parity with Sensors.java)
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = stringResource(R.string.sensor_warmup_stabilization),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = pluralStringResource(
-                                R.plurals.sensor_minutes_short,
-                                warmupSliderValue.toInt(),
-                                warmupSliderValue.toInt()
-                            ),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Slider(
-                        value = warmupSliderValue,
-                        onValueChange = { warmupSliderValue = it },
-                        onValueChangeFinished = { onWarmupChanged(warmupSliderValue.toInt()) },
-                        valueRange = sensor.minWarmupMinutes.toFloat()..180f,
-                        steps = 11
-                    )
-                    Text(
-                        text = stringResource(R.string.sensor_warmup_adjustment_help),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
 
                 // Processed & Aligned Diagnostic Entries
                 val diagItems = remember(sensor.rawDiagnosticText) { parseDiagnosticLog(sensor.rawDiagnosticText) }

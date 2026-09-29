@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
@@ -47,18 +49,14 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.ScalingLazyListAnchorType
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
-import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CompactButton
+import androidx.wear.compose.material3.EdgeButton
+import androidx.wear.compose.material3.EdgeButtonSize
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
-import androidx.wear.compose.material3.TimeText
 import tk.glucodata.R
 import tk.glucodata.ui.components.WearQuickLogDial
 import tk.glucodata.ui.data.GlucoseRepository
@@ -70,6 +68,12 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 private val CategoryPickerHeight = 42.dp
+
+// Leaves the bottom of the ring open for the Save edge button.
+private const val DialSweepAngle = 230f
+
+// Extra-small edge button height plus a small gap above it.
+private val EdgeButtonReserve = 50.dp
 
 private val CategoryLabelSizes = listOf(12.sp, 11.sp, 10.sp, 9.sp)
 
@@ -137,10 +141,6 @@ fun WearQuickLogScreen(
     }
 
     val haptic = LocalHapticFeedback.current
-    val listState = rememberScalingLazyListState(
-        initialCenterItemIndex = 0,
-        initialCenterItemScrollOffset = 0
-    )
 
     val carbsLabel = stringResource(R.string.log_pick_carbs)
     val bolusLabel = stringResource(R.string.log_pick_bolus)
@@ -155,157 +155,116 @@ fun WearQuickLogScreen(
         )
     }
 
-    ScreenScaffold(
-        scrollState = listState,
-        timeText = { TimeText() }
-    ) {
-        ScalingLazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = listState,
-            anchorType = ScalingLazyListAnchorType.ItemStart,
-            autoCentering = null,
-            rotaryScrollableBehavior = RotaryScrollableDefaults.behavior(scrollableState = listState),
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            item {
-                SemicircleCategoryPicker(
-                    categories = categories,
-                    selected = selectedType,
-                    onSelect = { type ->
-                        selectedType = type
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    }
-                )
-            }
+    // Everything fits on one screen: the dial runs along the edge, the picker, value and
+    // steppers sit inside it, and Save is an edge button in the ring's bottom gap. A scrolling
+    // list does not work here because the dial owns both the crown and drags on the ring.
+    ScreenScaffold(timeText = {}) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val diameter = minOf(maxWidth, maxHeight)
 
-            // Circular rotary dial: crown + spin-the-ring to adjust
-            item {
-                WearQuickLogDial(
-                    value = value,
-                    range = spec.min..spec.max,
-                    step = spec.smallStep,
-                    onValueChange = { value = it },
-                    displayText = displayText,
-                    labelText = labelText,
-                    accentColor = typeColors.primary,
-                    contentDescription = stringResource(selectedType.labelRes)
-                )
-            }
-
-            item {
-                Text(
-                    text = stringResource(R.string.log_dial_hint),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-
-            // Stepper buttons with clear font size
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically
+            WearQuickLogDial(
+                value = value,
+                range = spec.min..spec.max,
+                step = spec.smallStep,
+                onValueChange = { value = it },
+                stateDescription = displayText,
+                contentDescription = stringResource(selectedType.labelRes),
+                accentColor = typeColors.primary,
+                sweepAngle = DialSweepAngle,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = diameter * 0.1f, bottom = EdgeButtonReserve),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    CompactButton(
-                        onClick = {
-                            adjust(-spec.largeStep)
+                    SemicircleCategoryPicker(
+                        categories = categories,
+                        selected = selectedType,
+                        onSelect = { type ->
+                            selectedType = type
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
+                        modifier = Modifier.width(diameter * 0.7f)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "-${formatStep(spec.largeStep)}",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            text = displayText,
+                            fontSize = if (diameter < 200.dp) 24.sp else 30.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = labelText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
                         )
                     }
 
-                    CompactButton(
-                        onClick = {
-                            adjust(-spec.smallStep)
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
+                    // Narrower than the picker: the row sits lower, where the ring closes in.
+                    Row(
+                        modifier = Modifier.width(diameter * 0.66f),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        Text(
-                            text = "-${formatStep(spec.smallStep)}",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    CompactButton(
-                        onClick = {
-                            adjust(spec.smallStep)
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
-                    ) {
-                        Text(
-                            text = "+${formatStep(spec.smallStep)}",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    CompactButton(
-                        onClick = {
-                            adjust(spec.largeStep)
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
-                    ) {
-                        Text(
-                            text = "+${formatStep(spec.largeStep)}",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        listOf(-spec.largeStep, -spec.smallStep, spec.smallStep, spec.largeStep).forEach { delta ->
+                            CompactButton(
+                                onClick = {
+                                    adjust(delta)
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(0.dp),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                            ) {
+                                Text(
+                                    text = (if (delta < 0f) "-" else "+") + formatStep(kotlin.math.abs(delta)),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            // Save Action (standard Wear M3 Button)
-            item {
-                Button(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        val rawValue = if (selectedType == LogType.BLOOD_GLUCOSE && unit == GlucoseUnit.MMOL_L) {
-                            unit.toMgDl(value)
-                        } else {
-                            value
-                        }
-                        repository.addLogEntry(selectedType, rawValue, "")
-                        onSaved()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = typeColors.primary,
-                        contentColor = typeColors.container,
-                        iconColor = typeColors.container
-                    ),
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(ButtonDefaults.IconSize)
-                        )
-                    },
-                    label = {
-                        Text(stringResource(R.string.save))
+            EdgeButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    val rawValue = if (selectedType == LogType.BLOOD_GLUCOSE && unit == GlucoseUnit.MMOL_L) {
+                        unit.toMgDl(value)
+                    } else {
+                        value
                     }
+                    repository.addLogEntry(selectedType, rawValue, "")
+                    onSaved()
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+                buttonSize = EdgeButtonSize.ExtraSmall,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = typeColors.primary,
+                    contentColor = typeColors.container,
+                    iconColor = typeColors.container
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = stringResource(R.string.save)
                 )
             }
         }
@@ -334,7 +293,8 @@ private fun formatStep(step: Float): String {
 private fun SemicircleCategoryPicker(
     categories: List<QuickLogCategory>,
     selected: LogType,
-    onSelect: (LogType) -> Unit
+    onSelect: (LogType) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     if (categories.isEmpty()) return
 
@@ -345,9 +305,7 @@ private fun SemicircleCategoryPicker(
     val baseStyle = MaterialTheme.typography.labelMedium
 
     BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(CategoryPickerHeight)
+        modifier = modifier.height(CategoryPickerHeight)
     ) {
         val widthPx = with(density) { maxWidth.toPx() }
         val heightPx = with(density) { CategoryPickerHeight.toPx() }

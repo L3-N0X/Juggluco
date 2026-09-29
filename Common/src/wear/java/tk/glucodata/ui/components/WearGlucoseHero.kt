@@ -72,13 +72,6 @@ fun WearGlucoseHero(
             }
         } else null
     }
-    // Label the window the number really covers, so a delta is never mistaken for a shorter one.
-    val deltaSuffix = if (deltaReference != null) {
-        stringResource(R.string.delta_interval_suffix, deltaReference.minutes)
-    } else {
-        ""
-    }
-
     // Time elapsed string
     val timeAgo = remember(currentReading?.timestamp) {
         val ts = currentReading?.timestamp ?: return@remember "--"
@@ -142,7 +135,7 @@ fun WearGlucoseHero(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "Δ $deltaText$deltaSuffix",
+                        text = "Δ $deltaText",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface

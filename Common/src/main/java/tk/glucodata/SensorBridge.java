@@ -19,9 +19,25 @@ public class SensorBridge {
         public String handshakeStr;
         public String infoHtml;
         public int warmupMinutes;
-        public int minWarmupMinutes;
         public boolean isHidden;
         public boolean hasCalibration;
+    }
+
+    /**
+     * Warmup length that applies to a sensor, in minutes. The stored manual warmup wins when it is
+     * set (SiBionics/AidexX ship with 45/15), otherwise the sensor's own warmup is used, which is
+     * what the glucose curve shows. Never guess a wear duration from the end time here: the
+     * sensors are not all 14 days.
+     */
+    public static int warmupMinutes(long sensorptr) {
+        if (sensorptr == 0L) return 60;
+        try {
+            int manual = Natives.getManualWarmupMinutes(sensorptr);
+            if (manual > 0) return manual;
+            int own = Natives.getMinimalWarmup(sensorptr);
+            if (own > 0) return own;
+        } catch (Throwable ignored) {}
+        return 60;
     }
 
     public static List<RawGattInfo> getActiveGattSensors() {
@@ -46,13 +62,11 @@ public class SensorBridge {
                     info.infoHtml = gatt.getinfo() != null ? gatt.getinfo() : "";
 
                     if (info.sensorptr != 0L) {
-                        info.warmupMinutes = Natives.getManualWarmupMinutes(info.sensorptr);
-                        info.minWarmupMinutes = Natives.getMinimalWarmup(info.sensorptr);
+                        info.warmupMinutes = warmupMinutes(info.sensorptr);
                         info.isHidden = Natives.getHidefromSensorptr(info.sensorptr);
                         info.hasCalibration = Natives.calibrateNR(info.sensorptr, 0) > 0 || Natives.calibrateNR(info.sensorptr, 1) > 0;
                     } else {
                         info.warmupMinutes = 60;
-                        info.minWarmupMinutes = 60;
                         info.isHidden = false;
                         info.hasCalibration = false;
                     }
