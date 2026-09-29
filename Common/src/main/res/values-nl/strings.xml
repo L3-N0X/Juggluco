@@ -501,6 +501,12 @@
     <string name="transport_needs_label">Label noodzakelijk bij directe Bluetooth en messages</string>
 <string name="transport_needs_password">Watchwoord noodzakelijk bij directe Bluetooth</string>
 
+    <string name="settings_language_desc">Selecteer de app-taal</string>
+    <string name="settings_language_system_default">Systeemstandaard</string>
+    <string name="settings_language_dialog_title">Taal selecteren</string>
+    <string name="settings_language_search_hint">Zoek taal…</string>
+    <string name="settings_language_no_results">Geen overeenkomende talen gevonden</string>
+    <string name="settings_language_follow_system">Apparaattaal volgen</string>
 <string name="use_for_numbers">Nummers</string>
 <string name="garmin_watch_app_id">Garmin Watch app ID:</string>
 <string name="garmin_id_length">De ID moet 32 tekens lang zijn (nu %1$d)</string>

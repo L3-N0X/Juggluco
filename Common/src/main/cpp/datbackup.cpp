@@ -717,19 +717,15 @@ void TCPConnect::passivesender(passhost_t *pass,int &recsock,int oldrecsock)  {
 
 
 bool getpassive(int pos) {
-    if(pos<backup->getupdatedata()->hostnr)  {
-        const auto &host=backup->getupdatedata()->allhosts[pos];
-        return host.getPassive();
-        }
-    return false;
+    if(!backup || pos<0 || pos>=backup->getupdatedata()->hostnr) return false;
+    const auto &host=backup->getupdatedata()->allhosts[pos];
+    return host.getPassive();
     }
 bool getactive(int pos) {
-    if(pos<backup->getupdatedata()->hostnr)  {
-        const auto &host=backup->getupdatedata()->allhosts[pos];
-        LOGGER("receivefrom=%d sendpassive=%d activereceive=%d\n",host.receivefrom,host.sendpassive,host.activereceive);
-        return host.getActive();
-        }
-    return false;
+    if(!backup || pos<0 || pos>=backup->getupdatedata()->hostnr) return false;
+    const auto &host=backup->getupdatedata()->allhosts[pos];
+    LOGGER("receivefrom=%d sendpassive=%d activereceive=%d\n",host.receivefrom,host.sendpassive,host.activereceive);
+    return host.getActive();
     }
     /*
 updateone &getsendto(int index) {

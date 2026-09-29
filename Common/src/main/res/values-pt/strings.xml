@@ -253,6 +253,12 @@
     <string name="webdeletefailed">Não foi possível excluir %1$s</string>
     <string name="webdirectoryempty">Este diretório está vazio</string>
     <string name="webdirectoryentry">[diretório] %1$s</string>
+    <string name="settings_language_desc">Selecionar idioma do aplicativo</string>
+    <string name="settings_language_system_default">Padrão do sistema</string>
+    <string name="settings_language_dialog_title">Selecionar idioma</string>
+    <string name="settings_language_search_hint">Pesquisar idioma…</string>
+    <string name="settings_language_no_results">Nenhum idioma correspondente encontrado</string>
+    <string name="settings_language_follow_system">Seguir o idioma do dispositivo</string>
 </resources>
 
 

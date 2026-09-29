@@ -224,6 +224,12 @@ override fun onCapabilityChanged(cap: CapabilityInfo) {
                 Log.d(LOG_ID, "sendmessage nodes=null")
                 scope.launch {
                 findWearDevicesWithApp()
+                // An alert must not be lost while the nodes are still unknown.
+                if(path==ALERTS_PATH)
+                    nodes?.forEach { node ->
+                        if(node.id !in bleTargets)
+                            nameSendMessage(node.id,path,data)
+                        }
                 }
             }
             nodes?.isEmpty() == true -> {
@@ -273,6 +279,10 @@ private fun nameSendMessage(name:String, path:String, data:ByteArray) {
                 else mirrorLabelForNode(name)?.takeIf { available(it) }
             if(bleLabel!=null)
                 return BleMirror.send(bleLabel,path,data)
+            // Alerts cannot wait for the data carrier: when BLE is not ready,
+            // Play services is the only way to reach the other device now.
+            if(path==ALERTS_PATH)
+                return nameSendMessageResultDirect(mirrorNodes[name]?:name,path,data)
         }
         if(BleMirror.isPeer(name)) {
             if(BleMirror.isConfiguredPeer(name)) {
@@ -449,9 +459,11 @@ companion object {
     const val MESSAGES_ACK_PATH = "/messagesack"
     const val MIRROR_TRANSPORT_PATH = "/mirrortransport"
     const val MIRROR_TRANSPORT_ACK_PATH = "/mirrortransportack"
+    const val ALERTS_PATH = tk.glucodata.alerts.AlertSync.PATH
+    const val DISPLAY_SETTINGS_PATH = tk.glucodata.ui.sync.DisplaySync.PATH
     fun isWearControlPath(path:String):Boolean = when(path) {
         START_PATH, ASKFORSTART_PATH, DEFAULTS_PATH, SETTINGS_PATH,
-        BLUETOOTH_PATH, UNPAIR_PATH -> true
+        BLUETOOTH_PATH, UNPAIR_PATH, ALERTS_PATH, DISPLAY_SETTINGS_PATH -> true
         else -> false
     }
     val scope = CoroutineScope(Dispatchers.IO+SupervisorJob()  )
@@ -576,6 +588,22 @@ companion object {
             BleMirror.sendAsync(nodeName,ASKFORSTART_PATH,byteArrayOf(0))
         else
             messagesender?.nameSendMessage(nodeName,ASKFORSTART_PATH,byteArrayOf(0))
+    }
+
+    /** Alert events and alert configuration for the Juggluco app on the other device. */
+    @JvmStatic
+    public fun sendAlerts(data: ByteArray): Boolean {
+        val sender = messagesender ?: return false
+        sender.sendmessage(ALERTS_PATH, data)
+        return true
+    }
+
+    /** Display settings that must be identical on the phone and the watch. */
+    @JvmStatic
+    public fun sendDisplaySettings(data: ByteArray): Boolean {
+        val sender = messagesender ?: return false
+        sender.sendmessage(DISPLAY_SETTINGS_PATH, data)
+        return true
     }
 
     @JvmStatic
@@ -1342,6 +1370,7 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
         if(doLog) {Log.i(LOG_ID, "before new MessageSender");}
         messagesender = MessageSender(app)
         BleMirror.init(app)
+        WatchBridge.migrateWatchesToMessages(app)
         if(retryJob==null) {
             retryJob=scope.launch {
                 while(isActive) {

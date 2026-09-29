@@ -1,5 +1,5 @@
 // GENERATED FILE - DO NOT EDIT
-// Source: /home/jka/extra/android/Juggluco/Glucodata/Common/src/main/cpp/curve/arjugglucotext.cpp
+// Source: /home/lenox/coding/Juggluco/Common/src/main/cpp/curve/arjugglucotext.cpp
 
 #include "jugglucotext.hpp"
 #ifdef INJUGGLUCO

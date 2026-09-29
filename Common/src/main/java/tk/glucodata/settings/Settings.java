@@ -333,6 +333,14 @@ yeslow.setOnCheckedChangeListener(
 
     return new View[]{yeslow, alow,ring};
     }
+static EditText mkrangefield(android.content.Context context,int ems,int editoptions) {
+        var field = new EditText(context);
+        field.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        field.setMinEms(ems);
+        field.setImeOptions(editoptions);
+        return field;
+    }
+
 public static float str2float(String str) {
     if(str!=null) {
          try {
@@ -1041,23 +1049,21 @@ static private void displaysettings(MainActivity context,Settings settings) {
         Object[] graphrow = {graphlabel, new View[] {glow, line, ghigh}};
 
     TextView targetlabel = getlabel(context,R.string.targetrange);
-        var tlow = new EditText(context);
-
-        tlow.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        tlow.setMinEms(1);
-        tlow.setImeOptions(editoptions);
+        var vlow = mkrangefield(context,1,editoptions);
+        TextView slash=new TextView(context); slash.setText("/");
+        var tlow = mkrangefield(context,1,editoptions);
         TextView line2=new TextView(context); line2.setText("-");
-        var thigh = new EditText(context);
-
-        thigh.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        thigh.setMinEms(2);
-        thigh.setImeOptions(editoptions);
-        Object[] targetrow = {targetlabel, new View[]{tlow, line2, thigh}};
+        var thigh = mkrangefield(context,2,editoptions);
+        TextView slash2=new TextView(context); slash2.setText("/");
+        var vhigh = mkrangefield(context,2,editoptions);
+        Object[] targetrow = {targetlabel, new View[]{vlow, slash, tlow, line2, thigh, slash2, vhigh}};
 
 
 
+        vlow.setText(float2string(Natives.verylow()));
         tlow.setText(float2string(Natives.targetlow()));
         thigh.setText(float2string(Natives.targethigh()));
+        vhigh.setText(float2string(Natives.veryhigh()));
 
     var colbut=getbutton(context,R.string.colors);
    var help=getbutton(context,R.string.helpname);
@@ -1282,6 +1288,7 @@ Runnable closerun= () -> {
         Natives.setfixatey(!fixatey.isChecked());
        Natives.setGraphRange(str2float(glow.getText().toString()), str2float(ghigh.getText().toString()));
       Natives.setTargetRange(str2float(tlow.getText().toString()), str2float(thigh.getText().toString()));
+        Natives.setVeryRange(str2float(vlow.getText().toString()), str2float(vhigh.getText().toString()));
         removeContentView(scroll) ;
         };
     MainActivity.setonback(closerun);

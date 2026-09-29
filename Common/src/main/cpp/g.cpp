@@ -180,6 +180,10 @@ static void            logscanresult( const AlgorithmResults *alg) {
                     LOGGER("mkdir(%s) failed\n",logbasedir.data());
                     }
                 else {
+                    constexpr const off_t maxscanlog=1024L*1024L;
+                    struct stat st;	/*Appended for every scan, so cap it*/
+                    if(stat(logfile.data(),&st)==0&&st.st_size>maxscanlog)
+                        truncate(logfile.data(),0);
                     FILE *fp=fopen(logfile.data(),"a");
                     alg->showresults(fp,datptr);
                     fclose(fp);
@@ -431,6 +435,68 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(streamfromSensorptr)(JNIEnv *env, 
         }
     return ((jlong)len)<<48;
     }
+extern "C" JNIEXPORT jlong JNICALL   fromjava(scanfromSensorptr)(JNIEnv *env, jclass cl,jlong sensorptr,int pos) {
+    if(!sensorptr)
+        return 0LL;
+    const auto *sens=reinterpret_cast<const SensorGlucoseData*>(sensorptr);
+    const ScanData *start= sens->beginscans();
+    const int len=sens->scancount();
+    auto cali=make_calibrator<ScanData>(sens);
+    for(int i=pos;i<len;i++) {
+        const ScanData *item=start+i;
+        if(item->valid()) {
+            for(++i;i<len&&!start[i].valid();i++)  {
+                ;
+                }
+            long mgdL;
+            if(double calibrated=cali.calibrateONEtest(*item);!isnan(calibrated)) {
+                mgdL=(long)round(calibrated);
+                }
+             else
+                mgdL=item->getmgdL();
+            return ((jlong)item->gettime())|(((jlong)mgdL)<<32|((jlong)i)<<48);
+            }
+        }
+    return ((jlong)len)<<48;
+    }
+extern "C" JNIEXPORT jlong JNICALL   fromjava(calibratedStreamfromSensorptr)(JNIEnv *env, jclass cl,jlong sensorptr,int pos) {
+    if(!sensorptr)
+        return 0LL;
+    const auto *sens=reinterpret_cast<const SensorGlucoseData*>(sensorptr);
+    const ScanData *start= sens->beginpolls();
+    const int len=sens->pollcount();
+    auto cali=make_calibrator<ScanData>(sens);
+    for(int i=pos;i<len;i++) {
+        const ScanData *item=start+i;
+        if(item->valid()) {
+            for(++i;i<len&&!start[i].valid();i++)  {
+                ;
+                }
+            if(double calibrated=cali.calibrateONEtest(*item);!isnan(calibrated)) {
+                long mgdL=(long)round(calibrated);
+                return ((jlong)item->gettime())|(((jlong)mgdL)<<32|((jlong)i)<<48);
+                }
+            }
+        }
+    return ((jlong)len)<<48;
+    }
+extern "C" JNIEXPORT jlongArray JNICALL   fromjava(allSensorPtrs)(JNIEnv *env, jclass cl) {
+    if(!sensors) return env->NewLongArray(0);
+    const int last = sensors->last();
+    std::vector<jlong> ptrs;
+    for(int i=0; i<=last; i++) {
+        const SensorGlucoseData *sens = sensors->getSensorData(i);
+        if(sens && sens != Sensoren::isdeleted && (sens->pollcount() > 0 || sens->scancount() > 0)) {
+            ptrs.push_back(reinterpret_cast<jlong>(sens));
+        }
+    }
+    const int len = ptrs.size();
+    jlongArray ptrAr = env->NewLongArray(len);
+    if(len > 0) {
+        env->SetLongArrayRegion(ptrAr, 0, len, ptrs.data());
+    }
+    return ptrAr;
+    }
 void    sendstreaming(SensorGlucoseData *hist) {
     setstreaming(hist);
     backup->wakebackup(wakeall);
@@ -501,6 +567,14 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(getSensorStartmsec)(JNIEnv *env, j
         return 0LL;
     const streamdata *sdata=reinterpret_cast<const streamdata *>(dataptr);
     return sdata->hist->getstarttime()*1000LL; 
+    }
+
+//starttime in seconds for a sensorptr, for sensors without a streaming/gatt datatptr
+extern "C" JNIEXPORT jlong JNICALL   fromjava(getSensorStartSecs)(JNIEnv *env, jclass cl,jlong sensorptr) {
+    if(!sensorptr)
+        return 0LL;
+    const SensorGlucoseData *sens=reinterpret_cast<const SensorGlucoseData *>(sensorptr);
+    return static_cast<jlong>(sens->getstarttime());
     }
 
 extern "C" JNIEXPORT jint JNICALL   fromjava(getSerialLength)(JNIEnv *env, jclass cl,jlong dataptr) {

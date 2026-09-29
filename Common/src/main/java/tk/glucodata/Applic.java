@@ -100,7 +100,7 @@ public static final  boolean horiScrollbar=true;
 //static final float mgdLmult= BuildConfig.DEBUG?18.0182f:18.0f;
 static final float mgdLmult=18.0f;
 //public static tk.glucodata.MessageSender messagesender=null;
-   static boolean Nativesloaded=false;
+public static boolean Nativesloaded=false;
 public static boolean hour24=true;
 static public final int TargetSDK=BuildConfig.targetSDK;
 static public final boolean isWearable= BuildConfig.isWear==1;
@@ -502,6 +502,15 @@ static     void explicit(Context context) {
         }
     }
 private boolean netstarted=false;
+public static boolean isNetStarted() {
+    return Applic.app != null && Applic.app.netstarted;
+}
+public static void ensureNetStarted() {
+    if(Applic.app != null && !Applic.app.netstarted) {
+        Applic.app.initializeNet();
+        Applic.app.netstarted = true;
+    }
+}
 void initbluetooth(boolean usebluetooth,Context context,boolean frommain) {
     // Establish the permission snapshot before BleMirror.init()/SensorBluetooth
     // can start Bluetooth work. Normally finepermission() already populated it,
@@ -700,13 +709,18 @@ static private final BroadcastReceiver minTimeReceiver = new BroadcastReceiver()
 };
 void domintime() {
     {if(doLog) {Log.i(LOG_ID,"TICK");};};
+    if (isWearable) {
+        // The legacy curve is never attached on a watch, so redrawing it is a no-op - but
+        // requestRender() fans out to a full repository reload, which walks every raw, calibrated
+        // and scan record of every sensor. Doing that once a minute just to repaint a view that is
+        // not on screen was one of the largest sources of garbage on Wear OS.
+        return;
+    }
     if (curve != null) {
         if((curve.render.stepresult & STEPBACK) == 0) {
             {if(doLog) {Log.i(LOG_ID,"requestRender()");};};
             curve.requestRender();
-            if (!isWearable) {
-                numdata.sendmessages();
-            }
+            numdata.sendmessages();
         }
     }
 }

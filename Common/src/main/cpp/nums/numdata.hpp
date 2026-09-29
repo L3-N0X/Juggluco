@@ -633,13 +633,15 @@ Num * numsaveonly( const uint32_t time, const float32_t value, const uint32_t ty
     return num;
      }
 
-void numsave( const uint32_t time, const float32_t value, const uint32_t type,const uint32_t mealptrin) {
-    if(Num *num=numsaveonly(time,  value,  type, mealptrin)) {
+    int numsave( const uint32_t time, const float32_t value, const uint32_t type,const uint32_t mealptrin) {
+    if(Num *num=numsaveonly(time,  value,  type,  mealptrin)) {
         addCalibration( time, type,num,this);
         if(backup)
             backup->wakebackup(wakenums);
         setnumchanged();
+        return index(num);
         }
+     return -1;
      }
 
 

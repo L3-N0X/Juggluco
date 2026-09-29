@@ -1,0 +1,3004 @@
+package tk.glucodata.ui.data
+
+import android.app.Activity
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import tk.glucodata.Applic
+import tk.glucodata.Backup
+import tk.glucodata.BleMirror
+import tk.glucodata.BuildConfig
+import tk.glucodata.Log
+import tk.glucodata.MainActivity
+import tk.glucodata.JugglucoSend
+import tk.glucodata.MessageSender
+import tk.glucodata.Natives
+import tk.glucodata.Nightscout
+import tk.glucodata.Notify
+import tk.glucodata.SensorBridge
+import tk.glucodata.SendLikexDrip
+import tk.glucodata.SuperGattCallback
+import tk.glucodata.WatchBridge
+import tk.glucodata.XInfuus
+import tk.glucodata.nums.numio
+import tk.glucodata.ui.model.AgpProfile
+import tk.glucodata.ui.model.AlarmBehavior
+import tk.glucodata.ui.model.AlarmConfig
+import tk.glucodata.ui.model.AlarmSoundStream
+import tk.glucodata.ui.model.BroadcastReceiverApp
+import tk.glucodata.ui.model.DeltaCalculation
+import tk.glucodata.ui.model.DisplayConfig
+import tk.glucodata.ui.model.ExchangesConfig
+import tk.glucodata.ui.model.GlucosePoint
+import tk.glucodata.ui.model.GlucoseRange
+import tk.glucodata.ui.model.GlucoseStats
+import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.ui.model.HardwareConfig
+import tk.glucodata.ui.model.LogRecord
+import tk.glucodata.ui.model.LogType
+import tk.glucodata.ui.model.MirrorConnection
+import tk.glucodata.ui.model.MirrorHostEditState
+import tk.glucodata.ui.model.NumberStore
+import tk.glucodata.ui.model.NumberStoreSource
+import tk.glucodata.ui.model.RangeLevel
+import tk.glucodata.ui.model.SensorDetail
+import tk.glucodata.ui.model.SensorInfo
+import tk.glucodata.ui.model.SensorState
+import tk.glucodata.ui.model.SensorStatus
+import tk.glucodata.ui.model.SignalQuality
+import tk.glucodata.ui.model.StatsPeriod
+import tk.glucodata.ui.model.TimeRange
+import tk.glucodata.ui.model.WatchConfig
+import tk.glucodata.ui.model.WearDiagnosticInfo
+import tk.glucodata.ui.model.WearWatchDevice
+import tk.glucodata.ui.sync.DisplaySync
+import java.util.concurrent.atomic.AtomicBoolean
+
+sealed interface SensorActivationState {
+    data object Idle : SensorActivationState
+    data object Waiting : SensorActivationState
+    data object Reading : SensorActivationState
+    data object Activating : SensorActivationState
+    data object AwaitingSecondScan : SensorActivationState
+    data object Verifying : SensorActivationState
+    data class Success(
+        val sensorName: String,
+        val endTime: Long,
+        val canAddToCalendar: Boolean,
+        val sensorTypeName: String? = null,
+        val warmupMinutes: Int = 60
+    ) : SensorActivationState
+    data class Failure(val reason: String? = null) : SensorActivationState
+    data object Cancelled : SensorActivationState
+}
+
+class GlucoseRepository(
+    private val scope: CoroutineScope
+) {
+    private data class NativeEntryIdentity(
+        val store: NumberStore,
+        val timeSeconds: Long,
+        val valueBits: Long,
+        val label: Int,
+        val mealPointer: Int
+    )
+
+    private data class PersistedLogNote(
+        val id: Long,
+        val store: NumberStore,
+        val position: Int,
+        val identity: NativeEntryIdentity,
+        val note: String
+    )
+
+    private val logNoteLock = Any()
+
+    /**
+     * Guards the expensive native loads. [refreshAll] and the polling heartbeat both walk the whole
+     * sensor store, which allocates tens of megabytes per pass; letting two passes overlap turns a
+     * stutter into an out-of-memory death spiral on a watch, so at most one is ever in flight and
+     * requests that arrive while it runs are coalesced into a single follow-up pass.
+     */
+    private val nativeLoadMutex = Mutex()
+
+    /** Set by callers wanting a full reload; consumed by whichever pass holds [nativeLoadMutex]. */
+    private val nativeLoadPending = AtomicBoolean(false)
+
+    @Volatile
+    private var statsRecalcPending = false
+
+    @Volatile
+    private var statsRecalcJob: Job? = null
+
+    /** Fingerprints of the values already published, so identical reloads emit nothing. */
+    private var publishedReadingsFingerprint = 0L
+    private var publishedSensorsFingerprint = 0L
+    private var publishedSensorDetailsFingerprint = 0L
+    private var publishedLogsFingerprint = 0L
+
+    private val _currentReading = MutableStateFlow<GlucosePoint?>(null)
+    val currentReading: StateFlow<GlucosePoint?> = _currentReading.asStateFlow()
+
+    private val _readings = MutableStateFlow<List<GlucosePoint>>(emptyList())
+    val readings: StateFlow<List<GlucosePoint>> = _readings.asStateFlow()
+
+    private val _sensors = MutableStateFlow<List<SensorInfo>>(emptyList())
+    val sensors: StateFlow<List<SensorInfo>> = _sensors.asStateFlow()
+
+    private val _mirrorConnections = MutableStateFlow<List<MirrorConnection>>(emptyList())
+    val mirrorConnections: StateFlow<List<MirrorConnection>> = _mirrorConnections.asStateFlow()
+
+    private val _sensorDetails = MutableStateFlow<List<SensorDetail>>(emptyList())
+    val sensorDetails: StateFlow<List<SensorDetail>> = _sensorDetails.asStateFlow()
+
+    private val _previousSensors = MutableStateFlow<List<SensorDetail>>(emptyList())
+    val previousSensors: StateFlow<List<SensorDetail>> = _previousSensors.asStateFlow()
+
+    private val _sensorActivationState = MutableStateFlow<SensorActivationState>(SensorActivationState.Idle)
+    val sensorActivationState: StateFlow<SensorActivationState> = _sensorActivationState.asStateFlow()
+
+    private val _logs = MutableStateFlow<List<LogRecord>>(emptyList())
+    val logs: StateFlow<List<LogRecord>> = _logs.asStateFlow()
+
+    private val _unit = MutableStateFlow(GlucoseUnit.MG_DL)
+    val unit: StateFlow<GlucoseUnit> = _unit.asStateFlow()
+
+    /**
+     * The four configurable band edges. Everything that classifies or colours a reading reads
+     * this, so changing it in settings updates graphs, statistics, widgets and the watch at once.
+     */
+    private val _range = MutableStateFlow(GlucoseRange())
+    val range: StateFlow<GlucoseRange> = _range.asStateFlow()
+
+    private val _targetLow = MutableStateFlow(GlucoseRange.DEFAULT_LOW)
+    val targetLow: StateFlow<Float> = _targetLow.asStateFlow()
+
+    private val _targetHigh = MutableStateFlow(GlucoseRange.DEFAULT_HIGH)
+    val targetHigh: StateFlow<Float> = _targetHigh.asStateFlow()
+
+    private val _selectedTimeRange = MutableStateFlow<TimeRange?>(TimeRange.SIX_HOURS)
+    val selectedTimeRange: StateFlow<TimeRange?> = _selectedTimeRange.asStateFlow()
+
+    private val _stats = MutableStateFlow(GlucoseStats())
+    val stats: StateFlow<GlucoseStats> = _stats.asStateFlow()
+
+    private val _screenStats = MutableStateFlow(GlucoseStats())
+    val screenStats: StateFlow<GlucoseStats> = _screenStats.asStateFlow()
+
+    private val _statsPeriod = MutableStateFlow(StatsPeriod.FOURTEEN_DAYS)
+    val statsPeriod: StateFlow<StatsPeriod> = _statsPeriod.asStateFlow()
+
+    private val _statsUseHistory = MutableStateFlow(true)
+    val statsUseHistory: StateFlow<Boolean> = _statsUseHistory.asStateFlow()
+
+    private val _agpProfile = MutableStateFlow(AgpProfile.calculate(emptyList(), StatsPeriod.FOURTEEN_DAYS))
+    val agpProfile: StateFlow<AgpProfile> = _agpProfile.asStateFlow()
+
+    private val _alarms = MutableStateFlow(AlarmConfig())
+    val alarms: StateFlow<AlarmConfig> = _alarms.asStateFlow()
+
+    private val _alarmBehavior = MutableStateFlow<List<AlarmBehavior>>(emptyList())
+    val alarmBehavior: StateFlow<List<AlarmBehavior>> = _alarmBehavior.asStateFlow()
+
+    private val _voiceAnnounce = MutableStateFlow(false)
+    val voiceAnnounce: StateFlow<Boolean> = _voiceAnnounce.asStateFlow()
+
+    private val _speakAlarms = MutableStateFlow(true)
+    val speakAlarms: StateFlow<Boolean> = _speakAlarms.asStateFlow()
+
+    private val _exchanges = MutableStateFlow(ExchangesConfig())
+    val exchanges: StateFlow<ExchangesConfig> = _exchanges.asStateFlow()
+
+    private val _xdripReceiverApps = MutableStateFlow<List<BroadcastReceiverApp>>(emptyList())
+    val xdripReceiverApps: StateFlow<List<BroadcastReceiverApp>> = _xdripReceiverApps.asStateFlow()
+
+    private val _xdripReceiverAppsLoading = MutableStateFlow(false)
+    val xdripReceiverAppsLoading: StateFlow<Boolean> = _xdripReceiverAppsLoading.asStateFlow()
+
+    private val _glucodataReceiverApps = MutableStateFlow<List<BroadcastReceiverApp>>(emptyList())
+    val glucodataReceiverApps: StateFlow<List<BroadcastReceiverApp>> = _glucodataReceiverApps.asStateFlow()
+
+    private val _glucodataReceiverAppsLoading = MutableStateFlow(false)
+    val glucodataReceiverAppsLoading: StateFlow<Boolean> = _glucodataReceiverAppsLoading.asStateFlow()
+
+    private val _displayConfig = MutableStateFlow(DisplayConfig())
+    val displayConfig: StateFlow<DisplayConfig> = _displayConfig.asStateFlow()
+
+    private val _bloodLabels = MutableStateFlow<List<String>>(emptyList())
+    val bloodLabels: StateFlow<List<String>> = _bloodLabels.asStateFlow()
+
+    private val bloodLabelLock = Any()
+    private val bloodLabelHistory = mutableSetOf(LEGACY_COMPOSE_BLOOD_LABEL)
+    @Volatile private var bloodLabelIndex = -1
+
+    private val _hardwareConfig = MutableStateFlow(HardwareConfig())
+    val hardwareConfig: StateFlow<HardwareConfig> = _hardwareConfig.asStateFlow()
+
+    private val _watchConfig = MutableStateFlow(WatchConfig())
+    val watchConfig: StateFlow<WatchConfig> = _watchConfig.asStateFlow()
+
+    private val _wearDevices = MutableStateFlow<List<WearWatchDevice>>(emptyList())
+    val wearDevices: StateFlow<List<WearWatchDevice>> = _wearDevices.asStateFlow()
+
+    private val _wearDiagnosticInfo = MutableStateFlow(WearDiagnosticInfo())
+    val wearDiagnosticInfo: StateFlow<WearDiagnosticInfo> = _wearDiagnosticInfo.asStateFlow()
+
+    init {
+        DisplaySync.install(this)
+        bloodLabelHistory += readBloodLabelHistory().filterNot { it in RESERVED_COMPOSE_LABELS }
+        // Never touch JNI or SharedPreferences from whatever thread constructs the repository:
+        // on Wear that is the main thread, during activity creation.
+        scope.launch(Dispatchers.IO) {
+            refreshSettings()
+            refreshAllLocked()
+            refreshWearDevices()
+            refreshMirrorConnections()
+            startPolling()
+        }
+    }
+
+    fun setTimeRange(range: TimeRange?) {
+        _selectedTimeRange.value = range
+        requestStatsRecalculation()
+    }
+
+    fun setStatsPeriod(period: StatsPeriod) {
+        _statsPeriod.value = period
+        requestStatsRecalculation()
+    }
+
+    fun setStatsUseHistory(useHistory: Boolean) {
+        _statsUseHistory.value = useHistory
+        try {
+            if (Applic.Nativesloaded) {
+                Natives.analysedays(_statsPeriod.value.days, useHistory)
+            }
+        } catch (_: Throwable) {}
+        requestStatsRecalculation()
+    }
+
+    fun setUnit(newUnit: GlucoseUnit) {
+        _unit.value = newUnit
+        val nativeUnit = if (newUnit == GlucoseUnit.MMOL_L) 1 else 2
+        try {
+            if (Applic.Nativesloaded) {
+                if (Applic.app != null) {
+                    Applic.app.setunit(nativeUnit)
+                } else {
+                    Natives.setunit(nativeUnit)
+                    Applic.unit = nativeUnit
+                }
+            }
+        } catch (_: Throwable) {
+            try {
+                if (Applic.Nativesloaded) Natives.setunit(nativeUnit)
+            } catch (_: Throwable) {}
+            Applic.unit = nativeUnit
+        }
+    }
+
+    /**
+     * The single write path for the four band edges. Values are sanitized before anything sees
+     * them, persisted to `settings.dat` for the legacy view and the native statistics, and pushed
+     * into every held reading so the graph, logbook and hero recolour immediately.
+     */
+    fun setGlucoseRange(newRange: GlucoseRange) {
+        val sanitized = newRange.normalized()
+        _range.value = sanitized
+        _targetLow.value = sanitized.lowMgDl
+        _targetHigh.value = sanitized.highMgDl
+        try {
+            if (Applic.Nativesloaded) {
+                val unit = _unit.value
+                Natives.setTargetRange(unit.toDisplay(sanitized.lowMgDl), unit.toDisplay(sanitized.highMgDl))
+                Natives.setVeryRange(unit.toDisplay(sanitized.veryLowMgDl), unit.toDisplay(sanitized.veryHighMgDl))
+            }
+        } catch (_: Throwable) {}
+        reclassifyReadings()
+        requestStatsRecalculation()
+    }
+
+    /** Moves one band edge, keeping the four cut points ordered and separated. */
+    fun setRangeLevel(level: RangeLevel, valueMgDl: Float) {
+        setGlucoseRange(_range.value.withLevel(level, valueMgDl))
+    }
+
+    private fun readBloodLabelHistory(): Set<Int> {
+        return try {
+            Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                .getStringSet(KEY_BLOOD_LABELS, emptySet())
+                .orEmpty()
+                .mapNotNull { it.toIntOrNull() }
+                .toSet()
+        } catch (_: Throwable) {
+            emptySet()
+        }
+    }
+
+    fun canSelectBloodLabel(index: Int): Boolean {
+        return index in _bloodLabels.value.indices &&
+            _bloodLabels.value[index].isNotBlank() &&
+            index !in RESERVED_COMPOSE_LABELS
+    }
+
+    private fun rememberBloodLabel(index: Int) {
+        if (!canSelectBloodLabel(index) && index != LEGACY_COMPOSE_BLOOD_LABEL) return
+        val changed = synchronized(bloodLabelLock) { bloodLabelHistory.add(index) }
+        if (!changed) return
+        try {
+            val persisted = synchronized(bloodLabelLock) { bloodLabelHistory.map(Int::toString).toSet() }
+            Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putStringSet(KEY_BLOOD_LABELS, persisted)
+                .apply()
+        } catch (_: Throwable) {}
+    }
+
+    private fun isBloodLabel(label: Int): Boolean {
+        return synchronized(bloodLabelLock) {
+            label !in RESERVED_COMPOSE_LABELS && label in bloodLabelHistory
+        }
+    }
+
+    private fun currentBloodLabelForSave(): Int {
+        if (_bloodLabels.value.isEmpty() && Applic.Nativesloaded) {
+            try { _bloodLabels.value = Natives.getLabels().toList() } catch (_: Throwable) {}
+        }
+        val labels = _bloodLabels.value
+        val configured = try { Natives.getbloodvar().toInt() } catch (_: Throwable) { -1 }
+        val resolved = when {
+            labels.getOrNull(configured)?.isNotBlank() == true -> configured
+            labels.getOrNull(DEFAULT_BLOOD_LABEL)?.isNotBlank() == true -> {
+                if (Applic.Nativesloaded) Natives.setbloodvar(DEFAULT_BLOOD_LABEL.toByte())
+                DEFAULT_BLOOD_LABEL
+            }
+            else -> -1
+        }
+        bloodLabelIndex = resolved
+        if (resolved >= 0) {
+            rememberBloodLabel(resolved)
+            if (_displayConfig.value.bloodLabelIndex != resolved) {
+                _displayConfig.value = _displayConfig.value.copy(bloodLabelIndex = resolved)
+            }
+        }
+        return resolved
+    }
+
+    fun refreshSettings() {
+        try {
+            if (Applic.Nativesloaded) {
+                val nativeUnit = Natives.getunit()
+                val unit = GlucoseUnit.fromNative(nativeUnit)
+                _unit.value = unit
+                if (Applic.app != null && Applic.unit != nativeUnit) {
+                    Applic.app.setunit(nativeUnit)
+                } else {
+                    Applic.unit = nativeUnit
+                }
+                val storedRange = GlucoseRange(
+                    veryLowMgDl = unit.toMgDl(Natives.verylow()),
+                    lowMgDl = unit.toMgDl(Natives.targetlow()),
+                    highMgDl = unit.toMgDl(Natives.targethigh()),
+                    veryHighMgDl = unit.toMgDl(Natives.veryhigh())
+                ).normalized()
+                if (storedRange != _range.value) {
+                    _range.value = storedRange
+                    _targetLow.value = storedRange.lowMgDl
+                    _targetHigh.value = storedRange.highMgDl
+                    // The range can also be changed outside this process (the legacy settings
+                    // screen, a restored backup), so the held readings have to catch up here too.
+                    reclassifyReadings()
+                    requestStatsRecalculation()
+                }
+
+                // Read Alarms (native getters return display-unit values, see
+                // settings.hpp gconvert/tomgperL, so fallbacks are unit-aware)
+                val mmol = _unit.value == GlucoseUnit.MMOL_L
+                _alarms.value = AlarmConfig(
+                    lowAlarmEnabled = Natives.hasalarmlow(),
+                    lowThreshold = Natives.alarmlow().let { if (it > 0f) it else if (mmol) 3.9f else 70f },
+                    lowSnoozeMinutes = Natives.readalarmsuspension(0).toInt().coerceAtLeast(5),
+                    highAlarmEnabled = Natives.hasalarmhigh(),
+                    highThreshold = Natives.alarmhigh().let { if (it > 0f) it else if (mmol) 10f else 180f },
+                    highSnoozeMinutes = Natives.readalarmsuspension(1).toInt().coerceAtLeast(5),
+                    urgentLowEnabled = try { Natives.hasalarmverylow() } catch (_: Throwable) { true },
+                    urgentLowThreshold = try { Natives.alarmverylow().let { if (it > 0f) it else if (mmol) 3f else 54f } } catch (_: Throwable) { if (mmol) 3f else 54f },
+                    urgentLowSnoozeMinutes = try { Natives.readalarmsuspension(5).toInt().coerceAtLeast(5) } catch (_: Throwable) { 15 },
+                    veryHighEnabled = try { Natives.hasalarmveryhigh() } catch (_: Throwable) { false },
+                    veryHighThreshold = try { Natives.alarmveryhigh().let { if (it > 0f) it else if (mmol) 13.9f else 250f } } catch (_: Throwable) { if (mmol) 13.9f else 250f },
+                    veryHighSnoozeMinutes = try { Natives.readalarmsuspension(6).toInt().coerceAtLeast(5) } catch (_: Throwable) { 30 },
+                    preLowEnabled = try { Natives.hasalarmprelow() } catch (_: Throwable) { false },
+                    preLowThreshold = try { Natives.alarmprelow().let { if (it > 0f) it else if (mmol) 4.4f else 80f } } catch (_: Throwable) { if (mmol) 4.4f else 80f },
+                    preLowSnoozeMinutes = try { Natives.readalarmsuspension(7).toInt().coerceAtLeast(5) } catch (_: Throwable) { 15 },
+                    preHighEnabled = try { Natives.hasalarmprehigh() } catch (_: Throwable) { false },
+                    preHighThreshold = try { Natives.alarmprehigh().let { if (it > 0f) it else if (mmol) 9.4f else 170f } } catch (_: Throwable) { if (mmol) 9.4f else 170f },
+                    preHighSnoozeMinutes = try { Natives.readalarmsuspension(8).toInt().coerceAtLeast(5) } catch (_: Throwable) { 15 },
+                    lossAlarmEnabled = Natives.hasalarmloss(),
+                    lossWaitMinutes = Natives.readalarmsuspension(4).toInt().coerceAtLeast(10),
+                    valueAvailableNotification = Natives.hasvaluealarm(),
+                    soundStream = AlarmSoundStream.fromId(Natives.getalarmSoundType())
+                )
+
+                // Read Exchanges
+                val xdripReceiverPackages = Natives.xdripRecepters()
+                    .filterNotNull()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                val glucodataReceiverPackages = Natives.glucodataRecepters()
+                    .filterNotNull()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                _exchanges.value = ExchangesConfig(
+                    xdripBroadcast = xdripReceiverPackages.isNotEmpty(),
+                    xdripReceiverPackages = xdripReceiverPackages,
+                    glucodataBroadcast = glucodataReceiverPackages.isNotEmpty(),
+                    glucodataReceiverPackages = glucodataReceiverPackages,
+                    librelinkBroadcast = Natives.getlibrelinkused(),
+                    everSenseBroadcast = try { Natives.geteverSensebroadcast() } catch (_: Throwable) { false },
+                    healthConnect = try { Natives.gethealthConnect() } catch (_: Throwable) { false },
+                    libreViewEnabled = Natives.getuselibreview(),
+                    xdripWebServer = Natives.getusexdripwebserver()
+                )
+
+                val savedMinimalistUnits = try {
+                    Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                        .getBoolean(KEY_MINIMALIST_UNITS, true)
+                } catch (_: Throwable) { true }
+                val savedDeltaMinutes = try {
+                    Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                        .getInt(KEY_DELTA_CALCULATION, 1)
+                } catch (_: Throwable) { 1 }
+                val deltaCalculation = DeltaCalculation.fromMinutes(savedDeltaMinutes)
+                val nativeLabels = Natives.getLabels().toList()
+                _bloodLabels.value = nativeLabels
+                val configuredBloodLabel = try { Natives.getbloodvar().toInt() } catch (_: Throwable) { -1 }
+                val resolvedBloodLabel = when {
+                    nativeLabels.getOrNull(configuredBloodLabel)?.isNotBlank() == true -> configuredBloodLabel
+                    nativeLabels.getOrNull(DEFAULT_BLOOD_LABEL)?.isNotBlank() == true -> {
+                        Natives.setbloodvar(DEFAULT_BLOOD_LABEL.toByte())
+                        DEFAULT_BLOOD_LABEL
+                    }
+                    else -> -1
+                }
+                bloodLabelIndex = resolvedBloodLabel
+                rememberBloodLabel(resolvedBloodLabel)
+
+                // Read Display
+                _displayConfig.value = DisplayConfig(
+                    floatingGlucose = Natives.getfloatglucose(),
+                    statusBarNotification = Natives.getshowalways(),
+                    systemUiFullscreen = Natives.getsystemUI(),
+                    invertColors = Natives.getInvertColors(),
+                    showScans = Natives.getshowscans(),
+                    showCalibratedScans = Natives.getshowcalibratedscans(),
+                    showStream = Natives.getshowstream(),
+                    showCalibratedStream = Natives.getshowcalibratedstream(),
+                    showHistory = Natives.getshowhistories(),
+                    showCalibratedHistory = Natives.getshowcalibratedhistories(),
+                    showAmounts = Natives.getshownumbers(),
+                    showMeals = Natives.getshowmeals(),
+                    minimalistUnits = savedMinimalistUnits,
+                    deltaCalculation = deltaCalculation,
+                    calibrationEnabled = try { Natives.getDoCalibrate() } catch (_: Throwable) { false },
+                    bloodLabelIndex = resolvedBloodLabel,
+                    calibratePastReadings = try { Natives.getCalibratePast() } catch (_: Throwable) { false },
+                    calibrateAllValues = try { Natives.getAllValues() } catch (_: Throwable) { false },
+                    use24Hour = try { Natives.gethour24() } catch (_: Throwable) { true }
+                )
+
+                // Read Hardware
+                _hardwareConfig.value = HardwareConfig(
+                    nfcSound = Natives.nfcsound(),
+                    globalScanStartsApp = isNfcLaunchEnabled(),
+                    googleScan = try { Natives.getGoogleScan() } catch (_: Throwable) { false },
+                    hasNfc = MainActivity.hasnfc
+                )
+
+                // Read Watch & Wear OS
+                _watchConfig.value = WatchConfig(
+                    wearOsEnabled = WatchBridge.isWearOsEnabled(),
+                    garminEnabled = try { Natives.getusegarmin() } catch (_: Throwable) { false },
+                    watchdripEnabled = try { Natives.getwatchdrip() } catch (_: Throwable) { false },
+                    gadgetbridgeEnabled = try { SuperGattCallback.doGadgetbridge } catch (_: Throwable) { false },
+                    separateAlerts = try { Notify.alertseparate } catch (_: Throwable) { false },
+                    notifyWatch = WatchBridge.getNotifyWatch()
+                )
+
+                // Read per-alarm sound behavior, voice output and NFC sound
+                _alarmBehavior.value = readAlarmBehavior()
+                _voiceAnnounce.value = try { Natives.getVoiceActive() } catch (_: Throwable) { false }
+                _speakAlarms.value = try { Natives.speakalarms() } catch (_: Throwable) { true }
+            }
+        } catch (_: Throwable) {}
+    }
+
+    fun refreshAll() {
+        scope.launch(Dispatchers.IO) { refreshAllLocked() }
+    }
+
+    /**
+     * Reloads everything, but never concurrently with itself. A reload that arrives while another is
+     * running simply marks the work as still-pending and returns; the pass already in flight picks
+     * the flag up and runs exactly once more on the way out. A burst of BLE callbacks therefore
+     * collapses into one extra pass instead of N overlapping walks of the sensor store.
+     */
+    private suspend fun refreshAllLocked() {
+        nativeLoadPending.set(true)
+        if (!nativeLoadMutex.tryLock()) return
+        try {
+            while (nativeLoadPending.getAndSet(false)) {
+                refreshSettings()
+                loadReadingsFromNative()
+                loadSensorsFromNative()
+                loadLogsFromNative()
+                recalculateStats()
+            }
+        } finally {
+            nativeLoadMutex.unlock()
+        }
+    }
+
+    /**
+     * Coalesces stats recomputation onto a single background pass. This used to run inline on the
+     * caller, which meant five full passes over every reading plus an AGP profile build (24 boxing
+     * buckets, a [java.util.Calendar] lookup per reading and two sorts) on the main thread of a UI
+     * that was only trying to react to a target-range tap.
+     */
+    private fun requestStatsRecalculation() {
+        statsRecalcPending = true
+        if (statsRecalcJob?.isActive == true) return
+        statsRecalcJob = scope.launch(Dispatchers.Default) {
+            while (statsRecalcPending) {
+                statsRecalcPending = false
+                recalculateStats()
+            }
+        }
+    }
+
+    /**
+     * Re-stamps the status of every held reading with the current range. Readings carry their
+     * status so collectors don't have to re-derive it, which means a range change would otherwise
+     * leave the graph markers, logbook rows and hero coloured against the old cut points until the
+     * next full reload. Runs off the main thread; the list can hold six figures of points.
+     */
+    private fun reclassifyReadings() {
+        val range = _range.value
+        val current = _readings.value
+        val currentReading = _currentReading.value
+        scope.launch(Dispatchers.Default) {
+            var changed = false
+            val updated = ArrayList<GlucosePoint>(current.size)
+            for (point in current) {
+                val status = range.statusOf(point.valueMgDl)
+                if (status == point.status) {
+                    updated.add(point)
+                } else {
+                    changed = true
+                    updated.add(point.copy(status = status))
+                }
+            }
+            if (changed) publishReadings(updated)
+            if (currentReading != null) {
+                val status = range.statusOf(currentReading.valueMgDl)
+                if (status != currentReading.status) {
+                    _currentReading.value = currentReading.copy(status = status)
+                }
+            }
+        }
+    }
+
+    fun beginSensorActivation() {
+        _sensorActivationState.value = SensorActivationState.Waiting
+    }
+
+    fun reportSensorTagRead() {
+        if (_sensorActivationState.value is SensorActivationState.Waiting) {
+            _sensorActivationState.value = SensorActivationState.Reading
+        }
+    }
+
+    fun reportSensorActivationCommand(success: Boolean) {
+        if (!success) {
+            reportSensorActivationFailure()
+        } else if (_sensorActivationState.value in setOf(
+                SensorActivationState.Reading,
+                SensorActivationState.Activating
+            )
+        ) {
+            _sensorActivationState.value = SensorActivationState.AwaitingSecondScan
+        }
+    }
+
+    fun reportSensorActivated(sensorName: String) {
+        if (_sensorActivationState.value !in setOf(
+                SensorActivationState.Waiting,
+                SensorActivationState.Reading,
+                SensorActivationState.Activating,
+                SensorActivationState.AwaitingSecondScan
+            )
+        ) {
+            return
+        }
+        _sensorActivationState.value = SensorActivationState.Verifying
+        scope.launch(Dispatchers.IO) {
+            loadSensorsFromNative()
+            val endData = try {
+                if (Applic.Nativesloaded) Natives.getSensorEndData(sensorName) else 0L
+            } catch (_: Throwable) {
+                0L
+            }
+            val endTime = (endData and 0xFFFFFFFFL) * 1000L
+            if (_sensorActivationState.value is SensorActivationState.Verifying) {
+                val detail = _sensorDetails.value.firstOrNull { it.id == sensorName }
+                _sensorActivationState.value = SensorActivationState.Success(
+                    sensorName = sensorName,
+                    endTime = endTime,
+                    canAddToCalendar = (endData ushr 32) != 0L && endTime > System.currentTimeMillis(),
+                    sensorTypeName = detail?.sensorTypeName,
+                    warmupMinutes = detail?.warmupMinutes ?: 60
+                )
+            }
+        }
+    }
+
+    fun reportSensorActivationFailure(reason: String? = null) {
+        if (_sensorActivationState.value !in setOf(
+                SensorActivationState.Waiting,
+                SensorActivationState.Reading,
+                SensorActivationState.Activating,
+                SensorActivationState.AwaitingSecondScan,
+                SensorActivationState.Verifying
+            )
+        ) {
+            return
+        }
+        _sensorActivationState.value = SensorActivationState.Failure(reason)
+    }
+
+    fun cancelSensorActivation() {
+        if (_sensorActivationState.value is SensorActivationState.Success) return
+        _sensorActivationState.value = SensorActivationState.Cancelled
+    }
+
+    fun resetSensorActivation() {
+        _sensorActivationState.value = SensorActivationState.Idle
+    }
+
+    /**
+     * Publishes [next] only when it differs from what every collector already has.
+     *
+     * A reload always allocates a brand new list, and a `StateFlow` conflates on `equals`, so
+     * assigning unconditionally meant every poll produced a structural comparison of the whole
+     * history and - when anything at all had shifted - a recomposition of the home screen and a full
+     * redraw of the graph. Scanning for a change first costs one linear pass over primitives and
+     * emits nothing in the overwhelmingly common case where the sensor store has not moved.
+     */
+    private fun publishReadings(next: List<GlucosePoint>) {
+        val fingerprint = readingsFingerprint(next)
+        if (fingerprint == publishedReadingsFingerprint && _readings.value.size == next.size) return
+        publishedReadingsFingerprint = fingerprint
+        _readings.value = next
+    }
+
+    /**
+     * Order-sensitive 64-bit digest of the history. Two lists with the same fingerprint are treated
+     * as identical, so a false "unchanged" would only ever cost a skipped redraw, never wrong data
+     * at a scale where a collision is conceivable.
+     */
+    private fun readingsFingerprint(readings: List<GlucosePoint>): Long {
+        var hash = 1125899906842597L
+        for (i in readings.indices) {
+            val point = readings[i]
+            hash = hash * 31 + point.timestamp
+            hash = hash * 31 + point.valueMgDl.toRawBits()
+            hash = hash * 31 + (if (point.isCalibrated) 1L else 0L)
+            hash = hash * 31 + (if (point.isScan) 1L else 0L)
+            // Status is part of the identity: reclassifying after a range change has to be
+            // publishable, or the graph markers and logbook keep the old colours.
+            hash = hash * 31 + point.status.ordinal.toLong()
+        }
+        return hash * 31 + readings.size
+    }
+
+    private fun loadReadingsFromNative() {
+        val loadedList = ArrayList<GlucosePoint>(INITIAL_READING_CAPACITY)
+        // Hoisted out of the read loops: a StateFlow read per point, over six figures of points, is
+        // not free and the value cannot change halfway through a single pass.
+        val range = _range.value
+        try {
+            if (Applic.Nativesloaded) {
+                // Check latest reading first
+                val strGl = Natives.lastglucose()
+                if (strGl != null && strGl.time > 0) {
+                    val rawVal = try {
+                        strGl.value.replace(',', '.').toFloat()
+                    } catch (_: Throwable) {
+                        0f
+                    }
+                    val valMgDl = if (_unit.value == GlucoseUnit.MMOL_L) {
+                        GlucoseUnit.MMOL_L.toMgDl(rawVal)
+                    } else rawVal
+
+                    if (valMgDl > 0f) {
+                        _currentReading.value = GlucosePoint(
+                            timestamp = strGl.time * 1000L,
+                            valueMgDl = valMgDl,
+                            rate = strGl.rate,
+                            status = range.statusOf(valMgDl)
+                        )
+                    } else {
+                        _currentReading.value = null
+                    }
+                } else {
+                    _currentReading.value = null
+                }
+
+                // Read stream points from all sensors (falling back to active)
+                val allPtrs = try { Natives.allSensorPtrs() } catch (_: Throwable) { null }
+                val sensorPtrs: LongArray = if (allPtrs != null && allPtrs.isNotEmpty()) allPtrs else (Natives.activeSensorPtrs() ?: LongArray(0))
+
+                if (sensorPtrs.isNotEmpty()) {
+                    for (ptr in sensorPtrs) {
+                        if (ptr == 0L) continue
+
+                        // 1. Raw Stream Readings
+                        var pos = 0
+                        var safetyLimit = 50000
+                        while (safetyLimit-- > 0) {
+                            val res = Natives.streamfromSensorptr(ptr, pos)
+                            val time = res and 0xFFFFFFFFL
+                            val nextPos = (res ushr 48).toInt() and 0xFFFF
+                            if (time == 0L || nextPos <= pos) break
+                            val mgdL = (res ushr 32).toInt() and 0xFFFF
+                            if (mgdL in 20..600) {
+                                loadedList.add(
+                                    GlucosePoint(
+                                        timestamp = time * 1000L,
+                                        valueMgDl = mgdL.toFloat(),
+                                        isScan = false,
+                                        isHistory = false,
+                                        isCalibrated = false,
+                                        status = range.statusOf(mgdL.toFloat())
+                                    )
+                                )
+                            }
+                            pos = nextPos
+                        }
+
+                        // 2. Calibrated Stream Readings
+                        pos = 0
+                        safetyLimit = 50000
+                        while (safetyLimit-- > 0) {
+                            val res = try { Natives.calibratedStreamfromSensorptr(ptr, pos) } catch (_: Throwable) { 0L }
+                            val time = res and 0xFFFFFFFFL
+                            val nextPos = (res ushr 48).toInt() and 0xFFFF
+                            if (time == 0L || nextPos <= pos) break
+                            val mgdL = (res ushr 32).toInt() and 0xFFFF
+                            if (mgdL in 20..600) {
+                                loadedList.add(
+                                    GlucosePoint(
+                                        timestamp = time * 1000L,
+                                        valueMgDl = mgdL.toFloat(),
+                                        isScan = false,
+                                        isHistory = false,
+                                        isCalibrated = true,
+                                        status = range.statusOf(mgdL.toFloat())
+                                    )
+                                )
+                            }
+                            pos = nextPos
+                        }
+
+                        // 3. Scan Readings
+                        pos = 0
+                        safetyLimit = 10000
+                        while (safetyLimit-- > 0) {
+                            val res = try { Natives.scanfromSensorptr(ptr, pos) } catch (_: Throwable) { 0L }
+                            val time = res and 0xFFFFFFFFL
+                            val nextPos = (res ushr 48).toInt() and 0xFFFF
+                            if (time == 0L || nextPos <= pos) break
+                            val mgdL = (res ushr 32).toInt() and 0xFFFF
+                            if (mgdL in 20..600) {
+                                loadedList.add(
+                                    GlucosePoint(
+                                        timestamp = time * 1000L,
+                                        valueMgDl = mgdL.toFloat(),
+                                        isScan = true,
+                                        isHistory = false,
+                                        isCalibrated = false,
+                                        status = range.statusOf(mgdL.toFloat())
+                                    )
+                                )
+                            }
+                            pos = nextPos
+                        }
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+
+        if (_currentReading.value == null && loadedList.isNotEmpty()) {
+            var latest = loadedList[loadedList.size - 1]
+            for (point in loadedList) {
+                if (!point.isScan && !point.isCalibrated) latest = point
+            }
+            _currentReading.value = latest
+        }
+
+        // In-place stable sort on the timestamp only. `sortBy` would copy the whole list again and
+        // box every timestamp to build a sort key; the readings arrive per sensor and per kind, so
+        // they are grouped rather than ordered and do need sorting, but they do not need a second
+        // six-figure list to do it.
+        loadedList.sortWith { a, b -> a.timestamp.compareTo(b.timestamp) }
+        publishReadings(loadedList)
+    }
+
+    private fun loadSensorsFromNative() {
+        val detailsList = ArrayList<SensorDetail>()
+        val legacyList = ArrayList<SensorInfo>()
+        val mirroredSensorSource = hasLiveReceiverMirror()
+        // Derived from data rather than from the clock. `System.currentTimeMillis()` here made
+        // every reload produce a different list, so the sensor list was guaranteed to be unequal and
+        // the sensors screen recomposed on every single sweep even when nothing had changed.
+        val lastKnownReading = _readings.value.lastOrNull()?.timestamp ?: 0L
+
+        try {
+            if (Applic.Nativesloaded) {
+                // 1. Query live active GATT sensors via SensorBridge
+                val rawList = SensorBridge.getActiveGattSensors()
+                if (!rawList.isNullOrEmpty()) {
+                    for (info in rawList) {
+                        val typeName = when (info.sensorgen) {
+                            1 -> "FreeStyle Libre 1 / 2"
+                            2 -> "FreeStyle Libre 2"
+                            3 -> "FreeStyle Libre 3"
+                            0x10 -> "SiBionics (GS1 / GS3)"
+                            0x30, 0x40 -> "Dexcom G7 / ONE+"
+                            0x50 -> "Accu-Chek SmartGuide"
+                            else -> "CGM Sensor"
+                        }
+
+                        val status = when {
+                            !info.isConnected -> SensorStatus.DISCONNECTED
+                            info.isStreaming -> SensorStatus.CONNECTED_STREAMING
+                            else -> SensorStatus.CONNECTED_IDLE
+                        }
+
+                        var start = info.startTime
+                        if (start <= 0L && info.dataptr != 0L) {
+                            try {
+                                start = Natives.getSensorStartmsec(info.dataptr)
+                            } catch (_: Throwable) {}
+                        }
+                        var end = 0L
+                        if (!info.serial.isNullOrEmpty()) {
+                            try {
+                                val endData = Natives.getSensorEndData(info.serial)
+                                val expectedSec = endData and 0xFFFFFFFFL
+                                if (expectedSec > 0L) {
+                                    end = expectedSec * 1000L
+                                }
+                            } catch (_: Throwable) {}
+                        }
+                        if (end <= 0L && start > 0L) {
+                            end = start + 14 * 24 * 3600 * 1000L
+                        }
+
+                        detailsList.add(
+                            SensorDetail(
+                                id = info.serial ?: "Unknown",
+                                name = info.serial ?: typeName,
+                                sensorPtr = info.sensorptr,
+                                status = status,
+                                sensorGen = info.sensorgen,
+                                sensorTypeName = typeName,
+                                macAddress = info.macAddress,
+                                rssi = info.rssi,
+                                signalQuality = if (info.isConnected && info.rssi != null && info.rssi != 0) SignalQuality.fromRssi(info.rssi) else SignalQuality.LOST,
+                                startTime = start,
+                                endTime = end,
+                                lastReadingTime = if (info.isConnected) lastKnownReading else 0L,
+                                warmupMinutes = info.warmupMinutes,
+                                isConnected = info.isConnected,
+                                isStreaming = info.isStreaming,
+                                isHidden = info.isHidden,
+                                hasCalibration = info.hasCalibration,
+                                batteryPercent = null,
+                                connectionStatusStr = info.statusStr ?: if (info.isConnected) "Connected" else "Disconnected",
+                                handshakeStatusStr = info.handshakeStr ?: "",
+                                rawDiagnosticText = info.infoHtml ?: ""
+                            )
+                        )
+                        legacyList.add(
+                            SensorInfo(
+                                id = info.serial ?: "Unknown",
+                                name = info.serial ?: typeName,
+                                state = if (info.isConnected) SensorState.ACTIVE else SensorState.DISCONNECTED,
+                                startTime = start,
+                                endTime = end,
+                                lastReadingTime = if (info.isConnected) lastKnownReading else 0L,
+                                sensorType = typeName,
+                                isStreaming = info.isStreaming,
+                                isConnected = info.isConnected
+                            )
+                        )
+                    }
+                }
+
+                // 2. Check activeSensorPtrs if no Gatt callbacks found
+                if (detailsList.isEmpty()) {
+                    val ptrs = Natives.activeSensorPtrs()
+                    if (ptrs != null && ptrs.isNotEmpty()) {
+                        for (ptr in ptrs) {
+                            if (ptr == 0L) continue
+                            val name = Natives.namefromSensorptr(ptr) ?: "Sensor"
+                            val infoText = Natives.sensortextfromSensorptr(ptr) ?: ""
+                            val warmup = SensorBridge.warmupMinutes(ptr)
+                            val isHidden = try { Natives.getHidefromSensorptr(ptr) } catch (_: Throwable) { false }
+                            val hasCali = try { Natives.calibrateNR(ptr, 0) > 0 || Natives.calibrateNR(ptr, 1) > 0 } catch (_: Throwable) { false }
+
+                            var end = 0L
+                            try {
+                                val endData = Natives.getSensorEndData(name)
+                                val expectedSec = endData and 0xFFFFFFFFL
+                                if (expectedSec > 0L) {
+                                    end = expectedSec * 1000L
+                                }
+                            } catch (_: Throwable) {}
+                            // The real start time, never derived from the end time: sensors are 7, 10,
+                            // 14, 15 and 22 days long, so a "end minus 14 days" guess puts a fresh
+                            // 15 day sensor in the future and made the warmup countdown read ~1450 min.
+                            val start = try {
+                                val secs = Natives.getSensorStartSecs(ptr)
+                                if (secs > 0L) secs * 1000L else 0L
+                            } catch (_: Throwable) {
+                                0L
+                            }
+
+                            detailsList.add(
+                                SensorDetail(
+                                    id = name,
+                                    name = name,
+                                    sensorPtr = ptr,
+                                    status = SensorStatus.CONNECTED_STREAMING,
+                                    sensorGen = 3,
+                                    sensorTypeName = "FreeStyle Libre 3",
+                                    macAddress = null,
+                                    rssi = null,
+                                    signalQuality = SignalQuality.GOOD,
+                                    startTime = start,
+                                    endTime = end,
+                                    lastReadingTime = lastKnownReading,
+                                    warmupMinutes = warmup,
+                                    isConnected = true,
+                                    isStreaming = true,
+                                    isMirrored = mirroredSensorSource,
+                                    isHidden = isHidden,
+                                    hasCalibration = hasCali,
+                                    batteryPercent = null,
+                                    connectionStatusStr = "Connected",
+                                    handshakeStatusStr = "Authenticated",
+                                    rawDiagnosticText = infoText
+                                )
+                            )
+                            legacyList.add(
+                                SensorInfo(
+                                    id = name,
+                                    name = name,
+                                    state = SensorState.ACTIVE,
+                                    startTime = start,
+                                    endTime = end,
+                                    lastReadingTime = lastKnownReading,
+                                    sensorType = if (infoText.isNotEmpty()) infoText else "Active Sensor",
+                                    isConnected = true,
+                                    isStreaming = true
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+
+        publishSensors(legacyList, detailsList)
+    }
+
+    /** Publishes the sensor lists only when their contents actually differ from the last publish. */
+    private fun publishSensors(legacy: List<SensorInfo>, details: List<SensorDetail>) {
+        val legacyHash = legacyFingerprint(legacy)
+        val detailsHash = sensorDetailFingerprint(details)
+        if (legacyHash != publishedSensorsFingerprint) {
+            publishedSensorsFingerprint = legacyHash
+            _sensors.value = legacy
+        }
+        if (detailsHash != publishedSensorDetailsFingerprint) {
+            publishedSensorDetailsFingerprint = detailsHash
+            _sensorDetails.value = details
+        }
+        _previousSensors.value = emptyList()
+    }
+
+    private fun legacyFingerprint(sensors: List<SensorInfo>): Long {
+        var hash = 17L
+        for (sensor in sensors) {
+            hash = hash * 31 + sensor.id.hashCode()
+            hash = hash * 31 + sensor.state.hashCode()
+            hash = hash * 31 + sensor.startTime
+            hash = hash * 31 + sensor.endTime
+            hash = hash * 31 + sensor.lastReadingTime
+            hash = hash * 31 + (if (sensor.isConnected) 1L else 0L)
+            hash = hash * 31 + (if (sensor.isStreaming) 1L else 0L)
+        }
+        return hash * 31 + sensors.size
+    }
+
+    private fun sensorDetailFingerprint(details: List<SensorDetail>): Long {
+        var hash = 19L
+        for (sensor in details) {
+            hash = hash * 31 + sensor.id.hashCode()
+            hash = hash * 31 + sensor.status.hashCode()
+            hash = hash * 31 + sensor.signalQuality.hashCode()
+            hash = hash * 31 + sensor.startTime
+            hash = hash * 31 + sensor.endTime
+            hash = hash * 31 + sensor.lastReadingTime
+            hash = hash * 31 + (sensor.rssi ?: 0)
+            hash = hash * 31 + (if (sensor.isConnected) 1L else 0L)
+            hash = hash * 31 + (if (sensor.isStreaming) 1L else 0L)
+            hash = hash * 31 + (if (sensor.isMirrored) 1L else 0L)
+        }
+        return hash * 31 + details.size
+    }
+
+    private fun hasLiveReceiverMirror(): Boolean {
+        if (!Applic.Nativesloaded) return false
+        try {
+            Applic.ensureNetStarted()
+        } catch (_: Throwable) {}
+        val hostCount = try { Natives.backuphostNr() } catch (_: Throwable) { 0 }
+        for (index in 0 until hostCount) {
+            val receiveMode = try { Natives.getbackuphostreceive(index) } catch (_: Throwable) { 0 }
+            if ((receiveMode and 2) == 0) continue
+            val deactivated = try { Natives.getHostDeactivated(index) } catch (_: Throwable) { false }
+            if (deactivated) continue
+            val status = try { Natives.mirrorStatus(index) ?: "" } catch (_: Throwable) { "" }
+            if (isLiveMirrorStatus(status)) return true
+        }
+        return false
+    }
+
+    private fun isLiveMirrorStatus(status: String): Boolean {
+        val normalized = status.replace(MARKUP_PATTERN, "")
+        return (normalized.contains("TCP/IP live socket: true", ignoreCase = true) &&
+            normalized.contains("receive=true", ignoreCase = true)) ||
+            normalized.contains("Direct Bluetooth (BLE GATT)=true", ignoreCase = true) ||
+            normalized.contains("Messages (Wear OS MessageClient)=true", ignoreCase = true)
+    }
+
+    private fun numberStorePointer(store: NumberStore): Long? {
+        val index = store.nativeIndex
+        if (index < 0 || index >= numio.numptrs.size) return null
+        return numio.numptrs[index].takeIf { it != 0L }
+    }
+
+    private fun nativeType(label: Int): LogType = when {
+        isBloodLabel(label) -> LogType.BLOOD_GLUCOSE
+        label == 0 -> LogType.RAPID_INSULIN
+        label == 1 -> LogType.CARBS
+        label == 2 -> LogType.BASAL_INSULIN
+        else -> LogType.NOTE
+    }
+
+    private fun nativeLabel(type: LogType): Int = when (type) {
+        LogType.RAPID_INSULIN -> 0
+        LogType.CARBS, LogType.MEAL -> 1
+        LogType.BASAL_INSULIN -> 2
+        LogType.BLOOD_GLUCOSE -> bloodLabelIndex
+        LogType.NOTE -> 4
+    }
+
+    private fun sameSource(first: LogRecord, second: LogRecord): Boolean {
+        val firstSource = first.nativeSource
+        val secondSource = second.nativeSource
+        return firstSource != null && firstSource == secondSource
+    }
+
+    private fun matchesNativeEntry(
+        item: tk.glucodata.nums.item,
+        entry: LogRecord
+    ): Boolean {
+        return item.time == entry.timestamp / 1000L &&
+            item.value == entry.value &&
+            item.label == (entry.nativeLabel ?: nativeLabel(entry.type))
+    }
+
+    private fun syncNumberStore(store: NumberStore) {
+        if (!Applic.isWearable) {
+            try {
+                Applic.app?.numdata?.changedback(store.nativeIndex)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    private fun logNotePreferences() = Applic.app?.getSharedPreferences(LOG_NOTES_PREFS, Context.MODE_PRIVATE)
+
+    private fun readPersistedLogNotes(): MutableList<PersistedLogNote> {
+        val serialized = logNotePreferences()?.getString(LOG_NOTES_KEY, null) ?: return mutableListOf()
+        val notes = mutableListOf<PersistedLogNote>()
+        try {
+            val array = JSONArray(serialized)
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val store = NumberStore.entries.firstOrNull { it.nativeIndex == item.optInt("store") } ?: continue
+                notes += PersistedLogNote(
+                    id = item.optLong("id"),
+                    store = store,
+                    position = item.optInt("position"),
+                    identity = NativeEntryIdentity(
+                        store = store,
+                        timeSeconds = item.optLong("timeSeconds"),
+                        valueBits = item.optLong("valueBits") and 0xffffffffL,
+                        label = item.optInt("label"),
+                        mealPointer = item.optInt("mealPointer")
+                    ),
+                    note = item.optString("note")
+                )
+            }
+        } catch (_: Throwable) {}
+        return notes
+    }
+
+    private fun writePersistedLogNotes(notes: List<PersistedLogNote>) {
+        try {
+            val array = JSONArray()
+            notes.forEach { item ->
+                array.put(JSONObject().apply {
+                    put("id", item.id)
+                    put("store", item.store.nativeIndex)
+                    put("position", item.position)
+                    put("timeSeconds", item.identity.timeSeconds)
+                    put("valueBits", item.identity.valueBits)
+                    put("label", item.identity.label)
+                    put("mealPointer", item.identity.mealPointer)
+                    put("note", item.note)
+                })
+            }
+            logNotePreferences()?.edit()?.putString(LOG_NOTES_KEY, array.toString())?.commit()
+        } catch (_: Throwable) {}
+    }
+
+    private fun nativeIdentity(item: tk.glucodata.nums.item, store: NumberStore): NativeEntryIdentity {
+        return NativeEntryIdentity(
+            store = store,
+            timeSeconds = item.time,
+            valueBits = java.lang.Float.floatToRawIntBits(item.value).toLong() and 0xffffffffL,
+            label = item.label,
+            mealPointer = item.mealptr
+        )
+    }
+
+    private fun nativeIdentity(record: LogRecord): NativeEntryIdentity {
+        return NativeEntryIdentity(
+            store = record.nativeSource?.store ?: NumberStore.HERE,
+            timeSeconds = record.timestamp / 1000L,
+            valueBits = java.lang.Float.floatToRawIntBits(record.value).toLong() and 0xffffffffL,
+            label = record.nativeLabel ?: nativeLabel(record.type),
+            mealPointer = record.mealPointer
+        )
+    }
+
+    private fun sourceKey(source: NumberStoreSource): String = "${source.store.nativeIndex}:${source.position}"
+
+    private fun findNativeSource(
+        store: NumberStore,
+        identity: NativeEntryIdentity,
+        preferredPosition: Int
+    ): NumberStoreSource? {
+        val ptr = numberStorePointer(store) ?: return null
+        return try {
+            var found: NumberStoreSource? = null
+            for (position in Natives.getfirstNum(ptr) until Natives.getlastNum(ptr)) {
+                val item = Natives.getNumitem(ptr, position) ?: continue
+                if (nativeIdentity(item, store) != identity) continue
+                val candidate = NumberStoreSource(store, position)
+                if (position == preferredPosition) return candidate
+                if (found == null) found = candidate
+            }
+            found
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun upsertPersistedLogNote(note: PersistedLogNote) {
+        synchronized(logNoteLock) {
+            val notes = readPersistedLogNotes().toMutableList()
+            notes.removeAll { it.id == note.id }
+            if (note.note.isNotBlank()) notes += note
+            writePersistedLogNotes(notes)
+        }
+    }
+
+    private fun removePersistedLogNote(id: Long) {
+        synchronized(logNoteLock) {
+            val notes = readPersistedLogNotes()
+            if (notes.removeAll { it.id == id }) writePersistedLogNotes(notes)
+        }
+    }
+
+    private fun reconcilePersistedLogNotes(
+        records: List<LogRecord>,
+        availableStores: Set<NumberStore>
+    ): Map<String, PersistedLogNote> {
+        synchronized(logNoteLock) {
+            val stored = readPersistedLogNotes()
+            val retained = stored.filter { it.store !in availableStores }
+            val candidates = records.filter { it.nativeSource?.store in availableStores }
+            val usedSources = mutableSetOf<String>()
+            val resolved = retained.toMutableList()
+
+            stored.filter { it.store in availableStores }.forEach { persisted ->
+                val matches = candidates.filter { record ->
+                    val source = record.nativeSource ?: return@filter false
+                    source.store == persisted.store &&
+                        nativeIdentity(record) == persisted.identity &&
+                        sourceKey(source) !in usedSources
+                }
+                val match = matches.firstOrNull { it.nativeSource?.position == persisted.position } ?: matches.firstOrNull()
+                val source = match?.nativeSource ?: return@forEach
+                usedSources += sourceKey(source)
+                resolved += persisted.copy(
+                    store = source.store,
+                    position = source.position,
+                    identity = persisted.identity
+                )
+            }
+
+            if (resolved != stored) writePersistedLogNotes(resolved)
+            return resolved.mapNotNull { note ->
+                note.position.takeIf { it >= 0 }?.let { position ->
+                    sourceKey(NumberStoreSource(note.store, position)) to note
+                }
+            }.toMap()
+        }
+    }
+
+    private fun loadLogsFromNative() {
+        synchronized(logNoteLock) {
+            val logList = ArrayList<LogRecord>()
+            val availableStores = mutableSetOf<NumberStore>()
+            if (Applic.Nativesloaded) {
+                for (store in NumberStore.values()) {
+                    try {
+                        val ptr = numberStorePointer(store) ?: continue
+                        val resolvedStore = NumberStore.values().firstOrNull {
+                            it.nativeIndex == Natives.getNumindex(ptr)
+                        } ?: continue
+                        val first = Natives.getfirstNum(ptr)
+                        val last = Natives.getlastNum(ptr)
+                        availableStores += resolvedStore
+                        for (pos in first until last) {
+                            val itm = Natives.getNumitem(ptr, pos) ?: continue
+                            if (itm.time <= 0) continue
+                            logList.add(
+                                LogRecord(
+                                    id = LogRecord.nativeId(resolvedStore, pos),
+                                    timestamp = itm.time * 1000L,
+                                    type = nativeType(itm.label),
+                                    value = itm.value,
+                                    nativeSource = NumberStoreSource(resolvedStore, pos),
+                                    nativeLabel = itm.label,
+                                    mealPointer = itm.mealptr
+                                )
+                            )
+                        }
+                    } catch (_: Throwable) {}
+                }
+            }
+
+            val persistedNotes = reconcilePersistedLogNotes(logList, availableStores)
+            val hydratedLogs = logList.map { record ->
+                val source = record.nativeSource ?: return@map record
+                val persisted = persistedNotes[sourceKey(source)] ?: return@map record
+                record.copy(id = persisted.id, note = persisted.note)
+            }.toMutableList()
+            hydratedLogs.sortWith(
+                compareByDescending<LogRecord> { it.timestamp }
+                    .thenByDescending { it.nativeSource?.store?.nativeIndex ?: -1 }
+                    .thenByDescending { it.nativeSource?.position ?: -1 }
+            )
+            publishLogs(hydratedLogs)
+        }
+    }
+
+    /**
+     * Publishes the logbook only when it differs from the last publish. A native reload used to
+     * mint a brand new id for every entry, so the list could never compare equal and every collector
+     * recomposed every time the logbook was refreshed.
+     */
+    private fun publishLogs(next: List<LogRecord>) {
+        val fingerprint = logFingerprint(next)
+        if (fingerprint == publishedLogsFingerprint) return
+        publishedLogsFingerprint = fingerprint
+        _logs.value = next
+    }
+
+    private fun logFingerprint(records: List<LogRecord>): Long {
+        var hash = 23L
+        for (record in records) {
+            hash = hash * 31 + record.timestamp
+            hash = hash * 31 + record.value.toRawBits()
+            hash = hash * 31 + record.type.hashCode()
+            hash = hash * 31 + record.note.hashCode()
+            hash = hash * 31 + (record.nativeSource?.store?.nativeIndex ?: -1)
+            hash = hash * 31 + (record.nativeSource?.position ?: -1)
+        }
+        return hash * 31 + records.size
+    }
+
+    fun addCalibrationReference(
+        valueMgDl: Float,
+        note: String,
+        timestamp: Long = System.currentTimeMillis()
+    ): Boolean {
+        return addLogEntry(LogType.BLOOD_GLUCOSE, valueMgDl, note, timestamp)
+    }
+
+    fun addLogEntry(type: LogType, value: Float, note: String, timestamp: Long = System.currentTimeMillis()): Boolean {
+        val targetNativeLabel = if (type == LogType.BLOOD_GLUCOSE) {
+            synchronized(bloodLabelLock) { currentBloodLabelForSave() }
+        } else {
+            nativeLabel(type)
+        }
+        if (type == LogType.BLOOD_GLUCOSE && targetNativeLabel < 0) return false
+        val entry = LogRecord(
+            timestamp = timestamp,
+            type = type,
+            value = value,
+            note = note,
+            nativeLabel = targetNativeLabel
+        )
+        publishLogs((listOf(entry) + _logs.value).sortedByDescending { it.timestamp })
+
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    val store = NumberStore.HERE
+                    val ptr = numberStorePointer(store)
+                    if (ptr != null) {
+                        synchronized(logNoteLock) {
+                            val persistedNote = note.trim()
+                            val labelToSave = if (type == LogType.BLOOD_GLUCOSE) {
+                                synchronized(bloodLabelLock) { currentBloodLabelForSave() }
+                            } else {
+                                targetNativeLabel
+                            }
+                            if (labelToSave < 0) return@synchronized
+                            var identity = NativeEntryIdentity(
+                                store = store,
+                                timeSeconds = timestamp / 1000L,
+                                valueBits = java.lang.Float.floatToRawIntBits(value).toLong() and 0xffffffffL,
+                                label = labelToSave,
+                                mealPointer = 0
+                            )
+                            if (persistedNote.isNotEmpty()) {
+                                upsertPersistedLogNote(
+                                    PersistedLogNote(entry.id, store, -1, identity, persistedNote)
+                                )
+                            }
+                            val position = if (type == LogType.BLOOD_GLUCOSE) {
+                                synchronized(bloodLabelLock) {
+                                    val saveLabel = currentBloodLabelForSave()
+                                    if (saveLabel < 0) {
+                                        -1
+                                    } else {
+                                        identity = identity.copy(label = saveLabel)
+                                        Natives.saveNum(ptr, timestamp / 1000L, value, saveLabel, 0)
+                                    }
+                                }
+                            } else {
+                                Natives.saveNum(ptr, timestamp / 1000L, value, labelToSave, 0)
+                            }
+                            if (position >= 0 && persistedNote.isNotEmpty()) {
+                                val notes = readPersistedLogNotes().toMutableList()
+                                notes.replaceAll {
+                                    if (it.store == store && it.position >= position) it.copy(position = it.position + 1) else it
+                                }
+                                notes.removeAll { it.id == entry.id }
+                                notes += PersistedLogNote(entry.id, store, position, identity, persistedNote)
+                                writePersistedLogNotes(notes)
+                            }
+                            syncNumberStore(store)
+                            loadLogsFromNative()
+                        }
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
+        return true
+    }
+
+    fun updateLogEntry(
+        entry: LogRecord,
+        type: LogType,
+        value: Float,
+        timestamp: Long = entry.timestamp,
+        note: String = entry.note
+    ) {
+        val targetNativeLabel = if (type == entry.type && entry.nativeLabel != null) {
+            entry.nativeLabel
+        } else if (type == LogType.BLOOD_GLUCOSE) {
+            synchronized(bloodLabelLock) { currentBloodLabelForSave() }
+        } else {
+            nativeLabel(type)
+        }
+        if (type == LogType.BLOOD_GLUCOSE && targetNativeLabel < 0) return
+        val source = entry.nativeSource
+        if (source == null) {
+            publishLogs(_logs.value.map {
+                if (it.id == entry.id) it.copy(
+                    type = type,
+                    value = value,
+                    timestamp = timestamp,
+                    note = note,
+                    nativeLabel = targetNativeLabel
+                ) else it
+            })
+            return
+        }
+
+        publishLogs(_logs.value.map {
+            if (sameSource(it, entry)) it.copy(
+                type = type,
+                value = value,
+                timestamp = timestamp,
+                note = note,
+                nativeLabel = targetNativeLabel
+            ) else it
+        })
+        scope.launch(Dispatchers.IO) {
+            synchronized(logNoteLock) {
+                try {
+                    if (Applic.Nativesloaded) {
+                        val ptr = numberStorePointer(source.store)
+                        val itm = ptr?.let { Natives.getNumitem(it, source.position) }
+                        if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
+                            val hitPtr = Natives.mkhitptr(ptr, source.position)
+                            if (hitPtr != 0L) {
+                                try {
+                                    Natives.hitchange(
+                                        hitPtr,
+                                        timestamp / 1000L,
+                                        value,
+                                        targetNativeLabel,
+                                        entry.mealPointer
+                                    )
+                                } finally {
+                                    Natives.freehitptr(hitPtr)
+                                }
+                                val newIdentity = NativeEntryIdentity(
+                                    store = source.store,
+                                    timeSeconds = timestamp / 1000L,
+                                    valueBits = java.lang.Float.floatToRawIntBits(value).toLong() and 0xffffffffL,
+                                    label = targetNativeLabel,
+                                    mealPointer = entry.mealPointer
+                                )
+                                val newSource = findNativeSource(source.store, newIdentity, source.position)
+                                if (newSource != null) {
+                                    if (note.isNotBlank()) {
+                                        upsertPersistedLogNote(
+                                            PersistedLogNote(entry.id, source.store, newSource.position, newIdentity, note.trim())
+                                        )
+                                    } else {
+                                        removePersistedLogNote(entry.id)
+                                    }
+                                }
+                                syncNumberStore(source.store)
+                            }
+                        }
+                        loadLogsFromNative()
+                    }
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    fun deleteLogEntry(entry: LogRecord) {
+        val source = entry.nativeSource
+        if (source == null) {
+            publishLogs(_logs.value.filterNot { it.id == entry.id })
+            return
+        }
+
+        publishLogs(_logs.value.filterNot { sameSource(it, entry) })
+        scope.launch(Dispatchers.IO) {
+            synchronized(logNoteLock) {
+                try {
+                    if (Applic.Nativesloaded) {
+                        val ptr = numberStorePointer(source.store)
+                        val itm = ptr?.let { Natives.getNumitem(it, source.position) }
+                        if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
+                            Natives.removeNum(ptr, source.position)
+                            removePersistedLogNote(entry.id)
+                            syncNumberStore(source.store)
+                        }
+                        loadLogsFromNative()
+                    }
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    // --- SENSOR ACTIONS (UX Overhaul) ---
+
+    fun setSensorHidden(sensorPtr: Long, hidden: Boolean) {
+        _sensorDetails.value = _sensorDetails.value.map {
+            if (it.sensorPtr == sensorPtr || sensorPtr == 0L) it.copy(isHidden = hidden) else it
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded && sensorPtr != 0L) {
+                    Natives.setHidefromSensorptr(sensorPtr, hidden)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun useSensorAgain(sensorPtr: Long, activity: Activity?) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded && sensorPtr != 0L) {
+                    SensorBridge.useAgain(activity as? MainActivity, sensorPtr)
+                }
+            } catch (_: Throwable) {}
+            loadSensorsFromNative()
+        }
+    }
+
+    fun forgetAndRescan(sensorId: String) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                SensorBridge.forgetDevice(sensorId)
+            } catch (_: Throwable) {}
+            loadSensorsFromNative()
+        }
+    }
+
+    fun resetSensor(sensorPtr: Long) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded && sensorPtr != 0L) {
+                    // SiBionics reset if supported
+                }
+            } catch (_: Throwable) {}
+            loadSensorsFromNative()
+        }
+    }
+
+    // --- ALARM CONFIG ACTIONS ---
+
+    fun updateAlarms(config: AlarmConfig) {
+        _alarms.value = config
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setalarms(
+                        config.lowThreshold,
+                        config.highThreshold,
+                        config.lowAlarmEnabled,
+                        config.highAlarmEnabled,
+                        config.valueAvailableNotification,
+                        config.lossAlarmEnabled
+                    )
+                    Natives.writealarmsuspension(0, config.lowSnoozeMinutes.toShort())
+                    Natives.writealarmsuspension(1, config.highSnoozeMinutes.toShort())
+                    Natives.writealarmsuspension(4, config.lossWaitMinutes.toShort())
+                    Natives.setalarmSoundType(config.soundStream.id)
+                    // Advanced alarms are written as a group; values not edited by
+                    // the caller are the ones previously read, so this is a no-op for them.
+                    Natives.setAdvancedAlarms(
+                        config.urgentLowThreshold,
+                        config.veryHighThreshold,
+                        config.urgentLowEnabled,
+                        config.veryHighEnabled,
+                        config.preLowEnabled,
+                        config.preHighEnabled,
+                        config.preLowThreshold,
+                        config.preHighThreshold
+                    )
+                    Natives.writealarmsuspension(5, config.urgentLowSnoozeMinutes.toShort())
+                    Natives.writealarmsuspension(6, config.veryHighSnoozeMinutes.toShort())
+                    Natives.writealarmsuspension(7, config.preLowSnoozeMinutes.toShort())
+                    Natives.writealarmsuspension(8, config.preHighSnoozeMinutes.toShort())
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // --- ALARM BEHAVIOR (SOUND / VIBRATION / DURATION) ACTIONS ---
+
+    private fun readAlarmBehavior(): List<AlarmBehavior> {
+        return behaviorKinds.map { kind ->
+            AlarmBehavior(
+                kind = kind,
+                sound = try { Natives.alarmhassound(kind) } catch (_: Throwable) { true },
+                vibration = try { Natives.alarmhasvibration(kind) } catch (_: Throwable) { true },
+                durationSecs = try { Natives.readalarmduration(kind).takeIf { it > 0 } ?: 60 } catch (_: Throwable) { 60 }
+            )
+        }
+    }
+
+    fun behaviorFor(kind: Int): AlarmBehavior? = _alarmBehavior.value.find { it.kind == kind }
+
+    fun updateAlarmBehavior(behavior: AlarmBehavior) {
+        _alarmBehavior.value = _alarmBehavior.value.map { if (it.kind == behavior.kind) behavior else it }
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    // Preserve ringtone URI and flash flag, only sound/vibration change here.
+                    val uri = try { Natives.readring(behavior.kind) } catch (_: Throwable) { null } ?: ""
+                    val flash = try { Natives.alarmhasflash(behavior.kind) } catch (_: Throwable) { false }
+                    Natives.writering(behavior.kind, uri, behavior.sound, flash, behavior.vibration)
+                    Natives.writealarmduration(behavior.kind, behavior.durationSecs)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // --- VOICE OUTPUT ACTIONS ---
+
+    fun setVoiceAnnounce(enabled: Boolean) {
+        _voiceAnnounce.value = enabled
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    // Preserve current rate/pitch, only the on/off state changes here.
+                    val speed = try { Natives.getVoiceSpeed().let { if (it > 0) it else 1f } } catch (_: Throwable) { 1f }
+                    val pitch = try { Natives.getVoicePitch().let { if (it > 0) it else 1f } } catch (_: Throwable) { 1f }
+                    Natives.saveVoice(speed, pitch, 50, 0, enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setSpeakAlarms(enabled: Boolean) {
+        _speakAlarms.value = enabled
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setspeakalarms(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setNfcSound(enabled: Boolean) {
+        _hardwareConfig.value = _hardwareConfig.value.copy(nfcSound = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setnfcsound(enabled)
+                    Applic.RunOnUiThread {
+                        Applic.getActivity()?.setnfc()
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setNfcLaunchEnabled(enabled: Boolean) {
+        _hardwareConfig.value = _hardwareConfig.value.copy(globalScanStartsApp = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                val component = ComponentName(Applic.app, NFC_LAUNCH_COMPONENT)
+                val state = if (enabled) {
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                } else {
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                }
+                Applic.app.packageManager.setComponentEnabledSetting(
+                    component,
+                    state,
+                    PackageManager.DONT_KILL_APP
+                )
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setHour24(use24Hour: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(use24Hour = use24Hour)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Applic.sethour24(use24Hour)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // --- EXCHANGES ACTIONS ---
+
+    private fun discoverBroadcastReceiverApps(
+        action: String,
+        selectedPackages: List<String>
+    ): List<BroadcastReceiverApp> = try {
+        val packageManager = Applic.app.packageManager
+        val installedPackages = packageManager
+            .queryBroadcastReceivers(Intent(action), 0)
+            .asSequence()
+            .mapNotNull { it.activityInfo?.packageName }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toList()
+        val installedApps = installedPackages.map { packageName ->
+            val label = try {
+                val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
+                packageManager.getApplicationLabel(applicationInfo).toString().trim()
+            } catch (_: Throwable) {
+                packageName
+            }
+            BroadcastReceiverApp(
+                packageName = packageName,
+                label = label.ifEmpty { packageName }
+            )
+        }
+        val installedPackageSet = installedPackages.toSet()
+        val unavailableApps = selectedPackages
+            .filterNot { it in installedPackageSet }
+            .map { BroadcastReceiverApp(packageName = it, label = it, installed = false) }
+        (installedApps + unavailableApps)
+            .distinctBy { it.packageName }
+            .sortedWith(compareBy({ !it.installed }, { it.label.lowercase() }, { it.packageName }))
+    } catch (_: Throwable) {
+        emptyList()
+    }
+
+    private fun normalizeReceiverPackages(packageNames: Sequence<String>): List<String> = packageNames
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && it.toByteArray(Charsets.UTF_8).size < 100 }
+        .distinct()
+        .take(10)
+        .toList()
+
+    fun refreshXdripReceiverApps() {
+        _xdripReceiverAppsLoading.value = true
+        scope.launch(Dispatchers.IO) {
+            _xdripReceiverApps.value = discoverBroadcastReceiverApps(
+                action = SendLikexDrip.ACTION,
+                selectedPackages = _exchanges.value.xdripReceiverPackages
+            )
+            _xdripReceiverAppsLoading.value = false
+        }
+    }
+
+    fun setXdripReceivers(packageNames: List<String>) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    val normalizedPackages = normalizeReceiverPackages(packageNames.asSequence())
+                    Natives.setxdripRecepters(normalizedPackages.toTypedArray())
+                    SendLikexDrip.setreceivers()
+                    val savedPackages = normalizeReceiverPackages(Natives.xdripRecepters().asSequence())
+                    _exchanges.value = _exchanges.value.copy(
+                        xdripBroadcast = savedPackages.isNotEmpty(),
+                        xdripReceiverPackages = savedPackages
+                    )
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun refreshGlucodataReceiverApps() {
+        _glucodataReceiverAppsLoading.value = true
+        scope.launch(Dispatchers.IO) {
+            _glucodataReceiverApps.value = discoverBroadcastReceiverApps(
+                action = JugglucoSend.ACTION,
+                selectedPackages = _exchanges.value.glucodataReceiverPackages
+            )
+            _glucodataReceiverAppsLoading.value = false
+        }
+    }
+
+    fun setGlucodataReceivers(packageNames: List<String>) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    val normalizedPackages = normalizeReceiverPackages(packageNames.asSequence())
+                    Natives.setglucodataRecepters(normalizedPackages.toTypedArray())
+                    JugglucoSend.setreceivers()
+                    val savedPackages = normalizeReceiverPackages(Natives.glucodataRecepters().asSequence())
+                    _exchanges.value = _exchanges.value.copy(
+                        glucodataBroadcast = savedPackages.isNotEmpty(),
+                        glucodataReceiverPackages = savedPackages
+                    )
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setHealthConnect(enabled: Boolean, context: Activity?) {
+        _exchanges.value = _exchanges.value.copy(healthConnect = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    SensorBridge.initHealthConnect(context as? MainActivity, enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setLibreViewEnabled(enabled: Boolean) {
+        _exchanges.value = _exchanges.value.copy(libreViewEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setuselibreview(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setXdripWebServer(enabled: Boolean) {
+        _exchanges.value = _exchanges.value.copy(xdripWebServer = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setusexdripwebserver(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun restartXdripWebServer() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setusexdripwebserver(false)
+                    Natives.setusexdripwebserver(true)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setLibrelinkBroadcast(enabled: Boolean) {
+        _exchanges.value = _exchanges.value.copy(librelinkBroadcast = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    if (enabled) {
+                        val intent = Intent(XInfuus.glucoseaction)
+                        val receivers = Applic.app.packageManager.queryBroadcastReceivers(intent, 0)
+                        val names = receivers.mapNotNull { it.activityInfo?.packageName }.distinct()
+                        val targetNames = if (names.isNotEmpty()) names.toTypedArray() else arrayOf("tk.glucodata.dev", "com.freestylelibre.app")
+                        Natives.setlibrelinkRecepters(targetNames)
+                    } else {
+                        Natives.setlibrelinkRecepters(emptyArray())
+                    }
+                    XInfuus.setlibrenames()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // --- MIRROR & DATA RELAY ACTIONS ---
+
+    fun refreshMirrorConnections() {
+        scope.launch(Dispatchers.IO) {
+            val list = mutableListOf<MirrorConnection>()
+            try {
+                if (Applic.Nativesloaded) {
+                    Applic.ensureNetStarted()
+                    val count = try { Natives.backuphostNr() } catch (_: Throwable) { 0 }
+                    for (i in 0 until count) {
+                        val rawIps = try { Natives.getbackupIPs(i) } catch (_: Throwable) { null }
+                        val ips = rawIps?.filterNotNull()?.filter { it.isNotBlank() } ?: emptyList()
+                        val label = try { Natives.getbackuplabel(i) ?: "" } catch (_: Throwable) { "" }
+                        val port = try { Natives.getbackuphostport(i) ?: "" } catch (_: Throwable) { "" }
+                        val isReceiver = try { (Natives.getbackuphostreceive(i) and 2) != 0 } catch (_: Throwable) { false }
+                        val sendAmounts = try { Natives.getbackuphostnums(i) } catch (_: Throwable) { false }
+                        val sendStream = try { Natives.getbackuphoststream(i) } catch (_: Throwable) { false }
+                        val sendScans = try { Natives.getbackuphostscans(i) } catch (_: Throwable) { false }
+                        val isActive = try { Natives.getbackuphostactive(i) } catch (_: Throwable) { false }
+                        val isPassive = try { Natives.getbackuphostpassive(i) } catch (_: Throwable) { false }
+                        val isDeactivated = try { Natives.getHostDeactivated(i) } catch (_: Throwable) { false }
+                        val status = try { Natives.mirrorStatus(i) ?: "" } catch (_: Throwable) { "" }
+                        list.add(
+                            MirrorConnection(
+                                index = i,
+                                label = label,
+                                ips = ips,
+                                port = port,
+                                isReceiver = isReceiver,
+                                sendAmounts = sendAmounts,
+                                sendStream = sendStream,
+                                sendScans = sendScans,
+                                isActive = isActive,
+                                isPassive = isPassive,
+                                isDeactivated = isDeactivated,
+                                status = status
+                            )
+                        )
+                    }
+                }
+            } catch (_: Throwable) {}
+            _mirrorConnections.value = list
+        }
+    }
+
+    fun addLocalReceiverConnection(targetPort: String = "17580", label: String = "Local Prod Sync"): Boolean {
+        return try {
+            if (!Applic.Nativesloaded) return false
+            val portStr = targetPort.trim().ifEmpty { "17580" }
+            val pos = Natives.changebackuphost(
+                -1,
+                arrayOf("127.0.0.1"),
+                1,
+                false,
+                portStr,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                false,
+                null,
+                0L,
+                label.trim().ifEmpty { "Local Prod Sync" },
+                false,
+                false,
+                null,
+                false,
+                BleMirror.TRANSPORT_TCP,
+                false
+            )
+            if (pos >= 0) {
+                BleMirror.configurationChanged(pos, true)
+                MessageSender.reinit()
+                Applic.switchSync()
+                refreshMirrorConnections()
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun addLocalSenderConnection(targetPort: String = "17581", label: String = "Local Dev Build"): Boolean {
+        return try {
+            if (!Applic.Nativesloaded) return false
+            val portStr = targetPort.trim().ifEmpty { "17581" }
+            val pos = Natives.changebackuphost(
+                -1,
+                arrayOf("127.0.0.1"),
+                1,
+                false,
+                portStr,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                null,
+                0L,
+                label.trim().ifEmpty { "Local Dev Build" },
+                false,
+                false,
+                null,
+                false,
+                BleMirror.TRANSPORT_TCP,
+                false
+            )
+            if (pos >= 0) {
+                BleMirror.configurationChanged(pos, true)
+                MessageSender.reinit()
+                Applic.switchSync()
+                refreshMirrorConnections()
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun addCustomMirrorConnection(
+        ip: String,
+        port: String,
+        isReceiver: Boolean,
+        label: String,
+        sendStream: Boolean = true,
+        sendScans: Boolean = true,
+        sendAmounts: Boolean = true
+    ): Boolean {
+        return try {
+            if (!Applic.Nativesloaded) return false
+            val cleanIp = ip.trim().ifEmpty { "127.0.0.1" }
+            val cleanPort = port.trim().ifEmpty { "17580" }
+            val pos = Natives.changebackuphost(
+                -1,
+                arrayOf(cleanIp),
+                1,
+                false,
+                cleanPort,
+                if (isReceiver) false else sendAmounts,
+                if (isReceiver) false else sendStream,
+                if (isReceiver) false else sendScans,
+                false,
+                isReceiver,
+                isReceiver,
+                false,
+                null,
+                0L,
+                label.trim().ifEmpty { if (isReceiver) "Receiver" else "Sender" },
+                false,
+                false,
+                null,
+                false,
+                BleMirror.TRANSPORT_TCP,
+                false
+            )
+            if (pos >= 0) {
+                BleMirror.configurationChanged(pos, true)
+                MessageSender.reinit()
+                Applic.switchSync()
+                refreshMirrorConnections()
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    suspend fun mirrorHostEditState(index: Int): MirrorHostEditState? = withContext(Dispatchers.IO) {
+        try {
+            if (!Applic.Nativesloaded || index < 0) return@withContext null
+            val raw = Natives.getMirrorHostEditState(index) ?: return@withContext null
+            if (raw.size < Natives.MIRRORSTATE_SIZE) return@withContext null
+            fun boolAt(pos: Int) = raw[pos] as? Boolean ?: false
+            fun intAt(pos: Int) = (raw[pos] as? Int) ?: 0
+            MirrorHostEditState(
+                index = index,
+                label = raw[Natives.MIRRORSTATE_LABEL] as? String ?: "",
+                hasLabel = boolAt(Natives.MIRRORSTATE_HASLABEL),
+                ips = (raw[Natives.MIRRORSTATE_IPS] as? Array<*>)
+                    ?.mapNotNull { it as? String }
+                    ?: emptyList(),
+                port = raw[Natives.MIRRORSTATE_PORT] as? String ?: "",
+                receiveFrom = intAt(Natives.MIRRORSTATE_RECEIVEFROM),
+                activeReceive = intAt(Natives.MIRRORSTATE_ACTIVERECEIVE),
+                sendAmounts = boolAt(Natives.MIRRORSTATE_SENDNUMS),
+                sendStream = boolAt(Natives.MIRRORSTATE_SENDSTREAM),
+                sendScans = boolAt(Natives.MIRRORSTATE_SENDSCANS),
+                sendPassive = boolAt(Natives.MIRRORSTATE_SENDPASSIVE),
+                restore = boolAt(Natives.MIRRORSTATE_RESTORE),
+                startTime = (raw[Natives.MIRRORSTATE_STARTTIME] as? Long) ?: 0L,
+                detect = boolAt(Natives.MIRRORSTATE_DETECT),
+                testIp = boolAt(Natives.MIRRORSTATE_TESTIP),
+                hasHostname = boolAt(Natives.MIRRORSTATE_HOSTNAME),
+                iceLabel = raw[Natives.MIRRORSTATE_ICE] as? String ?: "",
+                side = boolAt(Natives.MIRRORSTATE_SIDE),
+                transport = intAt(Natives.MIRRORSTATE_TRANSPORT),
+                bleClient = boolAt(Natives.MIRRORSTATE_BLECLIENT),
+                bleReverse = boolAt(Natives.MIRRORSTATE_BLEREVERSE),
+                bleUnproven = boolAt(Natives.MIRRORSTATE_BLEUNPROVEN),
+                wearOs = boolAt(Natives.MIRRORSTATE_WEAROS),
+                deactivated = boolAt(Natives.MIRRORSTATE_DEACTIVATED),
+                hasPassword = boolAt(Natives.MIRRORSTATE_HASPASS)
+            )
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    suspend fun saveMirrorConnection(
+        index: Int,
+        ips: List<String>,
+        port: String,
+        isReceiver: Boolean,
+        label: String,
+        sendStream: Boolean = true,
+        sendScans: Boolean = true,
+        sendAmounts: Boolean = true,
+        isActiveOnly: Boolean = false,
+        isPassiveOnly: Boolean = false,
+        changedFields: Int = 0,
+        password: String? = null,
+        passwordAction: Int = Natives.MIRRORPASS_PRESERVE
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            if (!Applic.Nativesloaded) return@withContext false
+            val cleanIps = ips.map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { listOf("127.0.0.1") }
+            val cleanPort = port.trim().ifEmpty { "17580" }
+            val cleanLabel = label.trim()
+            if (index < 0) {
+                val pos = Natives.changebackuphost(
+                    -1,
+                    cleanIps.toTypedArray(),
+                    cleanIps.size,
+                    false,
+                    cleanPort,
+                    if (isReceiver) false else sendAmounts,
+                    if (isReceiver) false else sendStream,
+                    if (isReceiver) false else sendScans,
+                    false,
+                    isReceiver,
+                    isActiveOnly || isReceiver,
+                    isPassiveOnly,
+                    null,
+                    0L,
+                    cleanLabel.ifEmpty { if (isReceiver) "Receiver" else "Sender" },
+                    false,
+                    false,
+                    null,
+                    false,
+                    BleMirror.TRANSPORT_TCP,
+                    false
+                )
+                if (pos < 0) return@withContext false
+                BleMirror.configurationChanged(pos, true)
+                MessageSender.reinit()
+                Applic.switchSync()
+                refreshMirrorConnections()
+                return@withContext true
+            }
+            if (changedFields == 0) {
+                refreshMirrorConnections()
+                return@withContext true
+            }
+            if (mirrorHostEditState(index) == null) return@withContext false
+            val pass = password?.ifBlank { null }
+            val action = if (pass != null && passwordAction == Natives.MIRRORPASS_SET) {
+                Natives.MIRRORPASS_SET
+            } else if (passwordAction == Natives.MIRRORPASS_CLEAR) {
+                Natives.MIRRORPASS_CLEAR
+            } else {
+                Natives.MIRRORPASS_PRESERVE
+            }
+            val pos = Natives.patchbackuphost(
+                index,
+                changedFields,
+                cleanIps.toTypedArray(),
+                cleanIps.size,
+                cleanPort,
+                if (isReceiver) 2 else 0,
+                sendAmounts,
+                sendStream,
+                sendScans,
+                cleanLabel.ifEmpty { null },
+                pass,
+                action
+            )
+            if (pos < 0) return@withContext false
+            if (changedFields == Natives.MIRRORFIELD_LABEL) {
+                refreshMirrorConnections()
+                return@withContext true
+            }
+            BleMirror.configurationChanged(pos, true)
+            MessageSender.reinit()
+            Applic.switchSync()
+            refreshMirrorConnections()
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun deleteMirrorConnection(index: Int) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded && index >= 0) {
+                    Natives.deletebackuphost(index)
+                    BleMirror.configurationChanged()
+                    MessageSender.reinit()
+                    refreshMirrorConnections()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun resetMirrorConnection(index: Int) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded && index >= 0) {
+                    Natives.resetbackuphost(index)
+                    Applic.switchSync()
+                    MessageSender.reinit()
+                    refreshMirrorConnections()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setMirrorReceivePort(port: String): Boolean {
+        return try {
+            val cleanPort = port.trim()
+            val num = cleanPort.toIntOrNull()
+            if (num != null && num in 1024..65535 &&
+                Natives.setreceiveport(cleanPort) == Natives.RECEIVEPORT_OK
+            ) {
+                MessageSender.reinit()
+                true
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun openAdvancedMirrorView(activity: Activity) {
+        if (activity is MainActivity) {
+            try {
+                Backup().realmkbackupview(activity, false)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun openWebServerConfig(activity: Activity) {
+        if (activity is MainActivity) {
+            try {
+                Nightscout.show(activity, activity.window.decorView)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // --- SMARTWATCH & WEAR OS ACTIONS ---
+
+    fun refreshWearDevices() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val list = mutableListOf<WearWatchDevice>()
+                val targets = LinkedHashMap<String, Pair<String, Boolean>>()
+
+                val nodes = WatchBridge.getWearNodes()
+                for (node in nodes) {
+                    targets[node.id] = Pair(node.displayName, MessageSender.isGalaxy(node))
+                }
+                for (label in WatchBridge.getBleWatchLabels()) {
+                    targets.putIfAbsent(label, Pair(label, WatchBridge.isGalaxyDefault()))
+                }
+
+                val mirrorCount = try { Natives.backuphostNr() } catch (_: Throwable) { 0 }
+                val mirrorMap = mutableMapOf<String, Int>()
+                for (i in 0 until mirrorCount) {
+                    val isWearOS = try { Natives.isWearOS(i) } catch (_: Throwable) { false }
+                    val label = try { Natives.getbackuplabel(i) ?: "" } catch (_: Throwable) { "" }
+                    if (isWearOS && label.isNotBlank()) {
+                        mirrorMap[label] = i
+                        targets.putIfAbsent(label, Pair(label, WatchBridge.isGalaxyDefault()))
+                    }
+                }
+
+                for ((id, pair) in targets) {
+                    val displayName = pair.first
+                    val isGalaxy = pair.second
+                    val dirVal = try { Natives.directsensorwatch(id) } catch (_: Throwable) { 0 }
+                    val isDirectSensor = dirVal > 0
+                    val numsVal = try { Natives.hasWatchNums(id) } catch (_: Throwable) { 0 }
+                    val isEnterNums = numsVal > 0
+
+                    val mirrorIndex = mirrorMap[id] ?: -1
+                    var status = ""
+                    var ips = emptyList<String>()
+                    var isConnected = false
+                    if (mirrorIndex >= 0) {
+                        status = try { Natives.mirrorStatus(mirrorIndex) ?: "" } catch (_: Throwable) { "" }
+                        val rawIps = try { Natives.getbackupIPs(mirrorIndex) } catch (_: Throwable) { null }
+                        ips = rawIps?.filterNotNull()?.filter { it.isNotBlank() } ?: emptyList()
+                        val isActive = try { Natives.getbackuphostactive(mirrorIndex) } catch (_: Throwable) { false }
+                        val isLive = status.contains("live socket: true", ignoreCase = true) ||
+                                status.contains("TCP/IP live socket</b>: true", ignoreCase = true) ||
+                                status.contains("Direct Bluetooth (BLE GATT)=true", ignoreCase = true) ||
+                                status.contains("Messages (Wear OS MessageClient)=true", ignoreCase = true)
+                        isConnected = isLive || isActive
+                    }
+
+                    list.add(
+                        WearWatchDevice(
+                            id = id,
+                            displayName = if (displayName.isNotBlank() && displayName != id) "$displayName ($id)" else id,
+                            isDirectSensor = isDirectSensor,
+                            isEnterNumsOnWatch = isEnterNums,
+                            isGalaxy = isGalaxy,
+                            mirrorIndex = mirrorIndex,
+                            mirrorStatus = status,
+                            mirrorIps = ips,
+                            isConnected = isConnected,
+                            transport = if (mirrorIndex >= 0) WatchBridge.getWatchTransport(mirrorIndex) else -1
+                        )
+                    )
+                }
+                _wearDevices.value = list
+                updateWearDiagnosticInfo(targets.size)
+            } catch (th: Throwable) {
+                Log.stack("GlucoseRepository", th)
+            }
+        }
+    }
+
+    private fun updateWearDiagnosticInfo(reachableNodesCount: Int) {
+        val port = try {
+            Natives.getreceiveport() ?: ""
+        } catch (_: Throwable) { "" }
+        val isReceiverEnabled = WatchBridge.isWearOsEnabled()
+        val appId = try { Applic.app.packageName ?: "" } catch (_: Throwable) { "" }
+        val version = try {
+            val pInfo = Applic.app.packageManager.getPackageInfo(appId, 0)
+            pInfo.versionName ?: ""
+        } catch (_: Throwable) { "" }
+
+        _wearDiagnosticInfo.value = WearDiagnosticInfo(
+            phoneAppId = appId,
+            phoneVersion = version,
+            mirrorPort = if (port.isNotBlank()) port else if (BuildConfig.DEBUG) "9113" else "8795",
+            isReceiverServiceEnabled = isReceiverEnabled,
+            reachableWearNodesCount = reachableNodesCount
+        )
+    }
+
+    fun setWearOsEnabled(context: Context, enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(wearOsEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWearOsEnabled(context, enabled)
+            delay(500L)
+            refreshWearDevices()
+        }
+    }
+
+    fun scanForWatches() {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.searchWatches()
+            delay(1_000L)
+            refreshWearDevices()
+        }
+    }
+
+    fun setWatchDirectSensor(watchId: String, direct: Boolean, isGalaxy: Boolean, hasWatchNums: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWatchDirectSensor(watchId, direct, isGalaxy, hasWatchNums)
+            delay(500L)
+            refreshWearDevices()
+        }
+    }
+
+    fun setWatchEnterNums(watchId: String, watchNums: Boolean, direct: Boolean, isGalaxy: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWatchEnterNums(watchId, watchNums, direct, isGalaxy)
+            delay(500L)
+            refreshWearDevices()
+        }
+    }
+
+    fun setWatchTransport(watchId: String, mirrorIndex: Int, transport: Int) {
+        _wearDevices.value = _wearDevices.value.map {
+            if (it.id == watchId) it.copy(transport = transport) else it
+        }
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWatchTransport(watchId, mirrorIndex, transport)
+            delay(500L)
+            refreshWearDevices()
+        }
+    }
+
+    fun initWatchApp(watchId: String, isGalaxy: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.initWatchApp(watchId, isGalaxy)
+            delay(1_000L)
+            refreshWearDevices()
+        }
+    }
+
+    fun syncWatch(watchId: String) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.syncWatch(watchId)
+            delay(1_000L)
+            refreshWearDevices()
+        }
+    }
+
+    fun resetWatchDefaults(watchId: String, isGalaxy: Boolean, context: Context) {
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.resetWatchDefaults(watchId, isGalaxy, context)
+            delay(1_000L)
+            refreshWearDevices()
+        }
+    }
+
+    fun setWatchdripEnabled(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(watchdripEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setWatchdrip(enabled)
+        }
+    }
+
+    fun setGadgetbridgeEnabled(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(gadgetbridgeEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setGadgetbridge(enabled)
+        }
+    }
+
+    fun setGarminEnabled(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(garminEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setGarmin(enabled)
+        }
+    }
+
+    fun setSeparateAlerts(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(separateAlerts = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setSeparateAlerts(enabled)
+        }
+    }
+
+    fun setNotifyWatch(enabled: Boolean) {
+        _watchConfig.value = _watchConfig.value.copy(notifyWatch = enabled)
+        scope.launch(Dispatchers.IO) {
+            WatchBridge.setNotifyWatch(enabled)
+        }
+    }
+
+    // --- DISPLAY & UI ACTIONS ---
+
+    fun setFloatingGlucose(enabled: Boolean, activity: Activity) {
+        _displayConfig.value = _displayConfig.value.copy(floatingGlucose = enabled)
+        scope.launch(Dispatchers.Main) {
+            try {
+                tk.glucodata.Floating.setfloatglucose(activity, enabled)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setStatusBarNotification(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(statusBarNotification = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                Notify.glucosestatus(enabled)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setSystemUiFullscreen(enabled: Boolean, activity: Activity?) {
+        _displayConfig.value = _displayConfig.value.copy(systemUiFullscreen = enabled)
+        scope.launch(Dispatchers.Main) {
+            try {
+                if (Applic.Nativesloaded) {
+                    SensorBridge.setSystemUi(activity as? MainActivity, enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setInvertColors(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(invertColors = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setInvertColors(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setCalibrationEnabled(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(calibrationEnabled = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setDoCalibrate(enabled)
+                    Natives.setshowcalibratedstream(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setBloodLabelIndex(index: Int) {
+        if (!canSelectBloodLabel(index)) return
+        try {
+            synchronized(bloodLabelLock) {
+                if (Applic.Nativesloaded) {
+                    Natives.setbloodvar(index.toByte())
+                }
+                rememberBloodLabel(bloodLabelIndex)
+                rememberBloodLabel(index)
+                bloodLabelIndex = index
+            }
+            _displayConfig.value = _displayConfig.value.copy(bloodLabelIndex = index)
+            scope.launch(Dispatchers.IO) {
+                loadLogsFromNative()
+            }
+        } catch (_: Throwable) {}
+    }
+
+    fun setCalibratePastReadings(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(calibratePastReadings = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setCalibratePast(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setCalibrateAllValues(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(calibrateAllValues = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setAllValues(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    // Only true once: before the user has ever been asked, and only while the feature is off.
+    fun shouldPromptCalibrationEnable(): Boolean {
+        if (_displayConfig.value.calibrationEnabled) return false
+        return try {
+            !Applic.app.getSharedPreferences(CALIBRATION_PREFS, Context.MODE_PRIVATE)
+                .getBoolean(KEY_CALIBRATION_PROMPT_SHOWN, false)
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun markCalibrationPromptShown() {
+        try {
+            Applic.app.getSharedPreferences(CALIBRATION_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_CALIBRATION_PROMPT_SHOWN, true)
+                .apply()
+        } catch (_: Throwable) {}
+    }
+
+    fun toggleGraphLayer(layer: String, enabled: Boolean) {
+        val current = _displayConfig.value
+        val updated = when (layer) {
+            "scans" -> current.copy(showScans = enabled)
+            "calibratedscans" -> current.copy(showCalibratedScans = enabled)
+            "stream" -> current.copy(showStream = enabled)
+            "calibrated", "calibratedstream" -> current.copy(showCalibratedStream = enabled)
+            "history" -> current.copy(showHistory = enabled)
+            "calibratedhistory" -> current.copy(showCalibratedHistory = enabled)
+            "amounts" -> current.copy(showAmounts = enabled)
+            "meals" -> current.copy(showMeals = enabled)
+            else -> current
+        }
+        _displayConfig.value = updated
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    when (layer) {
+                        "scans" -> Natives.setshowscans(enabled)
+                        "calibratedscans" -> Natives.setshowcalibratedscans(enabled)
+                        "stream" -> Natives.setshowstream(enabled)
+                        "calibrated", "calibratedstream" -> Natives.setshowcalibratedstream(enabled)
+                        "history" -> Natives.setshowhistories(enabled)
+                        "calibratedhistory" -> Natives.setshowcalibratedhistories(enabled)
+                        "amounts" -> Natives.setshownumbers(enabled)
+                        "meals" -> Natives.setshowmeals(enabled)
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setMinimalistUnits(enabled: Boolean) {
+        _displayConfig.value = _displayConfig.value.copy(minimalistUnits = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_MINIMALIST_UNITS, enabled)
+                    .apply()
+            } catch (_: Throwable) {}
+        }
+    }
+
+    /**
+     * @param fromRemote true when the change arrived from the paired device, so it is not sent
+     *   back out again.
+     */
+    fun setDeltaCalculation(calculation: DeltaCalculation, fromRemote: Boolean = false) {
+        _displayConfig.value = _displayConfig.value.copy(deltaCalculation = calculation)
+        scope.launch(Dispatchers.IO) {
+            try {
+                Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt(KEY_DELTA_CALCULATION, calculation.minutes)
+                    .apply()
+            } catch (_: Throwable) {}
+            if (!fromRemote) {
+                try {
+                    DisplaySync.onLocalDeltaChange(calculation)
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    // --- GRAPH NAVIGATION ACTIONS ---
+
+    fun jumpToNow() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.settonow()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun navigateDays(days: Int) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    if (days < 0) Natives.prevday(-days) else Natives.nextday(days)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun showLastScan() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.showlastscan()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun moveToDate(year: Int, month: Int, day: Int) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    val start = Natives.getstarttime()
+                    Natives.movedate(start, year, month, day)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun searchGlucose(
+        label: Int = -1,
+        under: Float = 0f,
+        above: Float = 0f,
+        keyword: String = "",
+        typeLabels: Map<LogType, String> = emptyMap()
+    ): List<Long> {
+        val matches = mutableListOf<Long>()
+
+        // 1. Search in glucose readings
+        if (under > 0f || above > 0f) {
+            for (pt in _readings.value) {
+                if (under > 0f && pt.valueMgDl <= under) {
+                    matches.add(pt.timestamp)
+                } else if (above > 0f && pt.valueMgDl >= above) {
+                    matches.add(pt.timestamp)
+                }
+            }
+        }
+
+        // 2. Search in event logs
+        for (log in _logs.value) {
+            val categoryMatches = when (label) {
+                0 -> log.type == LogType.RAPID_INSULIN
+                1 -> log.type == LogType.CARBS || log.type == LogType.MEAL
+                2 -> log.type == LogType.BASAL_INSULIN
+                3 -> log.type == LogType.BLOOD_GLUCOSE
+                else -> true
+            }
+            val keywordMatches = if (keyword.isNotEmpty()) {
+                (log.note?.contains(keyword, ignoreCase = true) == true) ||
+                    typeLabels[log.type]?.contains(keyword, ignoreCase = true) == true
+            } else true
+
+            if (categoryMatches && keywordMatches) {
+                matches.add(log.timestamp)
+            }
+        }
+
+        try {
+            if (Applic.Nativesloaded) {
+                Natives.search(label, under, above, 0, 0, true, keyword, 0f)
+            }
+        } catch (_: Throwable) {}
+
+        matches.sort()
+        return matches.distinct()
+    }
+
+    fun nextSearchMatch() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.latersearch()
+                }
+            } catch (_: Throwable) {}
+            refreshAll()
+        }
+    }
+
+    fun prevSearchMatch() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.earliersearch()
+                }
+            } catch (_: Throwable) {}
+            refreshAll()
+        }
+    }
+
+    fun stopSearch() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.stopsearch()
+                }
+            } catch (_: Throwable) {}
+            refreshAll()
+        }
+    }
+
+    /**
+     * Recomputes the derived statistics from the currently published readings.
+     *
+     * [readings] is sorted by timestamp, so both windows are located with a binary search and
+     * addressed through [List.subList] views instead of building two throwaway filtered copies of a
+     * list that can hold six figures of points. The AGP profile is memoised against the inputs that
+     * actually change it, because rebuilding 24 percentile buckets over the whole history every time
+     * a single reading arrives was by far the most expensive thing this class did.
+     */
+    private fun recalculateStats() {
+        val all = _readings.value
+        val period = _statsPeriod.value
+        val range = _range.value
+        val now = System.currentTimeMillis()
+
+        if (all.isEmpty()) {
+            _stats.value = GlucoseStats()
+            _screenStats.value = GlucoseStats()
+            _agpProfile.value = AgpProfile.calculate(emptyList(), period)
+            publishedAgpKey = null
+            return
+        }
+
+        val periodStart = lowerBound(all, now - period.durationMillis)
+        val toUse = if (periodStart < all.size) all.subList(periodStart, all.size) else all
+
+        _stats.value = GlucoseStats.calculate(toUse, range)
+
+        val agpKey = agpCacheKey(toUse, period, range)
+        if (agpKey != publishedAgpKey) {
+            _agpProfile.value = AgpProfile.calculate(toUse, period)
+            publishedAgpKey = agpKey
+        }
+
+        // Statistics for the selected screen range (e.g. 1h, 6h or a custom duration).
+        val screenDuration = _selectedTimeRange.value?.durationMillis ?: (6 * 3600 * 1000L)
+        val screenStart = lowerBound(all, now - screenDuration)
+        val screenToUse = if (screenStart < all.size) all.subList(screenStart, all.size) else all
+        _screenStats.value = GlucoseStats.calculate(screenToUse, range)
+    }
+
+    private data class AgpCacheKey(
+        val period: StatsPeriod,
+        val range: GlucoseRange,
+        val count: Int,
+        val firstTimestamp: Long,
+        val lastTimestamp: Long,
+        val valueDigest: Long
+    )
+
+    @Volatile
+    private var publishedAgpKey: AgpCacheKey? = null
+
+    private fun agpCacheKey(
+        toUse: List<GlucosePoint>,
+        period: StatsPeriod,
+        range: GlucoseRange
+    ): AgpCacheKey {
+        var digest = 7L
+        for (point in toUse) {
+            digest = digest * 31 + point.valueMgDl.toRawBits()
+        }
+        return AgpCacheKey(
+            period = period,
+            range = range,
+            count = toUse.size,
+            firstTimestamp = toUse.firstOrNull()?.timestamp ?: 0L,
+            lastTimestamp = toUse.lastOrNull()?.timestamp ?: 0L,
+            valueDigest = digest
+        )
+    }
+
+    /** Index of the first element of the timestamp-sorted [points] at or after [time]. */
+    private fun lowerBound(points: List<GlucosePoint>, time: Long): Int {
+        var low = 0
+        var high = points.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (points[mid].timestamp < time) low = mid + 1 else high = mid
+        }
+        return low
+    }
+
+    /**
+     * Heartbeat that keeps the UI live.
+     *
+     * The cheap part - a single [Natives.lastglucose] call - still runs every few seconds and
+     * appends the point, which is all a live view needs. The expensive part used to run every 9
+     * seconds and walked every raw, calibrated and scan record of every sensor: hundreds of
+     * thousands of JNI calls, a fresh [GlucosePoint] each, a full sort, and tens of megabytes of
+     * garbage that stalled the render thread with 40 ms GC pauses. That is now a slow safety net,
+     * with the event-driven [refreshAll] covering the cases that actually matter (sensor activated,
+     * calibration written, scan taken, Bluetooth state changed).
+     */
+    private fun startPolling() {
+        scope.launch(Dispatchers.IO) {
+            var ticks = 0
+            while (isActive) {
+                delay(FAST_POLL_INTERVAL_MILLIS)
+                try {
+                    ticks++
+                    if (Applic.Nativesloaded) {
+                        val strGl = Natives.lastglucose()
+                        if (strGl != null && strGl.time > 0) {
+                            val rawVal = try {
+                                strGl.value.replace(',', '.').toFloat()
+                            } catch (_: Throwable) { 0f }
+                            val valMgDl = if (_unit.value == GlucoseUnit.MMOL_L) {
+                                GlucoseUnit.MMOL_L.toMgDl(rawVal)
+                            } else rawVal
+
+                            if (valMgDl > 0f) {
+                                val newPt = GlucosePoint(
+                                    timestamp = strGl.time * 1000L,
+                                    valueMgDl = valMgDl,
+                                    rate = strGl.rate,
+                                    status = _range.value.statusOf(valMgDl)
+                                )
+                                // A new object with the same time and value would still be unequal to
+                                // the old one, and that is enough to make every collector of
+                                // `currentReading` recompose - the home screen's hero and sparkline
+                                // included - three times a minute for no reason.
+                                val previous = _currentReading.value
+                                if (previous == null ||
+                                    previous.timestamp != newPt.timestamp ||
+                                    previous.valueMgDl != newPt.valueMgDl
+                                ) {
+                                    _currentReading.value = newPt
+                                }
+                                if (appendReading(newPt)) {
+                                    requestStatsRecalculation()
+                                }
+                            }
+                        }
+                    }
+                    if (ticks % FAST_TICKS_PER_SENSOR_SWEEP == 0) {
+                        sweepSensors()
+                    }
+                    if (ticks % FAST_TICKS_PER_FULL_REFRESH == 0) {
+                        refreshAllLocked()
+                    }
+                    if (ticks % FAST_TICKS_PER_DEVICE_SWEEP == 0) {
+                        refreshWearDevices()
+                        refreshMirrorConnections()
+                    }
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    /**
+     * Sensor sweep that yields to a full reload rather than racing it. Both drive the same native
+     * library, and two threads inside it at once is not something to find out about on a watch.
+     */
+    private fun sweepSensors() {
+        if (!nativeLoadMutex.tryLock()) return
+        try {
+            loadSensorsFromNative()
+        } finally {
+            nativeLoadMutex.unlock()
+        }
+    }
+
+    /**
+     * Adds [point] to the published history when it is genuinely new. Returns whether the history
+     * actually changed.
+     *
+     * `readings` is kept sorted, and the same reading arrives here as both a raw and a calibrated
+     * point, so the insert has to be stable and the duplicate check has to key on the timestamp
+     * alone. [publishReadings] then decides whether anything is worth emitting.
+     */
+    private fun appendReading(point: GlucosePoint): Boolean {
+        val current = _readings.value
+        val insertAt = lowerBound(current, point.timestamp)
+        if (insertAt < current.size && current[insertAt].timestamp == point.timestamp) return false
+        val next = ArrayList<GlucosePoint>(current.size + 1)
+        next.addAll(current.subList(0, insertAt))
+        next.add(point)
+        next.addAll(current.subList(insertAt, current.size))
+        val before = _readings.value
+        publishReadings(next)
+        return before !== _readings.value
+    }
+
+    private fun isNfcLaunchEnabled(): Boolean {
+        return try {
+            val component = ComponentName(Applic.app, NFC_LAUNCH_COMPONENT)
+            Applic.app.packageManager.getComponentEnabledSetting(component) !=
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        } catch (_: Throwable) {
+            true
+        }
+    }
+
+    private companion object {
+        const val NFC_LAUNCH_COMPONENT = "tk.glucodata.glucodata"
+        const val CALIBRATION_PREFS = "calibration_prefs"
+        const val KEY_CALIBRATION_PROMPT_SHOWN = "calibration_prompt_shown"
+        const val UI_PREFS = "ui_prefs"
+        const val KEY_DELTA_CALCULATION = "delta_calculation_minutes"
+        const val KEY_MINIMALIST_UNITS = "minimalist_units"
+        const val KEY_BLOOD_LABELS = "blood_label_indices"
+        const val DEFAULT_BLOOD_LABEL = 6
+        const val LEGACY_COMPOSE_BLOOD_LABEL = 3
+        val RESERVED_COMPOSE_LABELS = setOf(0, 1, 2, 4)
+        const val LOG_NOTES_PREFS = "log_notes"
+        const val LOG_NOTES_KEY = "notes"
+        /** Native alarm kinds with user-facing sound behavior, in UI order. */
+        val behaviorKinds = listOf(0, 5, 1, 6, 7, 8, 4, 2)
+
+        /**
+         * Heartbeat cadence. The cheap `lastglucose` poll stays at 3 s because a new reading really
+         * does arrive every 5 minutes and a user watching the number expects it to move promptly.
+         */
+        const val FAST_POLL_INTERVAL_MILLIS = 3_000L
+
+        /** Sensor list sweep, 15 s: cheap, and only publishes when something actually differs. */
+        const val FAST_TICKS_PER_SENSOR_SWEEP = 5
+
+        /** Paired-device sweep, 30 s. */
+        const val FAST_TICKS_PER_DEVICE_SWEEP = 10
+
+        /**
+         * Full native reload, 2 minutes. This walks every raw, calibrated and scan record of every
+         * sensor - six figures of JNI calls and tens of megabytes of garbage - so it is a safety net
+         * for "something changed and nobody told us", not the primary update path. Sensor
+         * activation, calibration, scans and Bluetooth transitions all arrive through [refreshAll].
+         */
+        const val FAST_TICKS_PER_FULL_REFRESH = 40
+
+        /** Pre-sizing hint for a full sensor read; grows on its own if a sensor holds more. */
+        const val INITIAL_READING_CAPACITY = 4096
+
+        val MARKUP_PATTERN = Regex("<[^>]+>")
+    }
+}

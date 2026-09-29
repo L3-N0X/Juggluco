@@ -367,7 +367,17 @@ static private int low(long tim,notGlucose    sglucose,float gl,float rate,int a
             fview.postInvalidate();
 
         try {
-
+          if(tk.glucodata.alerts.AlertEngine.isActive()) {
+            // The configurable alert engine replaces the fixed native alarm levels;
+            // the native code only still decides about the value-available chime (3).
+            Notify.onenot.normalglucose(sglucose,gl, rate,alarm==3);
+            final float glmgdl=Applic.unit==1?gl*Applic.mgdLmult:gl;
+            if(tk.glucodata.alerts.AlertEngine.onGlucose(glmgdl,rate,timmsec,sglucose.value)) {
+                alarm|=8;
+                alarmspeak[0]=true;
+                }
+            }
+          else
             switch (alarm) {
                 case 4: {
                     if(Natives.hasalarmveryhigh())

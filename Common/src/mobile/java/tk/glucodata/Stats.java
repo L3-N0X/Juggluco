@@ -140,13 +140,18 @@ final Runnable closeonback=()-> {
    }
 
 private static void webPercentiles(Context context, int days,boolean history) {
-    final long endtime=Natives.percentileEndtime(days);
+    long endtime=Natives.percentileEndtime(days);
+    if(endtime < 1577829600L) {
+        endtime = System.currentTimeMillis() / 1000L;
+    }
 	final String key=Natives.getApiSecret();
     final String addkey=(key!=null&&!key.isEmpty())?key+"/":"";
     final String type=(Natives.getDoCalibrate()?(
     (Natives.getCalibratePast()?"&pastvalues":"")+"&calibrated"):"&")+(history?"history":"stream");
-    final String url="http://127.0.0.1:"+Natives.gethttpport()+"/"+addkey+"x/report?amounts&days="+days+"&endtime="+endtime+type+"&hl="+Applic.curlang;
+    final int port = Natives.gethttpport() > 0 ? Natives.gethttpport() : 17580;
+    final String url="http://127.0.0.1:"+port+"/"+addkey+"x/report?amounts&days="+days+"&endtime="+endtime+type+"&hl="+Applic.curlang;
     var intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     context.startActivity(intent);
     }
 

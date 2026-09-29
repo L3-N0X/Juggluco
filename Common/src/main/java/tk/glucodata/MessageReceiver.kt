@@ -98,6 +98,12 @@ class MessageReceiver: WearableListenerService() {
             MessageSender.WAKE_PATH -> {
                 Natives.wakehereonly()
                 }
+            MessageSender.ALERTS_PATH -> {
+                tk.glucodata.alerts.AlertSync.receive(data)
+                }
+            MessageSender.DISPLAY_SETTINGS_PATH -> {
+                tk.glucodata.ui.sync.DisplaySync.receive(data)
+                }
             MessageSender.WAKESTREAM_PATH -> {
                 Natives.wakestreamhereonly()
             }

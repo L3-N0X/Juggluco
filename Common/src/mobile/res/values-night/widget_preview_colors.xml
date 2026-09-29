@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_preview_surface">#FF1B2125</color>
+    <color name="widget_preview_on_surface">#FFDFE3E6</color>
+    <color name="widget_preview_variant">#FFC0C8CD</color>
+    <color name="widget_preview_track">#24C0C8CD</color>
+    <color name="widget_preview_in_range">#FF7CB69D</color>
+    <color name="widget_preview_in_range_container">#FF1B382B</color>
+    <color name="widget_preview_warning">#FFF59E0B</color>
+</resources>

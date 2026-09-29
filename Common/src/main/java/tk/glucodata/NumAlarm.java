@@ -61,7 +61,7 @@ static final private String LOG_ID="NumAlarm";
          {
              if(RemoteGlucose.stopalarmAction.equals(action)) {
                 {if(doLog) {Log.i(LOG_ID,"Stop Alarm");};};
-	        Notify.stopalarm();
+	        Notify.stopAllAlarms();
                 }
              else {
                 if(scheduleProfileAlarm.equals(action)) {

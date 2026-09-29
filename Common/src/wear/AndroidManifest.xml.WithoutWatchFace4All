@@ -100,6 +100,7 @@
         </service>
   <service
             android:name=".glucosecomplication.ArrowDataSourceService"
+            android:directBootAware="true"
             android:exported="true"
 
             android:icon="@drawable/arrowblackwhite"
@@ -111,13 +112,14 @@
 
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SMALL_IMAGE" />
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="600" />
+                android:value="0" />
         </service>
   <service
             android:name=".glucosecomplication.NumberDataSourceService"
+            android:directBootAware="true"
             android:exported="true"
 
             android:icon="@drawable/valuemgdl"
@@ -129,12 +131,13 @@
 
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SMALL_IMAGE" />
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="600" />
+                android:value="0" />
         </service>
   <service android:name=".glucosecomplication.ArrowValueDataSourceService"
+            android:directBootAware="true"
             android:exported="true"
 
             android:icon="@drawable/valuearrow"
@@ -146,13 +149,14 @@
 
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="LARGE_IMAGE,SMALL_IMAGE" />
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="600" />
+                android:value="0" />
         </service>
 
   <service android:name=".glucosecomplication.IconArrowDataSourceService"
+            android:directBootAware="true"
             android:exported="true"
 
             android:icon="@drawable/arrowtime"
@@ -164,12 +168,13 @@
 
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="ICON"/>
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE"/>
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="600" />
+                android:value="0" />
         </service>
   <service android:name=".glucosecomplication.IconValueDataSourceService"
+            android:directBootAware="true"
             android:exported="true"
 
             android:icon="@drawable/number"
@@ -181,12 +186,13 @@
 
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="ICON"/>
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE"/>
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="600" />
+                android:value="0" />
         </service>
   <service android:name=".glucosecomplication.ShortArrowValueDataSourceService"
+            android:directBootAware="true"
             android:exported="true"
 
             android:icon="@drawable/shorttext"
@@ -198,10 +204,100 @@
 
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT"/>
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE"/>
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="600" />
+                android:value="0" />
+        </service>
+  <service android:name=".glucosecomplication.SignalArrowTopDataSourceService"
+            android:directBootAware="true"
+            android:exported="true"
+
+            android:icon="@drawable/valuearrow"
+            android:label="@string/glucose_signal_arrow_top"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE"/>
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+  <service android:name=".glucosecomplication.SignalArrowBottomDataSourceService"
+            android:directBootAware="true"
+            android:exported="true"
+
+            android:icon="@drawable/valuearrow"
+            android:label="@string/glucose_signal_arrow_bottom"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE"/>
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+  <service android:name=".glucosecomplication.MonoArrowTopDataSourceService"
+            android:directBootAware="true"
+            android:exported="true"
+
+            android:icon="@drawable/number"
+            android:label="@string/glucose_mono_arrow_top"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE"/>
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+  <service android:name=".glucosecomplication.MonoArrowBottomDataSourceService"
+            android:directBootAware="true"
+            android:exported="true"
+
+            android:icon="@drawable/number"
+            android:label="@string/glucose_mono_arrow_bottom"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE"/>
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+  <service android:name=".glucosecomplication.MonoArrowBesideDataSourceService"
+            android:directBootAware="true"
+            android:exported="true"
+
+            android:icon="@drawable/shorttext"
+            android:label="@string/glucose_mono_arrow_beside"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT,SMALL_IMAGE,MONOCHROMATIC_IMAGE,PHOTO_IMAGE"/>
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
         </service>
 
 

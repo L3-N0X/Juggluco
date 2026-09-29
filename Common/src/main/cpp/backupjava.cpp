@@ -20,7 +20,6 @@
 
 
 #include <jni.h>
-#include <alloca.h>
 #include "fromjava.h"
 #include "datbackup.hpp"
 #include "net/netstuff.hpp"
@@ -34,6 +33,7 @@ extern jstring myNewStringUTF(JNIEnv *env,const std::string_view str);
 extern bool networkpresent;
 
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(backuphasrestore)(JNIEnv *env, jclass cl) {
+    if(!backup) return false;
     return backup->getupdatedata()->hasrestore;
     }
 extern "C" JNIEXPORT jint JNICALL fromjava(getbackuptransport)(JNIEnv *,jclass,jint pos) {
@@ -82,14 +82,19 @@ extern "C" JNIEXPORT jboolean JNICALL fromjava(getbackupbleunproven)(JNIEnv *,jc
  * remains a server instead of being reset to the nominal r1-client direction.
  */
 extern "C" JNIEXPORT jint  JNICALL   fromjava(backuphostNr)(JNIEnv *env, jclass cl) {
+    if(!backup) {
+        return 0;
+    }
     return backup->    gethostnr();
     }
 
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(detectIP)(JNIEnv *envin, jclass cl,jint pos) {
+    if(!backup || pos<0 || pos>=backup->gethostnr()) return false;
     const passhost_t &host=backup->getupdatedata()->allhosts[pos];
     return host.detect;
     }
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl,jint pos) {
+    if(!backup || pos<0 || pos>=backup->gethostnr()) return false;
     const passhost_t &host=backup->getupdatedata()->allhosts[pos];
     return host.hashostname();
     }
@@ -142,6 +147,7 @@ extern "C" JNIEXPORT jstring JNICALL   fromjava(getbackuphostname)(JNIEnv *envin
 
 
 static int getposbylabel(const char *label) {
+    if(!backup) return -1;
     const int nr=backup->gethostnr();
     for(int pos=0;pos<nr;++pos) {
         const passhost_t &host=backup->getupdatedata()->allhosts[pos];
@@ -156,6 +162,7 @@ static int getposbylabel(const char *label) {
     return -1;
     }
 static bool removebylabel(const char *label) {
+    if(!backup) return false;
     int pos = getposbylabel(label);
     if (pos < 0)
         return false;
@@ -173,8 +180,8 @@ extern "C" JNIEXPORT jboolean JNICALL   fromjava(removebylabel)(JNIEnv *env, jcl
 #ifndef ABBOTT
 
 passhost_t * getwearoshost(const bool create,const char *label,bool,bool=false,bool=false);
-   
 static bool resetbylabel(const char *label,bool galaxy) {
+    if(!backup) return false;
     int pos=getposbylabel(label);
     if(pos<0)
         return false;
@@ -257,6 +264,89 @@ extern "C" JNIEXPORT jstring JNICALL   fromjava(getbackuphostport)(JNIEnv *envin
     backup->getport(pos,port);
     return envin->NewStringUTF(port);
     }
+extern "C" JNIEXPORT jobjectArray JNICALL fromjava(getMirrorHostEditState)(JNIEnv *env, jclass, jint pos) {
+    if(!backup)
+        return nullptr;
+#ifndef TESTMENU
+    const std::lock_guard<std::mutex> lock(change_host_mutex);
+#endif
+    mirrorhoststate state;
+    if(!backup->getmirrorstate(pos,state)) {
+        LOGGER("getMirrorHostEditState(%d) invalid\n",pos);
+        return nullptr;
+        }
+    const jclass objectclass=env->FindClass("java/lang/Object");
+    if(!objectclass)
+        return nullptr;
+    jobjectArray jall=env->NewObjectArray(mirrorstate_size,objectclass,nullptr);
+    if(!jall)
+        return nullptr;
+    const jclass stringclass=env->FindClass("java/lang/String");
+    const jclass integerclass=env->FindClass("java/lang/Integer");
+    const jclass longclass=env->FindClass("java/lang/Long");
+    const jclass booleanclass=env->FindClass("java/lang/Boolean");
+    if(!stringclass||!integerclass||!longclass||!booleanclass)
+        return nullptr;
+    const jmethodID intinit=env->GetMethodID(integerclass,"<init>","(I)V");
+    const jmethodID longinit=env->GetMethodID(longclass,"<init>","(J)V");
+    const jmethodID boolinit=env->GetMethodID(booleanclass,"<init>","(Z)V");
+    char portbuf[6];
+    if(state.icelabel.empty())
+        backup->getport(pos,portbuf);
+    else
+        strcpy(portbuf,"0");
+    jobjectArray ipar=env->NewObjectArray(passhost_t::maxip,stringclass,nullptr);
+    if(!ipar)
+        return nullptr;
+    for(int i=0;i<passhost_t::maxip;i++) {
+        env->SetObjectArrayElement(ipar,i,env->NewStringUTF(state.ips[i].c_str()));
+        }
+    env->SetObjectArrayElement(jall,mirrorstate_label,env->NewStringUTF(state.label.c_str()));
+    jboolean haslabel=state.haslabel;
+    env->SetObjectArrayElement(jall,mirrorstate_haslabel,env->NewObject(booleanclass,boolinit,haslabel));
+    env->SetObjectArrayElement(jall,mirrorstate_ips,ipar);
+    env->SetObjectArrayElement(jall,mirrorstate_port,env->NewStringUTF(portbuf));
+    jint receivefrom=state.receivefrom;
+    env->SetObjectArrayElement(jall,mirrorstate_receivefrom,env->NewObject(integerclass,intinit,receivefrom));
+    jint activereceive=state.activereceive;
+    env->SetObjectArrayElement(jall,mirrorstate_activereceive,env->NewObject(integerclass,intinit,activereceive));
+    jboolean sendnums=state.sendnums;
+    env->SetObjectArrayElement(jall,mirrorstate_sendnums,env->NewObject(booleanclass,boolinit,sendnums));
+    jboolean sendstream=state.sendstream;
+    env->SetObjectArrayElement(jall,mirrorstate_sendstream,env->NewObject(booleanclass,boolinit,sendstream));
+    jboolean sendscans=state.sendscans;
+    env->SetObjectArrayElement(jall,mirrorstate_sendscans,env->NewObject(booleanclass,boolinit,sendscans));
+    jboolean sendpassive=state.sendpassive;
+    env->SetObjectArrayElement(jall,mirrorstate_sendpassive,env->NewObject(booleanclass,boolinit,sendpassive));
+    jboolean restore=state.restore;
+    env->SetObjectArrayElement(jall,mirrorstate_restore,env->NewObject(booleanclass,boolinit,restore));
+    jlong starttime=state.starttime;
+    env->SetObjectArrayElement(jall,mirrorstate_starttime,env->NewObject(longclass,longinit,starttime));
+    jboolean detect=state.detect;
+    env->SetObjectArrayElement(jall,mirrorstate_detect,env->NewObject(booleanclass,boolinit,detect));
+    jboolean testip=state.testip;
+    env->SetObjectArrayElement(jall,mirrorstate_testip,env->NewObject(booleanclass,boolinit,testip));
+    jboolean hashostname=state.hashostname;
+    env->SetObjectArrayElement(jall,mirrorstate_hostname,env->NewObject(booleanclass,boolinit,hashostname));
+    env->SetObjectArrayElement(jall,mirrorstate_ice,env->NewStringUTF(state.icelabel.c_str()));
+    jboolean side=state.side;
+    env->SetObjectArrayElement(jall,mirrorstate_side,env->NewObject(booleanclass,boolinit,side));
+    jint transport=state.transport;
+    env->SetObjectArrayElement(jall,mirrorstate_transport,env->NewObject(integerclass,intinit,transport));
+    jboolean bleclient=state.bleclient;
+    env->SetObjectArrayElement(jall,mirrorstate_bleclient,env->NewObject(booleanclass,boolinit,bleclient));
+    jboolean blereverse=state.blereverse;
+    env->SetObjectArrayElement(jall,mirrorstate_blereverse,env->NewObject(booleanclass,boolinit,blereverse));
+    jboolean bleunproven=state.bleunproven;
+    env->SetObjectArrayElement(jall,mirrorstate_bleunproven,env->NewObject(booleanclass,boolinit,bleunproven));
+    jboolean wearos=state.wearos;
+    env->SetObjectArrayElement(jall,mirrorstate_wearos,env->NewObject(booleanclass,boolinit,wearos));
+    jboolean deactivated=state.deactivated;
+    env->SetObjectArrayElement(jall,mirrorstate_deactivated,env->NewObject(booleanclass,boolinit,deactivated));
+    jboolean haspass=state.haspass;
+    env->SetObjectArrayElement(jall,mirrorstate_haspass,env->NewObject(booleanclass,boolinit,haspass));
+    return jall;
+    }
 extern "C" JNIEXPORT jboolean JNICALL   fromjava(isWearOS)(JNIEnv *envin, jclass cl,jint pos) {
     if(!backup||pos<0||pos>=backup->gethostnr()) {
         LOGGER("isWearos(%d)=false\n",pos);
@@ -280,50 +370,66 @@ extern "C" JNIEXPORT jboolean JNICALL   fromjava(getbackuphostpassive)(JNIEnv *e
     return getpassive(pos);
     }
 extern "C" JNIEXPORT int JNICALL   fromjava(getbackuphostreceive)(JNIEnv *envin, jclass cl,jint pos) {
-    if(pos<backup->getupdatedata()->hostnr) 
-        return backup->getupdatedata()->allhosts[pos].receivefrom;
-    return 0;
+    if(!backup || pos<0 || pos>=backup->getupdatedata()->hostnr) 
+        return 0;
+    return backup->getupdatedata()->allhosts[pos].receivefrom;
     }
 extern "C" JNIEXPORT jboolean JNICALL   fromjava(getbackuphostnums)(JNIEnv *envin, jclass cl,jint pos) {
-    if(pos<backup->getupdatedata()->hostnr) {
-        int index=backup->getupdatedata()->allhosts[pos].index;
-        if(index>=0)
-            return  backup->getupdatedata()->tosend[index].sendnums;
-        }
+    if(!backup || pos<0 || pos>=backup->getupdatedata()->hostnr) return false;
+    int index=backup->getupdatedata()->allhosts[pos].index;
+    if(index>=0)
+        return  backup->getupdatedata()->tosend[index].sendnums;
     return false;
     }
 extern "C" JNIEXPORT jboolean JNICALL   fromjava(getbackuphoststream)(JNIEnv *envin, jclass cl,jint pos) {
-    if(pos<backup->getupdatedata()->hostnr) {
-        int index=backup->getupdatedata()->allhosts[pos].index;
-        if(index>=0)
-            return  backup->getupdatedata()->tosend[index].sendstream;
-        }
+    if(!backup || pos<0 || pos>=backup->getupdatedata()->hostnr) return false;
+    int index=backup->getupdatedata()->allhosts[pos].index;
+    if(index>=0)
+        return  backup->getupdatedata()->tosend[index].sendstream;
     return false;
     }
 extern "C" JNIEXPORT jboolean JNICALL   fromjava(getbackuphostscans)(JNIEnv *envin, jclass cl,jint pos) {
-    if(pos<backup->getupdatedata()->hostnr) {
-        int index=backup->getupdatedata()->allhosts[pos].index;
-        if(index>=0)
-            return  backup->getupdatedata()->tosend[index].sendscans;
-        }
+    if(!backup || pos<0 || pos>=backup->getupdatedata()->hostnr) return false;
+    int index=backup->getupdatedata()->allhosts[pos].index;
+    if(index>=0)
+        return  backup->getupdatedata()->tosend[index].sendscans;
     return false;
     }
-extern "C" JNIEXPORT void JNICALL   fromjava(setreceiveport)(JNIEnv *env, jclass cl,jstring jport) {
+extern "C" JNIEXPORT jint JNICALL   fromjava(setreceiveport)(JNIEnv *env, jclass cl,jstring jport) {
+    if(!backup||!jport) return receiveport_status_nodigits;
     jint portlen= env->GetStringUTFLength( jport);
-    if(portlen<6) {
-        char newport[portlen+1];
-        jint jlen = env->GetStringLength( jport);
-         env->GetStringUTFRegion( jport, 0,jlen, newport); 
-        LOGGER("setreceiveport %s\n",newport);
-        if(backup->getupdatedata()->port[portlen]||memcmp(newport, backup->getupdatedata()->port,portlen)) {
-            memcpy(backup->getupdatedata()->port,newport,portlen);
-            backup->getupdatedata()->port[portlen]='\0';
-            backup->startreceiver(true);
-            }
+    jint jlen = env->GetStringLength( jport);
+    if(portlen<1||portlen>5||jlen!=portlen) {
+        LOGGER("setreceiveport invalid length %d/%d\n",portlen,jlen);
+        return receiveport_status_nodigits;
         }
+    char newport[6];
+     env->GetStringUTFRegion( jport, 0,jlen, newport); 
+    newport[portlen]='\0';
+    int portnum=0;
+    for(jint i=0;i<portlen;i++) {
+        if(newport[i]<'0'||newport[i]>'9') {
+            LOGGER("setreceiveport not a number len=%d\n",portlen);
+            return receiveport_status_nodigits;
+            }
+        portnum=portnum*10+(newport[i]-'0');
+        }
+    if(portnum<1024||portnum>65535) {
+        LOGGER("setreceiveport out of range %d\n",portnum);
+        return receiveport_status_range;
+        }
+    LOGGER("setreceiveport %s\n",newport);
+    if(backup->getupdatedata()->port[portlen]||memcmp(newport, backup->getupdatedata()->port,portlen)) {
+        memcpy(backup->getupdatedata()->port,newport,portlen);
+        backup->getupdatedata()->port[portlen]='\0';
+        backup->startreceiver(true);
+        }
+    return receiveport_status_ok;
     }
 extern "C" JNIEXPORT jstring JNICALL   fromjava(getreceiveport)(JNIEnv *env, jclass cl) {
-
+    if(!backup) {
+        return env->NewStringUTF(defaultport);
+    }
     return env->NewStringUTF(backup->getupdatedata()->port);
     }
 /*
@@ -356,34 +462,54 @@ extern "C" JNIEXPORT jboolean JNICALL   fromjava(stringarray)(JNIEnv *env, jclas
 //extern bool mkwearos;
 
 extern "C" JNIEXPORT jint JNICALL   fromjava(changebackuphost)(JNIEnv *env, jclass cl,jint pos,jobjectArray jnames,jint nr,jboolean detect,jstring jport,jboolean nums,jboolean stream,jboolean scans,jboolean recover,jboolean receive,jboolean activeonly,jboolean passiveonly,jstring jpass,jlong starttime,jstring jlabel,jboolean testip,jboolean hashostname,jstring jICElabel,jboolean side,jint transport,jboolean bleclient) {
+    if(!backup) return changehost_invalidindex;
 #ifndef TESTMENU
     LOGAR("changebackuphost const std::lock_guard<std::mutex> lock(change_host_mutex)");
   const std::lock_guard<std::mutex> lock(change_host_mutex);
 #endif
-LOGGER("changebackuphost(%d,%p,%d,%d,%p,%d,%d,%d,%d%,%d,%d,%d,%p,%ld,%p,%d,%d)\n", pos, jnames, nr, detect, jport, nums, stream, scans, recover, receive, activeonly, passiveonly, jpass, starttime, jlabel, testip, hashostname);
-    char *passptr=nullptr;
-    jint passlen=0;
+    LOGGER("changebackuphost(%d,%p,%d,%d,%p,%d,%d,%d,%d%,%d,%d,%d,%p,%ld,%p,%d,%d)\n", pos, jnames, nr, detect, jport, nums, stream, scans, recover, receive, activeonly, passiveonly, jpass, starttime, jlabel, testip, hashostname);
+    char passbuf[passhost_t::maxpasslen+1];
+    int passlen=0;
     if(jpass) {
-        passlen= env->GetStringUTFLength( jpass);
-        jint jpasslen = env->GetStringLength( jpass);
-        passptr=(char *)alloca(passlen+1); 
-        env->GetStringUTFRegion( jpass, 0,jpasslen, passptr); passptr[passlen]='\0';
+        const jint passutf= env->GetStringUTFLength( jpass);
+        const jint jpasslen = env->GetStringLength( jpass);
+        if(passutf<0||passutf>passhost_t::maxpasslen||jpasslen!=passutf) {
+            LOGGER("changebackuphost invalid password length %d/%d\n",passutf,jpasslen);
+            return changehost_passwordlong;
+            }
+        env->GetStringUTFRegion( jpass, 0,jpasslen, passbuf); passbuf[passutf]='\0';
+        passlen=passutf;
         }
     const char *label=jlabel?env->GetStringUTFChars( jlabel, NULL):nullptr;
+    if(jlabel&&(!label||env->GetStringLength(jlabel)!=(jint)strlen(label))) {
+        if(label)
+            env->ReleaseStringUTFChars(jlabel,label);
+        return changehost_labellong;
+        }
      jint res;
      if(jICElabel) {
         const char *ICElabel=env->GetStringUTFChars( jICElabel, NULL);
         res=backup->changeICEhost(ICElabel,pos,nums,stream,scans,receive,
-                std::string_view(passptr,passlen),starttime,label,side,true,transport,bleclient);
+                std::string_view(passbuf,passlen),starttime,label,side,true,transport,bleclient);
         env->ReleaseStringUTFChars(jICElabel, ICElabel);
         }
      else {
-        jint portlen= env->GetStringUTFLength( jport);
-        jint jlen = env->GetStringLength( jport);
-        char port[portlen+1]; 
-        env->GetStringUTFRegion( jport, 0,jlen, port); port[portlen]='\0';
+        char port[6];
+        int portlen=0;
+        if(jport) {
+            const jint portutf= env->GetStringUTFLength( jport);
+            const jint jlen = env->GetStringLength( jport);
+            if(portutf<0||portutf>5||jlen!=portutf) {
+                LOGGER("changebackuphost invalid port length %d/%d\n",portutf,jlen);
+                if(jlabel)
+                    env->ReleaseStringUTFChars(jlabel,label);
+                return changehost_invalidport;
+                }
+            env->GetStringUTFRegion( jport, 0,jlen, port); port[portutf]='\0';
+            portlen=portutf;
+            }
         const int arlen=jnames?std::min(env->GetArrayLength(jnames),nr):0;
-        res=backup->changehost(pos,env,jnames,arlen,detect,std::string_view(port,portlen),nums,stream,scans,recover,receive,activeonly,std::string_view(passptr,passlen),starttime,passiveonly,label,testip,true,hashostname,transport,bleclient);
+        res=backup->changehost(pos,env,jnames,arlen,detect,std::string_view(port,portlen),nums,stream,scans,recover,receive,activeonly,std::string_view(passbuf,passlen),starttime,passiveonly,label,testip,true,hashostname,transport,bleclient);
         if(res>=0&&res<backup->gethostnr()) {
             // For ordinary mirrors side is immutable pair identity. New QR
             // peers explicitly receive the opposite bit; editing a row passes
@@ -403,6 +529,49 @@ LOGGER("changebackuphost(%d,%p,%d,%d,%p,%d,%d,%d,%d%,%d,%d,%d,%p,%ld,%p,%d,%d)\n
     if(jlabel)
         env->ReleaseStringUTFChars(jlabel, label);
     return res;
+    }
+
+extern "C" JNIEXPORT jint JNICALL   fromjava(patchbackuphost)(JNIEnv *env, jclass,jint pos,jint mask,jobjectArray jnames,jint nr,jstring jport,jint receivefrom,jboolean sendnums,jboolean sendstream,jboolean sendscans,jstring jlabel,jstring jpassword,jint passaction) {
+    if(!backup) return changehost_invalidindex;
+#ifndef TESTMENU
+    const std::lock_guard<std::mutex> lock(change_host_mutex);
+#endif
+    LOGGER("patchbackuphost(%d,%d,%p,%d,%p,%d,%d,%d,%d,%p,%p,%d)\n",pos,mask,jnames,nr,jport,receivefrom,
+            sendnums,sendstream,sendscans,jlabel,jpassword,passaction);
+    char portbuf[6]{};
+    int portlen=0;
+    if(jport) {
+        const jint portutf= env->GetStringUTFLength( jport);
+        const jint jlen = env->GetStringLength( jport);
+        if(portutf<1||portutf>5||jlen!=portutf) {
+            LOGGER("patchbackuphost invalid port length %d/%d\n",portutf,jlen);
+            return changehost_invalidport;
+            }
+        env->GetStringUTFRegion( jport, 0,jlen, portbuf); portbuf[portutf]='\0';
+        portlen=portutf;
+        }
+    char passbuf[passhost_t::maxpasslen+1]{};
+    int passlen=0;
+    if(jpassword) {
+        const jint passutf= env->GetStringUTFLength( jpassword);
+        const jint jpasslen = env->GetStringLength( jpassword);
+        if(passutf<0||passutf>passhost_t::maxpasslen||jpasslen!=passutf) {
+            LOGGER("patchbackuphost invalid password length %d/%d\n",passutf,jpasslen);
+            return changehost_passwordlong;
+            }
+        env->GetStringUTFRegion( jpassword, 0,jpasslen, passbuf); passbuf[passutf]='\0';
+        passlen=passutf;
+        }
+    const char *label=jlabel?env->GetStringUTFChars( jlabel, NULL):nullptr;
+    destruct   dest([&]{ if(jlabel&&label) env->ReleaseStringUTFChars(jlabel,label); });
+    if(jlabel&&(!label||env->GetStringLength(jlabel)!=(jint)strlen(label))) {
+        LOGAR("patchbackuphost invalid label");
+        return changehost_labellong;
+        }
+    const int arlen=jnames?std::min(env->GetArrayLength(jnames),nr):0;
+    return backup->patchhost(pos,env,jnames,arlen,mask,std::string_view(portbuf,portlen),receivefrom,
+            sendnums,sendstream,sendscans,label?std::string_view(label,strlen(label)):std::string_view(),
+            std::string_view(passbuf,passlen),passaction);
     }
 
 extern "C" JNIEXPORT jboolean JNICALL fromjava(setbackupblereverse)(JNIEnv *,jclass,jint pos,jboolean reverse) {
@@ -518,9 +687,11 @@ extern "C" JNIEXPORT void JNICALL fromjava(setMirrorWearOS)(JNIEnv *,jclass,jint
     LOGGER("setMirrorWearOS %s(%d)\n",host.getnameif(),index);
     }
 extern "C" JNIEXPORT jboolean JNICALL   fromjava(isreceiving)(JNIEnv *env, jclass cl) {
+    if(!backup) return false;
     return backup->isreceiving() ;
     }
 extern "C" JNIEXPORT void JNICALL   fromjava(deletebackuphost)(JNIEnv *env, jclass cl,jint pos) {
+    if(!backup || pos<0 || pos>=backup->gethostnr()) return;
     backup->deletehost(pos);
     }
 extern "C" JNIEXPORT jlong JNICALL   fromjava(lastuptodate)(JNIEnv *env, jclass cl,jint pos) {
@@ -540,6 +711,7 @@ extern "C" JNIEXPORT jboolean JNICALL   fromjava(stopWifi)(JNIEnv *env, jclass c
     }
 
 extern "C" JNIEXPORT void JNICALL   fromjava(resetbackuphost)(JNIEnv *env, jclass cl,jint pos) {
+    if(!backup || pos<0 || pos>=backup->gethostnr()) return;
     backup->resethost(pos) ;
     }
 extern void wakeaftermin(const int waitmin) ;
@@ -566,8 +738,10 @@ extern "C" JNIEXPORT void JNICALL   fromjava(networkpresent)(JNIEnv *env, jclass
 extern "C" JNIEXPORT void JNICALL   fromjava(switchSync)(JNIEnv *env, jclass cl) {
      networkpresent=true;
      LOGAR("switchSync");
-     backup->wakebackup(wakeUpSwitch|wakeall);
-     backup->getupdatedata()->wakesender(wakeUpSwitch|wakeall);
+     if(backup) {
+         backup->wakebackup(wakeUpSwitch|wakeall);
+         backup->getupdatedata()->wakesender(wakeUpSwitch|wakeall);
+     }
     }
 
 //void wakebackup(myuintptr_t kind=wakeall,bool sendwake=false){
@@ -605,7 +779,9 @@ extern "C" JNIEXPORT jboolean JNICALL fromjava(probeMirrorTcp)(JNIEnv *,jclass,j
 
 extern "C" JNIEXPORT void JNICALL   fromjava(networkabsent)(JNIEnv *env, jclass cl) {
     LOGSTRING("networkabsent\n");
-    backup->endAllConnections();
+    if(backup) {
+        backup->endAllConnections();
+    }
 /*    networkpresent=false;
     if(backup) {
         backup->closeallsocks();
@@ -640,13 +816,13 @@ extern "C" JNIEXPORT void JNICALL   fromjava(wakehereonly)(JNIEnv *env, jclass c
     }
 
 extern "C" JNIEXPORT jboolean JNICALL   fromjava(getHostDeactivated)(JNIEnv *envin, jclass cl,jint pos) {
-    if(pos<backup->getupdatedata()->hostnr) {
-        return backup->getupdatedata()->allhosts[pos].deactivated;
+    if(!backup || pos<0 || pos>=backup->getupdatedata()->hostnr) {
+        return true;
         }
-    return true;
+    return backup->getupdatedata()->allhosts[pos].deactivated;
     }
 extern "C" JNIEXPORT void JNICALL   fromjava(setHostDeactivated)(JNIEnv *envin, jclass cl,jint pos,jboolean val) {
-    backup->deactivateHost(pos,val);
+    if(backup) backup->deactivateHost(pos,val);
     }
 
 

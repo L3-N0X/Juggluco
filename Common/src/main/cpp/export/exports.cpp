@@ -422,7 +422,12 @@ bool savemeals(FILE * handle,uint32_t starttime,uint32_t endtime) {
 #ifdef JUGGLUCO_APP
 extern bool libreviewexport(int handle,uint32_t starttime,uint32_t endtime,const bool calibrate,bool calibratePast)  ;
 bool  exportdata(uint32_t starttimein, uint32_t duration,int intype,int fd,float days) {
-	uint32_t endtime=std::min(starttimein+duration,(uint32_t)time(nullptr));
+	uint32_t endtime=starttimein+duration;
+	if(endtime < 1577829600u) {
+		endtime = time(nullptr);
+	} else {
+		endtime = std::min(endtime, (uint32_t)time(nullptr));
+	}
 	uint32_t starttime=endtime-days*24*60*60;
     int type=intype&7;
     bool calibrated=intype&8;

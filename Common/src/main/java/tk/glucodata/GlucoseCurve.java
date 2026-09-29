@@ -569,7 +569,7 @@ long multitime=0L;
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if(turnoffalarm())
-        Notify.stopalarm();
+        Notify.stopAllAlarms();
         if((render.stepresult&STEPBACK)!=0) {
             final float x = graphX(event.getX(),event.getY());
             final float y = graphY(event.getX(),event.getY());
@@ -716,7 +716,7 @@ static private boolean startv1=true;
                                 break;
                                 }
                                             case 6: ((Activity) getContext()).moveTaskToBack(true);break; //keeps current state 
-                                            case 7:  Notify.stopalarm();break;
+                                            case 7:  Notify.stopAllAlarms();break;
                                             default:
                                     }
 

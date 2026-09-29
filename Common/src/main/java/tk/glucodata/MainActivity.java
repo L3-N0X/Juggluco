@@ -97,6 +97,7 @@ import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.Toast;
+import tk.glucodata.ui.ComposeUiBridge;
 
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.UiThread;
@@ -253,9 +254,19 @@ private void startdisplay() {
     else {
         }
 
-      lightBars(!getInvertColors( ));
-      }
-    setContentView(curve);
+       if(!isWearable) {
+           boolean isDark = getInvertColors() ||
+               ((getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
+           lightBars(!isDark);
+       } else {
+           lightBars(!getInvertColors( ));
+       }
+       }
+    if(!isWearable) {
+        tk.glucodata.ui.ComposeUiBridge.setupComposeUi(this);
+    } else {
+        Specific.setupWearUi(this);
+    }
 
 if(!isWearable) {
     applyScreenOrientation(getResources().getConfiguration());
@@ -336,28 +347,36 @@ private void supportRTL() {
     // Returns true if the currently applied theme is a light theme
 private void reallightBars(boolean light) {
    Log.i(LOG_ID,"lightBars "+ light);
-   if(Build.VERSION.SDK_INT >= 30) {
+   if(Build.VERSION.SDK_INT >= 23) {
      var win=getWindow();
-     var view= win.getDecorView();
-     WindowInsetsControllerCompat windowInsetsController =WindowCompat.getInsetsController(win, view);
-     windowInsetsController.setAppearanceLightStatusBars(light);
-     windowInsetsController.setAppearanceLightNavigationBars(light);
+     if(win != null) {
+       var view= win.getDecorView();
+       WindowInsetsControllerCompat windowInsetsController =WindowCompat.getInsetsController(win, view);
+       windowInsetsController.setAppearanceLightStatusBars(light);
+       if(Build.VERSION.SDK_INT >= 26) {
+         windowInsetsController.setAppearanceLightNavigationBars(light);
+       }
      }
    }
+}
 
 
 private boolean waslight=true;
 public void lightBars(boolean light) {
    waslight=light;
-    reallightBars(light);
-   }
+   reallightBars(light);
+}
 
 public void themeLightBars() {
-    lightBars(isLightTheme);
+    if(!isWearable && tk.glucodata.ui.ComposeUiBridge.isComposeUiActive) {
+        reallightBars(waslight);
+        return;
     }
+    lightBars(isLightTheme);
+}
 private void waslightBars() {
     reallightBars(waslight);
-    }
+}
 
 //s/android.view.WindowInsetsController.\([A-Z_]*\),/if((status\&android.view.WindowInsetsController.\1)!=0)  {message+=" "+"\1";};/g
 //s/\([A-Z_]*\),/if((status\&android.view.WindowInsetsController.\1)!=0)  {message+=" "+"\1";};/g
@@ -604,6 +623,10 @@ public boolean isHandlingConfigurationChange() {
     }
 public void applyScreenOrientation(Configuration config) {
 if(!isWearable) {
+    if(tk.glucodata.ui.ComposeUiBridge.isComposeUiActive) {
+        requestOrientationOnce(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        return;
+    }
     try {
     /*
     if(menuForcesLandscape) {
@@ -742,7 +765,7 @@ if(!isWearable) {
          return;
       startall();
       Natives.onCreate();
-     if(!isWearable&&Menus.on)
+     if(!isWearable && !tk.glucodata.ui.ComposeUiBridge.isComposeUiActive && Menus.on)
            Menus.show(this);
 
 //        var gestureListener= new Layout.ScrollListener(); mGestureDetector = new GestureDetector(this, gestureListener);
@@ -757,7 +780,7 @@ void handleIntent(Intent intent) {
     if(extras!=null)  {
         if(extras.getBoolean(Notify.fromnotification, false)) {
             {if(doLog) {Log.i(LOG_ID,"fromnotification");};};
-            Notify.stopalarm();
+            Notify.stopAllAlarms();
             return;
             }
         else   {
@@ -833,7 +856,7 @@ private static boolean askNFC=true;
 private static    final int nfcflags=NfcAdapter.FLAG_READER_NFC_V | NfcAdapter.FLAG_READER_NFC_A|NfcAdapter.FLAG_READER_NFC_B|NfcAdapter.FLAG_READER_NFC_F|NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK| NfcAdapter.FLAG_READER_NFC_BARCODE; //=415. Activation of sensor was only possible if app not at the foreground, so I add some flags
 //private static    final int nfcflags=NfcAdapter.FLAG_READER_NFC_V | NfcAdapter.FLAG_READER_NFC_A|NfcAdapter.FLAG_READER_NFC_B|NfcAdapter.FLAG_READER_NFC_F| NfcAdapter.FLAG_READER_NFC_BARCODE; // Activation of sensor was only possible if app not at the foreground, so I add some flags
 //private static    final int nfcflags=NfcAdapter.FLAG_READER_NFC_V |NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK; 
-public void setnfc() {
+public boolean setnfc() {
 try {
     if (mNfcAdapter == null) {
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
@@ -844,9 +867,9 @@ try {
          if(askNFC) {
             {if(doLog) {Log.i(LOG_ID, "No NFC adapter found!");};};
             Applic.argToaster(this, getResources().getString(R.string.error_nfc_device_not_supported), Toast.LENGTH_SHORT);
-            askNFC=false;
-            return;
-            }
+             askNFC=false;
+             return false;
+             }
         }
     } else {
         if(!mNfcAdapter.isEnabled()) {
@@ -865,8 +888,8 @@ try {
                    }
                   }
 
-            return;
-        } else {
+             return false;
+         } else {
     
 //            mNfcAdapter.enableReaderMode(this, this,  NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS|NfcAdapter.FLAG_READER_NFC_V , null);
 
@@ -887,9 +910,12 @@ try {
     if(mess==null) {
         mess="error";
         }
-    Log.e(LOG_ID,"setnfc "+mess);
-        }
-}
+     Log.e(LOG_ID,"setnfc "+mess);
+     return false;
+     }
+ return true;
+ }
+
 
 boolean active=false;
 /*
@@ -1069,6 +1095,9 @@ synchronized void   startnfc(Tag tag) {
         if(!isWearable) {
             if(hasTech(techs,"android.nfc.tech.IsoDep")) {
                if(doLog){showbytes("tag", tag.getId());};
+               if (ComposeUiBridge.isComposeUiActive) {
+                   ComposeUiBridge.reportSensorActivationFailure("Unsupported NFC tag");
+               }
                tk.glucodata.NovoPen.Scan.onTag(this,tag);
                return;
                }
@@ -1083,8 +1112,11 @@ synchronized void   startnfc(Tag tag) {
             Log.i(LOG_ID,"onTagDiscovered: ");
         }
 
-   if(!isWearable) {
+    if(!isWearable) {
         // Generic NDEF fallback (TagInfo-style readout)
+        if (ComposeUiBridge.isComposeUiActive) {
+            ComposeUiBridge.reportSensorActivationFailure("Unsupported NFC tag");
+        }
         if (Thread.currentThread().equals(Looper.getMainLooper().getThread())) {
             new Thread(() -> Sib3Scan.readNdef(this,tag)).start();
         } else {
@@ -1135,14 +1167,18 @@ String filespath=files.getAbsolutePath();
    
    }
 
-void activateresult(boolean res) {
-    String message= "Activation "+(res?"successfull":"failed");
-    Applic.argToaster(this,message,Toast.LENGTH_SHORT);
-    AlertDialog.Builder builder = new AlertDialog.Builder(this);
-    builder.setNegativeButton(R.string.ok, (dialog, id) -> { // User cancelled the dialog
-    requestRender();
-    }).setTitle("  ").setMessage(message).show().setCanceledOnTouchOutside(false);
-}
+ void activateresult(boolean res) {
+     if (ComposeUiBridge.isComposeUiActive) {
+         ComposeUiBridge.reportSensorActivationCommand(res);
+         return;
+     }
+     String message= "Activation "+(res?"successfull":"failed");
+     Applic.argToaster(this,message,Toast.LENGTH_SHORT);
+     AlertDialog.Builder builder = new AlertDialog.Builder(this);
+     builder.setNegativeButton(R.string.ok, (dialog, id) -> { // User cancelled the dialog
+     requestRender();
+     }).setTitle("  ").setMessage(message).show().setCanceledOnTouchOutside(false);
+ }
 
     @Override
     public  void onTagDiscovered(Tag tag) {
@@ -1343,6 +1379,13 @@ public void onConfigurationChanged(Configuration newConfig) {
 public void requestRender() {
     if(curve!=null)
         curve.requestRender();
+    if(!isWearable) {
+        if(tk.glucodata.ui.ComposeUiBridge.isComposeUiActive && tk.glucodata.ui.ComposeUiBridge.repository != null) {
+            tk.glucodata.ui.ComposeUiBridge.repository.refreshAll();
+        }
+    } else {
+        Specific.refreshRepository();
+    }
     }
 
 private void netinitstep() {
@@ -1690,7 +1733,11 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                     int type = requestCode & 0xF;
                     Uri uri;
                     if (data == null || (uri = data.getData()) == null) {
-                        curve.dialogs.exportlabel.setText(R.string.nodata);
+                        if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                            curve.dialogs.exportlabel.setText(R.string.nodata);
+                        } else {
+                            Applic.argToaster(this, getString(R.string.nodata), Toast.LENGTH_SHORT);
+                        }
                         return;
                     }
                     int fd = -1;
@@ -1698,24 +1745,44 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                         if (parcelFileDescriptor != null)
                             fd = parcelFileDescriptor.detachFd();
                         else {
-                            curve.dialogs.exportlabel.setText("Can't save: parcelFileDescriptor == null");
+                            if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                                curve.dialogs.exportlabel.setText("Can't save: parcelFileDescriptor == null");
+                            } else {
+                                Applic.argToaster(this, "Can't save: parcelFileDescriptor == null", Toast.LENGTH_SHORT);
+                            }
                             return;
                         }
 
                     } catch (IOException e) {
 
                         Log.stack(LOG_ID, e);
-                        curve.dialogs.exportlabel.setText(R.string.failedbyexception);
+                        if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                            curve.dialogs.exportlabel.setText(R.string.failedbyexception);
+                        } else {
+                            Applic.argToaster(this, getString(R.string.failedbyexception), Toast.LENGTH_SHORT);
+                        }
                         return;
                     }
                     if (Natives.exportdata(type, fd,Dialogs.showdays)) {
-                        curve.dialogs.exportlabel.setText(R.string.saved);
+                        if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                            curve.dialogs.exportlabel.setText(R.string.saved);
+                        } else {
+                            Applic.argToaster(this, getString(R.string.saved), Toast.LENGTH_SHORT);
+                        }
                     } else {
-                        curve.dialogs.exportlabel.setText(R.string.savefailed);
+                        if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                            curve.dialogs.exportlabel.setText(R.string.savefailed);
+                        } else {
+                            Applic.argToaster(this, getString(R.string.savefailed), Toast.LENGTH_SHORT);
+                        }
                     }
                 } else {
 
-                    curve.dialogs.exportlabel.setText(R.string.notsaved);
+                    if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
+                        curve.dialogs.exportlabel.setText(R.string.notsaved);
+                    } else {
+                        Applic.argToaster(this, getString(R.string.notsaved), Toast.LENGTH_SHORT);
+                    }
                 }
 
             } catch (Throwable th) {
@@ -2146,12 +2213,16 @@ Runnable doswitch=null;
 
 
 private void runNfcV(Tag tag) {
-    if (Thread.currentThread().equals(Looper.getMainLooper().getThread())) {
+     if (ComposeUiBridge.isComposeUiActive) {
+         ComposeUiBridge.reportSensorTagRead();
+     }
+     if (Thread.currentThread().equals(Looper.getMainLooper().getThread())) {
         new Thread(() -> ScanNfcV.scan(curve, tag)).start();
-    } else {
-        ScanNfcV.scan(curve, tag);
-    }
-}
+     } else {
+         ScanNfcV.scan(curve, tag);
+     }
+ }
+
 
 
 int mirrorlistcolor=-1;

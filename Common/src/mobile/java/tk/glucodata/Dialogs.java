@@ -251,9 +251,27 @@ static private void exportdata(MainActivity     context,int type,String name,flo
     try {
         showdays=days;
         context.startActivityForResult(intent, request);
-        } catch(Throwable th) {
-            Log.stack(LOG_ID,"ACTION_CREATE_DOCUMENT",th);
-            }
+    } catch(Throwable th) {
+        Log.stack(LOG_ID,"ACTION_CREATE_DOCUMENT",th);
+    }
+}
+
+    public static void runExport(MainActivity activity, int typeIndex, boolean isCalibrated, float days) {
+        String label;
+        switch (typeIndex) {
+            case 0: label = activity.getString(R.string.amountsname); break;
+            case 1: label = activity.getString(R.string.scansname); break;
+            case 2: label = activity.getString(R.string.streamname); break;
+            case 3: label = activity.getString(R.string.historyname); break;
+            case 4: label = activity.getString(R.string.mealsname); break;
+            case 5: label = activity.getString(R.string.libreviewname); break;
+            default: label = "export-"; break;
+        }
+        switch (typeIndex) {
+            case 4: algexporter(activity, typeIndex, label, ".html", days); break;
+            case 5: algexporter(activity, typeIndex | (isCalibrated ? 8 : 0), label, ".csv", days); break;
+            default: exporter(activity, typeIndex | (isCalibrated ? 8 : 0), label, days); break;
+        }
     }
 
 }

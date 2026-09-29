@@ -51,7 +51,8 @@
         android:theme="@style/AppTheme.Base">
         <receiver
             android:name=".GlucoseWidget"
-            android:exported="false">
+            android:exported="false"
+            android:label="@string/widget_classic">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -60,6 +61,72 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/glucose_widget_info" />
         </receiver>
+        <!-- Home screen widgets, drawn by tk.glucodata.widgets.WidgetRenderer -->
+        <receiver
+            android:name=".widgets.MinimalGlucoseWidget"
+            android:exported="false"
+            android:label="@string/widget_minimal">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/home_widget_minimal_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.CompactGlucoseWidget"
+            android:exported="false"
+            android:label="@string/widget_compact">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/home_widget_compact_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.TrendGlucoseWidget"
+            android:exported="false"
+            android:label="@string/widget_trend">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/home_widget_trend_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.DialGlucoseWidget"
+            android:exported="false"
+            android:label="@string/widget_dial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/home_widget_dial_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.RangeGlucoseWidget"
+            android:exported="false"
+            android:label="@string/widget_range">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/home_widget_range_info" />
+        </receiver>
+        <activity
+            android:name=".widgets.WidgetConfigActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="@string/widget_settings_title"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
 
         <!--    android:screenOrientation="reverseLandscape" -->
         <activity
@@ -102,6 +169,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:host="*" android:pathPrefix="/alerts" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/data" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/messages" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/messagesack" android:scheme="wear" />

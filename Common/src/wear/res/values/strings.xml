@@ -29,4 +29,18 @@
 <string name="default_wf_token">hYp+D3PbJnviufTMTvtiPPC+vQeCfJKHnZRz8OFAfH8=:MS4wLjA=</string>
 
 
+    <string name="wear_sensors_status_title">Sensors &amp; Status</string>
+    <string name="wear_scan_sensor">Scan Sensor</string>
+    <string name="wear_scan_or_pair_sensor">Scan or pair sensor</string>
+    <string name="wear_no_active_sensor">No active sensor</string>
+    <string name="wear_sensor_days_remaining">%1$.1f d left</string>
+    <string name="wear_phone_connection">Phone connection</string>
+    <string name="wear_sync_with_phone">Sync with phone</string>
+    <string name="wear_phone_receiving">Receiving sensor data</string>
+    <string name="wear_phone_unavailable">Unavailable • Tap to retry</string>
+    <string name="wear_phone_no_link">No phone link</string>
+    <string name="wear_sync_requested">Requesting fresh data…</string>
+    <string name="wear_phone_sync_started">Phone sync requested</string>
+    <string name="wear_phone_sync_error">Phone sync failed: %1$s</string>
+
 </resources>

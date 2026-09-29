@@ -268,6 +268,7 @@ static RemoteGlucose arrowNotify;
     private static final String GLUCOSEALARM = "glucoseAlarm";
     //  private static final String LOSSALARM = "LossofSensorAlarm";
     private static final String GLUCOSENOTIFICATION = "glucoseNotification";
+    private static final String FOREGROUNDNOTIFICATION = "foregroundNotification";
 
 
     private void createNotificationChannel(Context context) {
@@ -292,6 +293,13 @@ static RemoteGlucose arrowNotify;
             importance = NotificationManager.IMPORTANCE_HIGH;
             channel = new NotificationChannel(GLUCOSENOTIFICATION, GLUCOSENOTIFICATION, importance);
             //allowbubbel(channel);
+            channel.setSound(null, null);
+            channel.setDescription(description);
+            notificationManager.createNotificationChannel(channel);
+
+            description = context.getString(R.string.ongoing_description);
+            importance = NotificationManager.IMPORTANCE_LOW;
+            channel = new NotificationChannel(FOREGROUNDNOTIFICATION, FOREGROUNDNOTIFICATION, importance);
             channel.setSound(null, null);
             channel.setDescription(description);
             notificationManager.createNotificationChannel(channel);
@@ -428,7 +436,17 @@ private static void showoldglucose() {
     static public void stopalarm() {
         stopalarmnotsend(true);
         }
+    /** Stop requested by the user here: silences both the legacy alarms and the configurable alerts. */
+    static public void stopAllAlarms() {
+        stopalarmnotsend(true);
+        if(tk.glucodata.alerts.AlertPlayer.INSTANCE.getActive().getValue()!=null)
+            tk.glucodata.alerts.AlertPlayer.INSTANCE.dismiss();
+        }
     static public void stopalarmnotsend(boolean send) {
+        if(!send) {
+            // Stop requested by a connected device: also silence the configurable alerts.
+            tk.glucodata.alerts.AlertPlayer.INSTANCE.stop(tk.glucodata.alerts.AlertPlayer.StopReason.REMOTE);
+            }
         if(!getisalarm()) {
             {if(doLog) {Log.d(LOG_ID,"stopalarm not is alarm");};};
             return;
@@ -777,7 +795,7 @@ static private String getglstring(float glvalue,int sensorgen2) {
         }
    }
 
-private void setIcon( Notification.Builder GluNotBuilder,float glvalue,int sensorgen2) {
+void setIcon( Notification.Builder GluNotBuilder,float glvalue,int sensorgen2) {
     if(makeicon) {
            final var icon=icons.getIcon(getglstring(glvalue,sensorgen2));  
            GluNotBuilder.setSmallIcon(icon);
@@ -1030,7 +1048,7 @@ private Notification  makenotification(int draw,String message,String type,boole
 
 Notification getforgroundnotification() {
     final String mess= app.getString(SensorBluetooth.blueone!=null?R.string.connectwithsensor:R.string.exchangedata);
-    Notification not=makenotification(R.drawable.novalue,mess,GLUCOSENOTIFICATION,true);
+    Notification not=makenotification(R.drawable.novalue,mess,FOREGROUNDNOTIFICATION,true);
     not.flags|= FLAG_ONGOING_EVENT;
     return not;
     }

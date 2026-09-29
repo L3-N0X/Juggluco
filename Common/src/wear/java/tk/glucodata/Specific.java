@@ -81,13 +81,19 @@ private static void rmlayoutUI() {
 static void rmlayout() {
      RunOnUiThread(Specific::rmlayoutUI);
      }
+public static void setupWearUi(MainActivity act) {
+    tk.glucodata.ui.WearComposeUiBridge.setupWearComposeUi(act);
+}
+
+public static void refreshRepository() {
+    if (tk.glucodata.ui.WearComposeUiBridge.isWearComposeUiActive && tk.glucodata.ui.WearComposeUiBridge.repository != null) {
+        tk.glucodata.ui.WearComposeUiBridge.repository.refreshAll();
+    }
+}
+
 static void initScreen(MainActivity act) {
-    LayoutInflater flater= LayoutInflater.from(act);
-    ViewGroup layout = (ViewGroup) flater.inflate(R.layout.startview ,null, false);
-    text=layout.findViewById(R.id.text2);
-    Specific.layout=layout;
-    act.addMyContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
-   }
+    // Wear Compose UI handles initial waiting state natively without blocking view
+}
 
 static void   blockedNum(MainActivity  act) {
     help.basehelp(R.string.staticnum,act,xzy->{ });

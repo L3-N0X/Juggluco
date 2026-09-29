@@ -566,7 +566,7 @@ public void    onScreenStateChanged(int state) {
 private static float movethreshold=6.0f;
 private boolean startedMain=false;
 public boolean onTouchEvent(MotionEvent event) {
-    if(Natives.turnoffalarm()) Notify.stopalarm();
+    if(Natives.turnoffalarm()) Notify.stopAllAlarms();
         {if(doLog) {Log.i(LOG_ID,event.toString());};};
     try {
         switch (event.getAction() & MotionEvent.ACTION_MASK) {
