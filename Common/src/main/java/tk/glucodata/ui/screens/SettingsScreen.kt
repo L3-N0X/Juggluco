@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -51,6 +52,7 @@ import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
 import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
 import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
+import tk.glucodata.ui.screens.settings.SettingsActionRow
 import tk.glucodata.ui.screens.settings.SettingsDestination
 import tk.glucodata.ui.screens.settings.SettingsNavRow
 import tk.glucodata.ui.screens.settings.SettingsSection
@@ -153,7 +155,6 @@ fun SettingsScreen(
             )
             SettingsDestination.DATA -> DataSettingsScreen(
                 repository = repository,
-                onOpenLegacyView = onOpenLegacyView,
                 onExportData = onExportData,
                 onNavigateBack = { handleNavigate(null) }
             )
@@ -359,6 +360,12 @@ fun SettingsScreen(
                 subtitle = stringResource(R.string.settings_group_data_desc),
                 icon = SettingsDestination.DATA.icon,
                 onClick = { handleNavigate(SettingsDestination.DATA) }
+            )
+            SettingsActionRow(
+                title = stringResource(R.string.loc_classic_interface),
+                subtitle = stringResource(R.string.settings_classic_view_desc),
+                icon = Icons.Default.Timeline,
+                onClick = onOpenLegacyView
             )
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_about_title),

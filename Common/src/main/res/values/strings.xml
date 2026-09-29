@@ -987,12 +987,9 @@
     <string name="settings_nfc_launch_desc">Automatically open Juggluco when phone touches sensor</string>
 
     <string name="settings_cat_data">Data management</string>
-    <string name="settings_card_data">Export &amp; Legacy View</string>
     <string name="settings_export_sensor_data">Export Sensor Data</string>
     <string name="settings_export_sensor_data_desc">Export CSV or HTML records for amounts, scans, stream &amp; history</string>
-    <string name="settings_legacy_canvas">Legacy OpenGL Canvas View</string>
-    <string name="settings_legacy_canvas_desc">Switch to classic landscape OpenGL curve. Press Back anytime to return.</string>
-    <string name="settings_btn_switch">Switch</string>
+    <string name="settings_classic_view_desc">OpenGL curve</string>
 
     <string name="settings_cat_about">About</string>
     <string name="settings_card_about">About Juggluco</string>
@@ -1015,7 +1012,7 @@
     <string name="settings_group_hardware_title">NFC &amp; Hardware</string>
     <string name="settings_group_hardware_desc">NFC scanning chimes and auto-launch options</string>
     <string name="settings_group_data_title">Data Management</string>
-    <string name="settings_group_data_desc">Export glucose data records and switch to legacy OpenGL view</string>
+    <string name="settings_group_data_desc">Export glucose data records, storage &amp; logs</string>
     <string name="settings_group_about_title">About Juggluco</string>
     <string name="settings_group_about_desc">App version, license, sensor support and development guide</string>
     <string name="settings_group_watch_title">Smartwatch &amp; Wear OS</string>

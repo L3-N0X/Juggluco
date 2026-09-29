@@ -158,7 +158,6 @@ fun JugglucoApp(
                 )
                 SettingsDestination.DATA -> DataSettingsScreen(
                     repository = repository,
-                    onOpenLegacyView = onOpenLegacyView,
                     onExportData = handleOpenExport,
                     onNavigateBack = { activeSettingsDestination = null }
                 )

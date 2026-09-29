@@ -7,7 +7,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -46,7 +45,6 @@ private fun formatLogSize(context: android.content.Context, bytes: Long): String
 @Composable
 fun DataSettingsScreen(
     repository: GlucoseRepository,
-    onOpenLegacyView: () -> Unit,
     onExportData: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
@@ -90,24 +88,6 @@ fun DataSettingsScreen(
                         modifier = Modifier.padding(start = 4.dp)
                     ) {
                         Text(stringResource(R.string.btn_export_data), fontSize = 12.sp)
-                    }
-                }
-            )
-        }
-
-        // LEGACY OPENGL CANVAS
-        SettingsSection(title = stringResource(R.string.loc_classic_interface)) {
-            SettingsActionRow(
-                title = stringResource(R.string.settings_legacy_canvas),
-                subtitle = stringResource(R.string.settings_legacy_canvas_desc),
-                icon = Icons.Default.Timeline,
-                onClick = onOpenLegacyView,
-                trailingContent = {
-                    OutlinedButton(
-                        onClick = onOpenLegacyView,
-                        modifier = Modifier.padding(start = 4.dp)
-                    ) {
-                        Text(stringResource(R.string.settings_btn_switch), fontSize = 12.sp)
                     }
                 }
             )

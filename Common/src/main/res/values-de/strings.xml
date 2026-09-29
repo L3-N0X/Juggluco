@@ -791,14 +791,13 @@
     <string name="settings_nfc_launch_desc">Juggluco automatisch starten, sobald das Smartphone den Sensor berührt</string>
 
     <string name="settings_cat_data">DATENVERWALTUNG &amp; WERKZEUGE</string>
-    <string name="settings_card_data">Export &amp; Klassische Ansicht</string>
     <string name="settings_export_sensor_data">Sensordaten exportieren</string>
     <string name="settings_export_sensor_data_desc">CSV- oder HTML-Dateien für Insulindosen, Scans, Datenstrom &amp; Verlauf exportieren</string>
-    <string name="settings_legacy_canvas">Klassische OpenGL-Ansicht</string>
-    <string name="settings_legacy_canvas_desc">Zur klassischen horizontalen OpenGL-Kurve wechseln. Jederzeit mit Zurück-Taste zurückkehren.</string>
-    <string name="settings_btn_switch">Wechseln</string>
+    <string name="settings_classic_view_desc">OpenGL-Kurve</string>
 
     <string name="settings_cat_about">ÜBER</string>
+
+    <string name="settings_group_data_desc">Glukosedaten exportieren, Speicher &amp; Protokolle</string>
     <string name="settings_card_about">Über Juggluco</string>
     <string name="settings_version_title">Juggluco v11.0.2</string>
     <string name="settings_about_details">Moderne Jetpack Compose Material 3 Edition\nOpen-Source-Software lizenziert unter GPLv3\nEntwickelt von Jaap Korthals Altes</string>
