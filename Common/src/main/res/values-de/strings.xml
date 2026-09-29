@@ -1528,6 +1528,8 @@
     <!-- Home screen widgets -->
     <string name="widget_settings_title">Startbildschirm-Widgets</string>
     <string name="widget_settings_desc">Widgets auswählen, gestalten und hinzufügen</string>
+    <string name="notif_settings_title">Benachrichtigungen</string>
+    <string name="notif_settings_desc">Glukose-Benachrichtigung, Grafik und Statusleisten-Symbole</string>
 <string name="use_for_numbers">Zahlen</string>
 <string name="garmin_watch_app_id">Garmin Watch App-ID:</string>
 <string name="garmin_app_id_button" translatable="false">ID</string>

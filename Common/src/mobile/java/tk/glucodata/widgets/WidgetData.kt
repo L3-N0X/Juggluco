@@ -104,8 +104,19 @@ object WidgetDataSource {
     private const val UI_PREFS = "ui_prefs"
     private const val KEY_DELTA_CALCULATION = "delta_calculation_minutes"
 
-    /** Reads the current reading plus [historyMillis] of history from the native store. Call off the main thread. */
-    fun load(context: Context, historyMillis: Long): WidgetSnapshot {
+    /**
+     * Reads the current reading plus [historyMillis] of history from the native store. Call off the main thread.
+     *
+     * A reading that is being handed out right now can be passed as [latestTime] (epoch milliseconds),
+     * [latestMgDl] and [latestRate]; it then takes the place of the stored last reading.
+     */
+    fun load(
+        context: Context,
+        historyMillis: Long,
+        latestTime: Long = 0L,
+        latestMgDl: Float = 0f,
+        latestRate: Float = Float.NaN
+    ): WidgetSnapshot {
         val now = System.currentTimeMillis()
         val unit = GlucoseUnit.fromNative(Applic.unit)
         var range = GlucoseRange()
@@ -124,7 +135,11 @@ object WidgetDataSource {
                 ).normalized()
             } catch (_: Throwable) {
             }
-            try {
+            if (latestTime > 0L && latestMgDl > 0f) {
+                currentTime = latestTime
+                currentMgDl = latestMgDl
+                rate = latestRate
+            } else try {
                 Natives.lastglucose()?.takeIf { it.time > 0L }?.let { last ->
                     val shown = last.value?.replace(',', '.')?.toFloatOrNull()
                     if (shown != null && shown > 0f) {

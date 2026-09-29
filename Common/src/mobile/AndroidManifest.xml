@@ -40,6 +40,8 @@
         android:xlargeScreens="true" />
 
     <uses-permission android:name="android.permission.FLASHLIGHT" />
+    <!-- Android 16 Live Updates: the glucose notification as a status bar chip (tk.glucodata.notifications.LiveUpdate) -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
      <uses-feature android:name="android.hardware.usb.host" android:required="false" />
@@ -127,6 +129,11 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".notifications.NotificationSettingsActivity"
+            android:exported="false"
+            android:label="@string/notif_settings_title" />
 
         <!--    android:screenOrientation="reverseLandscape" -->
         <activity

@@ -69,10 +69,10 @@ class WidgetRenderer(private val context: Context) {
         return parts.joinToString(", ")
     }
 
-    private fun timeText(snapshot: WidgetSnapshot): String =
+    internal fun timeText(snapshot: WidgetSnapshot): String =
         DateFormat.getTimeFormat(context).format(Date(snapshot.currentTime))
 
-    private fun deltaText(snapshot: WidgetSnapshot): String? {
+    internal fun deltaText(snapshot: WidgetSnapshot): String? {
         val delta = snapshot.deltaMgDl ?: return null
         if (snapshot.isStale) return null
         val shown = snapshot.unit.toDisplay(delta)
@@ -89,7 +89,8 @@ class WidgetRenderer(private val context: Context) {
         return sign + digits
     }
 
-    private inner class Frame(
+    /** One drawing pass. Also used by the glucose notification, which lays out the same pieces differently. */
+    internal inner class Frame(
         val canvas: Canvas,
         val w: Float,
         val h: Float,
@@ -199,26 +200,7 @@ class WidgetRenderer(private val context: Context) {
         fun capHeight(typeface: Typeface, size: Float) = digitRatio(typeface) * size
 
         fun drawArrow(cx: Float, cy: Float, box: Float, arrow: TrendArrow, color: Int) {
-            val paint = strokePaint(color, box * 0.14f)
-            val reach = box * 0.36f
-            val head = box * 0.27f
-            val path = Path().apply {
-                moveTo(cx - reach, cy)
-                lineTo(cx + reach, cy)
-                moveTo(cx + reach - head, cy - head)
-                lineTo(cx + reach, cy)
-                lineTo(cx + reach - head, cy + head)
-                if (arrow == TrendArrow.RAPIDLY_RISING || arrow == TrendArrow.RAPIDLY_FALLING) {
-                    val back = box * 0.24f
-                    moveTo(cx + reach - head - back, cy - head)
-                    lineTo(cx + reach - back, cy)
-                    lineTo(cx + reach - head - back, cy + head)
-                }
-            }
-            canvas.save()
-            canvas.rotate(arrow.angleDegrees, cx, cy)
-            canvas.drawPath(path, paint)
-            canvas.restore()
+            drawTrendArrow(canvas, strokePaint(color, box * 0.14f), cx, cy, box, arrow)
         }
 
         fun drawChip(cx: Float, cy: Float, diameter: Float, arrow: TrendArrow) {
@@ -756,6 +738,29 @@ class WidgetRenderer(private val context: Context) {
 
     companion object {
         private val typefaces = HashMap<String, Typeface>()
+
+        /** The trend arrow of the widgets, centred on [cx]/[cy] within a [box] wide square, stroked with [paint]. */
+        fun drawTrendArrow(canvas: Canvas, paint: Paint, cx: Float, cy: Float, box: Float, arrow: TrendArrow) {
+            val reach = box * 0.36f
+            val head = box * 0.27f
+            val path = Path().apply {
+                moveTo(cx - reach, cy)
+                lineTo(cx + reach, cy)
+                moveTo(cx + reach - head, cy - head)
+                lineTo(cx + reach, cy)
+                lineTo(cx + reach - head, cy + head)
+                if (arrow == TrendArrow.RAPIDLY_RISING || arrow == TrendArrow.RAPIDLY_FALLING) {
+                    val back = box * 0.24f
+                    moveTo(cx + reach - head - back, cy - head)
+                    lineTo(cx + reach - back, cy)
+                    lineTo(cx + reach - head - back, cy + head)
+                }
+            }
+            canvas.save()
+            canvas.rotate(arrow.angleDegrees, cx, cy)
+            canvas.drawPath(path, paint)
+            canvas.restore()
+        }
         private val digitRatios = HashMap<Typeface, Float>()
 
         fun typeface(font: WidgetFont, weight: Int): Typeface = synchronized(typefaces) {

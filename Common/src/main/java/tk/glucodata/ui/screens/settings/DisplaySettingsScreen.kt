@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Widgets
@@ -244,14 +243,6 @@ fun DisplaySettingsScreen(
 
         // SYSTEM UI & LAYOUT
         SettingsSection(title = stringResource(R.string.loc_system_ui_curve)) {
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_status_bar),
-                subtitle = stringResource(R.string.settings_status_bar_desc),
-                icon = Icons.Default.Notifications,
-                checked = displayConfig.statusBarNotification,
-                onCheckedChange = { repository.setStatusBarNotification(it) }
-            )
-
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_fullscreen),
                 subtitle = stringResource(R.string.settings_fullscreen_desc),

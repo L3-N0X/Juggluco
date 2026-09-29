@@ -92,6 +92,32 @@ class WidgetPalette(
             }
         }
 
+        /**
+         * Colors for drawing into a notification. The system draws the notification's background,
+         * which follows the system's dark mode from Android 10 and is always light before, so only
+         * the content is ours.
+         */
+        fun forNotification(
+            context: Context,
+            dark: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && systemIsDark()
+        ): WidgetPalette {
+            AppThemePreferences.ensureLoaded(context)
+            val scheme = jugglucoColorScheme(context, dark, AppThemePreferences.customColorArgb.value)
+            val content = if (dark) LIGHT_CONTENT else DARK_CONTENT
+            return WidgetPalette(
+                background = Color.TRANSPARENT,
+                content = content,
+                contentVariant = ColorUtils.setAlphaComponent(content, if (dark) 0xB8 else 0xA8),
+                accent = scheme.primary.toArgb(),
+                chip = scheme.secondaryContainer.toArgb(),
+                onChip = scheme.onSecondaryContainer.toArgb(),
+                shadow = false,
+                darkSurface = dark,
+                clinical = if (dark) DarkClinicalColors else LightClinicalColors,
+                monochrome = false
+            )
+        }
+
         fun resolve(
             context: Context,
             config: WidgetConfig,

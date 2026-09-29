@@ -47,6 +47,15 @@
 
 ---
 
+## Glucose Notification & Status Bar Icons
+- **Drawn with the widget renderer:** the phone's glucose notification (`Common/src/mobile/java/tk/glucodata/notifications/`) is painted by `NotificationRenderer` from `WidgetRenderer.Frame`'s building blocks, so value, arrow and graph match the widgets. Collapsed: value, arrow, Δ change over the reading time, optional mini graph. Expanded: the same row plus graph and time-in-range bar. Colors come from `WidgetPalette.forNotification` (system light/dark), and the notification is redrawn when the system theme flips.
+- **Status bar icons:** `StatusIconRenderer` draws alpha-only icons (value, arrow, value + arrow, change) centred on the digits' real outline. The glucose notification carries one; up to two extra silent notifications (`statusBarIcons` channel, local only) carry more. Alerts reuse the value icon via `Notify.setIcon`.
+- **Bridge:** `Notify.java` (main) reaches the phone code through `tk.glucodata.GlucoseNotifications`, which has a no-op stub in `wear/` (symlinked into `small/`). The legacy `RemoteGlucose` layout remains only for native alarms with a stop button and as the fallback.
+- **Live Update (Android 16):** with `liveUpdate` on and `canPostPromotedNotifications()` true, `LiveUpdate` swaps the drawn content for a system template (promotion forbids custom views and colorizing): title/text, `ProgressStyle` as a range gauge, chip icon + `setShortCriticalText`, and the `android.requestPromotedOngoing` extra (the setter is public only from API 36.1). `Notify.fornotify` updates a Live Update in place instead of cancelling first, so the chip does not blink. Otherwise it falls back to the drawn notification.
+- **Settings** live in `NotificationConfigStore` (one JSON object) and are edited in `NotificationSettingsActivity`, opened from Settings → Notifications. Saving redraws through `NotificationRefresher`. Whether the notification shows at all stays the native `showalways` flag. Add new options to `NotificationConfig` with a default.
+
+---
+
 ## Screen Layout & Headers
 - **Shared layout module:** `Common/src/main/java/tk/glucodata/ui/screens/ScreenLayout.kt` owns the spacing scale (`Gutter` / `CardPadding` 16.dp, `SectionSpacing`, `TopPadding`, `BottomPadding` 96.dp) plus `ScreenContent { }` (standard scrolling tab body) and `SectionTitle(...)`. Use these instead of ad-hoc dp values.
 - **One title per screen:** the persistent app bar supplies it — `JugglucoApp`'s `TopAppBar` for every tab, `SettingsDetailScaffold` for detail screens. Never repeat the page title in the content, and leave descriptions out unless they earn their space.
