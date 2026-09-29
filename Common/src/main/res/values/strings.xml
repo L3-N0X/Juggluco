@@ -1802,4 +1802,6 @@
     <!-- Home screen widgets -->
     <string name="widget_settings_title">Home screen widgets</string>
     <string name="widget_settings_desc">Pick, style and add widgets</string>
+    <string name="notif_settings_title">Notifications</string>
+    <string name="notif_settings_desc">Glucose notification, graph and status bar icons</string>
 </resources>

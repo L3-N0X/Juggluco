@@ -368,6 +368,23 @@ static public String glucosestr(float gl) {
     }
     boolean hasvalue=false;
 
+/** Redraws the glucose notification and the extra status bar icons after their settings or the system theme changed. */
+public static void refreshGlucoseNotification() {
+    var noti=onenot;
+    if(noti==null||isWearable)
+        return;
+    final var strgl=SuperGattCallback.previousglucose;
+    final var gl=SuperGattCallback.previousglucosevalue;
+    if(strgl==null||gl<2.0f||System.currentTimeMillis()-strgl.time>glucosetimeout) {
+        GlucoseNotifications.statusIcons(null,0.0f,null);
+        return;
+        }
+    if(showalways&&!getisalarm())
+        noti.arrowglucosenotification(2,gl, format(usedlocale,glucoseformat,gl),strgl,GLUCOSENOTIFICATION ,true);
+    else
+        GlucoseNotifications.statusIcons(strgl,gl,getglstring(gl,strgl.sensorgen2));
+    }
+
 
       /*
 private void showglucose(notGlucose strgl,float gl) {
@@ -419,6 +436,7 @@ private static void showoldglucose() {
                     else
                         notificationManager.cancel(glucosenotificationid);
                 }
+                GlucoseNotifications.statusIcons(strgl,gl,getglstring(gl,strgl.sensorgen2));
             }
         }
         else {
@@ -764,8 +782,7 @@ void overwriteglucose(int kind) {
 //    static final String closename= "ForceClose";
     final static int penmutable= android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M? PendingIntent.FLAG_IMMUTABLE:0;
 
-private final boolean makeicon=!isWearable&&tk.glucodata.BuildConfig.minSDK>=23;
-private final StatusIcon icons=makeicon?new StatusIcon():null;
+private final boolean makeicon=!isWearable&&Build.VERSION.SDK_INT>=23;
 
 static private String getglstring(float glvalue,int sensorgen2) {
    final var maxglucose=Natives.getmaxmgdL(sensorgen2);
@@ -797,13 +814,14 @@ static private String getglstring(float glvalue,int sensorgen2) {
 
 void setIcon( Notification.Builder GluNotBuilder,float glvalue,int sensorgen2) {
     if(makeicon) {
-           final var icon=icons.getIcon(getglstring(glvalue,sensorgen2));  
-           GluNotBuilder.setSmallIcon(icon);
+           final var icon=GlucoseNotifications.valueIcon(getglstring(glvalue,sensorgen2));
+           if(icon!=null) {
+               GluNotBuilder.setSmallIcon(icon);
+               return;
+               }
         }
-      else  {
-             var draw= GlucoseDraw.getgludraw(glvalue,sensorgen2);
-              GluNotBuilder.setSmallIcon(draw);
-           }
+     var draw= GlucoseDraw.getgludraw(glvalue,sensorgen2);
+     GluNotBuilder.setSmallIcon(draw);
        }
 private void  makeseparatenotification(float glvalue,String message,notGlucose glucose,String type) {
     if(!isWearable) {
@@ -854,10 +872,14 @@ static public boolean alertseparate=false;
             }
         final boolean glucosealarm=kind<2||kind>4;
         if(!isWearable) {
+            GluNotBuilder.setShowWhen(true);
+            }
+        // An alarm keeps the old layout for its stop button; everything else is drawn from the notification settings.
+        final boolean styled=!isWearable&&!(glucosealarm&&!once)&&GlucoseNotifications.style(GluNotBuilder,glucose,glvalue,getglstring(glvalue,glucose.sensorgen2));
+        if(!isWearable&&!styled) {
             if(Build.VERSION.SDK_INT  >= 24) {
                 GluNotBuilder.setStyle(new Notification.DecoratedCustomViewStyle());
                 }
-            GluNotBuilder.setShowWhen(true);
             RemoteViews remoteViews=arrowNotify.arrowremote(kind,glucose,glucosealarm&&!once);
             if(whiteonblack) {
                 if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -871,6 +893,7 @@ static public boolean alertseparate=false;
                 GluNotBuilder.setCustomContentView(remoteViews);
             } else
                 GluNotBuilder.setContent(remoteViews);
+            GlucoseNotifications.statusIcons(glucose,glvalue,getglstring(glvalue,glucose.sensorgen2));
             }
     if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         GluNotBuilder.setTimeoutAfter(glucosetimeout);
@@ -955,7 +978,9 @@ void fornotify(Notification notif) {
         }
     else  {
          {
-            notificationManager.cancel(glucosenotificationid);
+            // A Live Update is updated in place: taking it away first would drop its status bar chip every minute.
+            if(!notif.extras.getBoolean("android.requestPromotedOngoing"))
+                notificationManager.cancel(glucosenotificationid);
             if(keeprunning.theservice!=null) {
                 keeprunning.theservice.startForeground(glucosenotificationid,notif);
                    }

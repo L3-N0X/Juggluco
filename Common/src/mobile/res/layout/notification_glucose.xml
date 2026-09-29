@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Collapsed glucose notification (tk.glucodata.notifications). The picture keeps its proportions:
+     when the row is wider than drawn it sits at the start at full height, when narrower it
+     shrinks and stays centred. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <ImageView
+        android:id="@+id/notification_glucose_image"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:maxHeight="48dp"
+        android:scaleType="fitStart" />
+</LinearLayout>

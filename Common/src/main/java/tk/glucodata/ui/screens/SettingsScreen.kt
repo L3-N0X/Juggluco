@@ -1,5 +1,6 @@
 package tk.glucodata.ui.screens
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,10 +30,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import tk.glucodata.Applic
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
@@ -178,6 +182,7 @@ fun SettingsScreen(
         return
     }
 
+    val context = LocalContext.current
     val unit by repository.unit.collectAsState()
     val glucoseRange by repository.range.collectAsState()
     val alertRules by tk.glucodata.alerts.AlertStore.rules.collectAsState()
@@ -300,6 +305,17 @@ fun SettingsScreen(
                 icon = SettingsDestination.DISPLAY.icon,
                 onClick = { handleNavigate(SettingsDestination.DISPLAY) }
             )
+            if (!Applic.isWearable) {
+                SettingsNavRow(
+                    title = stringResource(R.string.notif_settings_title),
+                    subtitle = stringResource(R.string.notif_settings_desc),
+                    icon = Icons.Default.Notifications,
+                    onClick = {
+                        // Lives in the mobile source set, so it is started by name.
+                        context.startActivity(Intent().setClassName(context, "tk.glucodata.notifications.NotificationSettingsActivity"))
+                    }
+                )
+            }
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_voice_title),
                 subtitle = stringResource(R.string.settings_group_voice_desc),
