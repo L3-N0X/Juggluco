@@ -94,9 +94,8 @@ fun rememberAlertHistory(alert: AlertPlayer.ActiveAlert, hours: Int = AlertHisto
     }
 
 /**
- * Compact trend graph for the full-screen alerts: target band, the alert's threshold as a dashed
+ * Compact trend graph for the phone's full-screen alert: target band, the alert's threshold as a dashed
  * line, the curve in the colour of the range it passes through and a dot on the latest reading.
- * Colours are passed in so the phone (Material 3) and the watch (Wear Material 3) theme it alike.
  */
 @Composable
 fun AlertHistoryGraph(

@@ -47,14 +47,11 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import tk.glucodata.R
-import tk.glucodata.alerts.AlertHistoryGraph
 import tk.glucodata.alerts.AlertKind
 import tk.glucodata.alerts.AlertOutput
 import tk.glucodata.alerts.AlertPlayer
 import tk.glucodata.alerts.AlertStore
 import tk.glucodata.alerts.formatMinutes
-import tk.glucodata.alerts.graphThresholdMgDl
-import tk.glucodata.alerts.rememberAlertHistory
 import tk.glucodata.ui.theme.LocalClinicalColors
 import tk.glucodata.ui.theme.WearJugglucoTheme
 
@@ -186,21 +183,6 @@ private fun WearAlertScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
-                    )
-                }
-            }
-            item {
-                val history by rememberAlertHistory(alert)
-                if (!history.isEmpty) {
-                    AlertHistoryGraph(
-                        history = history,
-                        clinical = clinical,
-                        surfaceColor = scheme.surfaceContainerLow,
-                        highlightColor = glucoseColor,
-                        thresholdMgDl = rule.graphThresholdMgDl(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(72.dp)
                     )
                 }
             }
