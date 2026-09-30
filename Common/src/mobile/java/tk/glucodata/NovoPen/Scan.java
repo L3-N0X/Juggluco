@@ -101,7 +101,7 @@ public class Scan {
     }
     private static void earlytimeconfirmation(MainActivity act) {
         AlertDialog.Builder builder = new AlertDialog.Builder(act);
-        builder.setTitle("To get older values you have to scan again").
+        builder.setTitle(R.string.to_get_older_values_scan_again).
            setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
                     }

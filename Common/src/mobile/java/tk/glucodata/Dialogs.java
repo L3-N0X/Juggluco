@@ -80,7 +80,7 @@ private Button exportbutton(MainActivity activity,String label, int type) {
                 daynr=Float.parseFloat(String.valueOf(days.getText()));
                 } catch(Throwable th) {
 
-                    exportlabel.setText("I don't understand \'"+days.getText()+"\'");
+                    exportlabel.setText(activity.getString(R.string.dont_understand, days.getText()));
                     return;
                 };
             switch(type) {

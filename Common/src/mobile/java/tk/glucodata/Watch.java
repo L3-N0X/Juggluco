@@ -90,7 +90,7 @@ static public void show(MainActivity context) {
                 Natives.setgadgetbridge(isChecked);
                 SuperGattCallback.doGadgetbridge=isChecked;
                 });
-    var test=TestBridge?getbutton(context,"Test"):null;
+    var test=TestBridge?getbutton(context,context.getString(R.string.test)):null;
     View[] mibandrow;
     if(TestBridge) {
         test.setOnClickListener(v-> {

@@ -2,19 +2,21 @@ package tk.glucodata.ui.theme
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.StringRes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import tk.glucodata.Applic
+import tk.glucodata.R
 
-enum class WearColorPreset(val label: String) {
-    WATCH_DEFAULT("Watch default"),
-    BLUE("Blue"),
-    TEAL("Teal"),
-    PURPLE("Purple"),
-    ORANGE("Orange"),
-    GREEN("Green"),
-    PINK("Pink")
+enum class WearColorPreset(@StringRes val labelRes: Int) {
+    WATCH_DEFAULT(R.string.wear_color_watch_default),
+    BLUE(R.string.wear_color_blue),
+    TEAL(R.string.wear_color_teal),
+    PURPLE(R.string.wear_color_purple),
+    ORANGE(R.string.wear_color_orange),
+    GREEN(R.string.wear_color_green),
+    PINK(R.string.wear_color_pink)
 }
 
 object WearThemePreferences {

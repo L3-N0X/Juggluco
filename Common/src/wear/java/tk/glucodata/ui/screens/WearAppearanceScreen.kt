@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -28,6 +29,7 @@ import androidx.wear.compose.material3.RadioButton
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
+import tk.glucodata.R
 import tk.glucodata.ui.theme.WearColorPreset
 import tk.glucodata.ui.theme.WearThemePreferences
 import tk.glucodata.ui.theme.wearAccentColor
@@ -53,9 +55,9 @@ fun WearAppearanceScreen() {
             verticalArrangement = Arrangement.spacedBy(4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            item { ListHeader { Text("Appearance") } }
+            item { ListHeader { Text(stringResource(R.string.wear_ui_appearance)) } }
 
-            item { ListSubHeader { Text("Color") } }
+            item { ListSubHeader { Text(stringResource(R.string.wear_ui_color)) } }
             WearColorPreset.values().forEach { preset ->
                 item {
                     RadioButton(
@@ -75,7 +77,7 @@ fun WearAppearanceScreen() {
                                             wearAccentColor(preset, MaterialTheme.colorScheme.primary)
                                         )
                                 )
-                                Text(preset.label)
+                                Text(stringResource(preset.labelRes))
                             }
                         }
                     )

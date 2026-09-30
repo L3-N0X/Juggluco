@@ -9,6 +9,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
+import tk.glucodata.Applic;
+import tk.glucodata.R;
 import tk.glucodata.nums.AllData;
 
 import static consts.consts.GLUNITS;
@@ -24,6 +26,11 @@ import static consts.consts.LIBRE3DIRECT;
  */
 public final class GarminLibre3 {
     private static final String LOG_ID = "GarminLibre3";
+
+    /** Resolves a string resource; the handoff paths below are static and have no activity. */
+    private static String str(int res) {
+        return Applic.getContext().getString(res);
+    }
     private static final String PREFS = "garmin_libre3_handoff";
     // V44 and earlier saved the pre-handoff setting. Only remove that old key;
     // leaving Direct now always enables phone sensor Bluetooth.
@@ -444,15 +451,15 @@ public final class GarminLibre3 {
 
     private static boolean switchSensor(final String serial, final String address, final byte[] secret180) {
         if (activeTransfer != null) {
-            Applic.Toaster("Already sending a Libre 3 sensor to Garmin");
+            Applic.Toaster(str(R.string.garmin_already_sending));
             return false;
         }
         if (secret180 == null || secret180.length != 180 || address == null) {
-            Applic.Toaster("Libre 3 authorization data is not available");
+            Applic.Toaster(str(R.string.garmin_auth_unavailable));
             return false;
         }
         if (serial == null) {
-            Applic.Toaster("Libre 3 sensor identity is not available");
+            Applic.Toaster(str(R.string.garmin_identity_unavailable));
             Log.e(LOG_ID,"No sensor serial for Garmin handoff address="+address);
             return false;
         }
@@ -463,12 +470,12 @@ public final class GarminLibre3 {
 
         final AllData all = Applic.app == null ? null : Applic.app.numdata;
         if (all == null) {
-            Applic.Toaster("Garmin communication is not available");
+            Applic.Toaster(str(R.string.garmin_comm_unavailable));
             return false;
         }
         final long peerId = all.getLibre3DirectPeerId();
         if (peerId == Long.MIN_VALUE) {
-            Applic.Toaster("Select Libre 3 direct for a Garmin watch first");
+            Applic.Toaster(str(R.string.garmin_select_direct_first));
             return false;
         }
         Log.i(LOG_ID, "handoff start peer=" + peerId + " address=" + address);
@@ -478,7 +485,7 @@ public final class GarminLibre3 {
             message = GarminLibre3Provisioning.makeMessage(address, secret180);
         } catch (Throwable th) {
             Log.stack(LOG_ID, "Making Libre 3 Garmin provisioning data", th);
-            Applic.Toaster("Can't make Libre 3 Garmin provisioning data");
+            Applic.Toaster(str(R.string.garmin_provisioning_failed));
             return false;
         }
 
@@ -557,7 +564,7 @@ public final class GarminLibre3 {
         void succeed() {
             if (done) return;
             done = true;
-            Applic.Toaster("Libre 3 transferred to selected Garmin watch");
+            Applic.Toaster(str(R.string.garmin_transferred));
             finished(this);
         }
 

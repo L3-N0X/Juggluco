@@ -41,6 +41,7 @@ import androidx.wear.compose.material3.SwitchButtonDefaults
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.material3.TitleCard
+import androidx.annotation.StringRes
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.DeltaCalculation
@@ -136,13 +137,13 @@ internal fun AlarmSwitchRow(
 }
 
 private fun ScalingLazyListScope.wearAlarmToggle(
-    title: String,
+    @StringRes titleRes: Int,
     summary: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
     item {
-        AlarmSwitchRow(title, summary, checked, onCheckedChange)
+        AlarmSwitchRow(stringResource(titleRes), summary, checked, onCheckedChange)
     }
 }
 
@@ -227,15 +228,15 @@ internal fun PresetStepperContent(
     presets: List<Int>,
     haptic: HapticFeedback,
     onChange: (Int) -> Unit,
-    unitLabel: String = "min",
-    valueText: ((Int) -> String)? = null
+    unitLabel: String,
+    valueText: (@Composable (Int) -> String)? = null
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "$label: ${valueText?.invoke(currentValue) ?: "$currentValue $unitLabel"}",
+            text = stringResource(R.string.wear_ui_label_value, label, valueText?.invoke(currentValue) ?: "$currentValue $unitLabel"),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -267,7 +268,7 @@ private fun ScalingLazyListScope.wearPresetStepper(
     currentValue: Int,
     presets: List<Int>,
     haptic: HapticFeedback,
-    unitLabel: String = "min",
+    unitLabel: String,
     onChange: (Int) -> Unit
 ) {
     item {
@@ -305,6 +306,8 @@ fun WearSettingsScreen(
     val lowLabel = stringResource(R.string.status_low)
     val highLabel = stringResource(R.string.status_high)
     val veryHighLabel = stringResource(R.string.status_very_high)
+    val onLabel = stringResource(R.string.wear_ui_on)
+    val offLabel = stringResource(R.string.wear_ui_off)
 
     val listState = rememberScalingLazyListState()
 
@@ -322,7 +325,7 @@ fun WearSettingsScreen(
         ) {
             item {
                 ListHeader {
-                    Text("Settings")
+                    Text(stringResource(R.string.wear_ui_settings))
                 }
             }
 
@@ -338,19 +341,19 @@ fun WearSettingsScreen(
                             modifier = Modifier.size(ButtonDefaults.IconSize)
                         )
                     },
-                    label = { Text("Alerts") }
+                    label = { Text(stringResource(R.string.wear_ui_alerts)) }
                 )
             }
 
             // Voice output (legacy Talker config equivalent)
             item {
                 ListSubHeader {
-                    Text("Voice")
+                    Text(stringResource(R.string.wear_ui_voice))
                 }
             }
             wearAlarmToggle(
-                title = "Speak readings",
-                summary = if (voiceAnnounce) "On" else "Off",
+                titleRes = R.string.wear_ui_speak_readings,
+                summary = if (voiceAnnounce) onLabel else offLabel,
                 checked = voiceAnnounce,
                 onCheckedChange = { enabled -> tap { repository.setVoiceAnnounce(enabled) } }
             )
@@ -358,11 +361,11 @@ fun WearSettingsScreen(
             item {
                 TitleCard(
                     onClick = onOpenAppearance,
-                    title = { Text("Appearance") },
+                    title = { Text(stringResource(R.string.wear_ui_appearance)) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = colorPreset.label,
+                        text = stringResource(colorPreset.labelRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -371,19 +374,19 @@ fun WearSettingsScreen(
             // Display & device
             item {
                 ListSubHeader {
-                    Text("Display")
+                    Text(stringResource(R.string.wear_ui_display))
                 }
             }
             wearAlarmToggle(
-                title = "24-hour clock",
-                summary = if (displayConfig.use24Hour) "On" else "Off",
+                titleRes = R.string.wear_ui_24h_clock,
+                summary = if (displayConfig.use24Hour) onLabel else offLabel,
                 checked = displayConfig.use24Hour,
                 onCheckedChange = { enabled -> tap { repository.setHour24(enabled) } }
             )
             if (hardwareConfig.hasNfc) {
                 wearAlarmToggle(
-                    title = "NFC sound",
-                    summary = if (hardwareConfig.nfcSound) "On" else "Off",
+                    titleRes = R.string.wear_ui_nfc_sound,
+                    summary = if (hardwareConfig.nfcSound) onLabel else offLabel,
                     checked = hardwareConfig.nfcSound,
                     onCheckedChange = { enabled -> tap { repository.setNfcSound(enabled) } }
                 )
@@ -392,7 +395,7 @@ fun WearSettingsScreen(
             // Glucose Unit Section
             item {
                 ListSubHeader {
-                    Text("Glucose Unit")
+                    Text(stringResource(R.string.wear_ui_glucose_unit))
                 }
             }
             item {
@@ -469,17 +472,17 @@ fun WearSettingsScreen(
             // Complications Section
             item {
                 ListSubHeader {
-                    Text("Complications")
+                    Text(stringResource(R.string.wear_ui_complications))
                 }
             }
             item {
                 TitleCard(
                     onClick = {},
-                    title = { Text("Watch Face") },
+                    title = { Text(stringResource(R.string.wear_ui_watch_face)) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Add glucose complications via your watch face customization menu.",
+                        text = stringResource(R.string.wear_ui_watch_face_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

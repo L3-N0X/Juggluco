@@ -19,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -35,6 +36,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
+import tk.glucodata.R
 import tk.glucodata.ui.components.WearAlertIcon
 import tk.glucodata.ui.components.WearGlucoseHero
 import tk.glucodata.ui.components.WearMiniGraph
@@ -59,6 +61,7 @@ fun WearHomeScreen(
         initialCenterItemIndex = 0,
         initialCenterItemScrollOffset = 0
     )
+    val trendLabel = stringResource(R.string.wear_ui_hours_short, 2)
 
     ScreenScaffold(
         scrollState = listState,
@@ -114,7 +117,7 @@ fun WearHomeScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "2h Trend • Tap for graph",
+                            text = stringResource(R.string.wear_ui_trend_tap_for_graph, trendLabel),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -136,7 +139,7 @@ fun WearHomeScreen(
                     },
                     label = {
                         Text(
-                            text = "Quick Log",
+                            text = stringResource(R.string.wear_ui_quick_log),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -158,7 +161,7 @@ fun WearHomeScreen(
                     },
                     label = {
                         Text(
-                            text = "Graph",
+                            text = stringResource(R.string.wear_ui_graph),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -180,7 +183,7 @@ fun WearHomeScreen(
                     },
                     label = {
                         Text(
-                            text = "Sensors",
+                            text = stringResource(R.string.wear_ui_sensors),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -202,7 +205,7 @@ fun WearHomeScreen(
                     },
                     label = {
                         Text(
-                            text = "Settings",
+                            text = stringResource(R.string.wear_ui_settings),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )

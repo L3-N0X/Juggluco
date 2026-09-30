@@ -528,7 +528,10 @@ private fun LevelRow(
 private fun RateRow(rateMgdl: Float, unit: GlucoseUnit, falling: Boolean, onChange: (Float) -> Unit) {
     SettingsSliderRow(
         title = stringResource(if (falling) R.string.loc_rate_falling_at_least else R.string.loc_rate_rising_at_least),
-        valueText = "${unit.formatRate(rateMgdl)} ${stringResource(unit.labelRes)}/min",
+        valueText = stringResource(
+            R.string.unit_per_min,
+            stringResource(R.string.value_with_unit, unit.formatRate(rateMgdl), stringResource(unit.labelRes))
+        ),
         icon = Icons.Default.Speed,
         value = rateMgdl,
         onValueChange = { value -> onChange((value * 4).roundToInt() / 4f) },
