@@ -121,6 +121,38 @@ public class SensorBridge {
         } catch (Throwable ignored) {}
     }
 
+    /**
+     * Permanently ends one active sensor without restarting Bluetooth discovery.
+     * Direct sensors are finished through their GATT stream, while sensors that
+     * have no matching GATT callback (for example a received mirror) use the
+     * native SensorGlucoseData pointer exposed by the Compose sensor inventory.
+     */
+    public static boolean finishSensor(String serial, long sensorptr) {
+        if (serial == null || serial.isEmpty() || sensorptr == 0L) return false;
+        try {
+            boolean finishedThroughGatt = false;
+            ArrayList<SuperGattCallback> gatts = SensorBluetooth.mygatts();
+            if (gatts != null) {
+                for (SuperGattCallback gatt : gatts) {
+                    if (gatt == null || !serial.equals(gatt.SerialNumber) || gatt.dataptr == 0L) continue;
+                    if (Natives.getsensorptr(gatt.dataptr) != sensorptr) continue;
+                    gatt.finishSensor();
+                    finishedThroughGatt = true;
+                    break;
+                }
+            }
+            if (!finishedThroughGatt) {
+                Natives.finishfromSensorptr(sensorptr);
+            }
+            // This removes only the matching callback. Unlike forgetDevice(), it
+            // does not start a replacement scan after the native finish.
+            SensorBluetooth.sensorEnded(serial);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     public static void setSystemUi(MainActivity activity, boolean fullscreen) {
         try {
             Natives.setsystemui(fullscreen);
