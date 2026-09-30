@@ -536,7 +536,9 @@ class GlucoseRepository(
                 _displayConfig.value = DisplayConfig(
                     floatingGlucose = Natives.getfloatglucose(),
                     statusBarNotification = Natives.getshowalways(),
-                    systemUiFullscreen = Natives.getsystemUI(),
+                    // Native systemUI stores whether the bars are shown. The Compose
+                    // setting expresses the inverse: whether immersive fullscreen is on.
+                    systemUiFullscreen = !Natives.getsystemUI(),
                     invertColors = Natives.getInvertColors(),
                     showScans = Natives.getshowscans(),
                     showCalibratedScans = Natives.getshowcalibratedscans(),
@@ -3115,7 +3117,8 @@ class GlucoseRepository(
         scope.launch(Dispatchers.Main) {
             try {
                 if (Applic.Nativesloaded) {
-                    SensorBridge.setSystemUi(activity as? MainActivity, enabled)
+                    // setSystemUI(true) reveals the bars; fullscreen hides them.
+                    SensorBridge.setSystemUi(activity as? MainActivity, !enabled)
                 }
             } catch (_: Throwable) {}
         }
