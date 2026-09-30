@@ -51,6 +51,9 @@ import tk.glucodata.ui.screens.settings.CalibrationSettingsScreen
 import tk.glucodata.ui.screens.settings.DataSettingsScreen
 import tk.glucodata.ui.screens.settings.DisplaySettingsScreen
 import tk.glucodata.ui.screens.settings.FloatingWidgetSettingsScreen
+import tk.glucodata.ui.screens.settings.GarminConfigScreen
+import tk.glucodata.ui.screens.settings.GarminShortcutsScreen
+import tk.glucodata.ui.screens.settings.GarminStatusScreen
 import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
@@ -78,6 +81,7 @@ fun JugglucoApp(
     var isExportScreenOpen by rememberSaveable { mutableStateOf(false) }
     var activeSettingsDestination by rememberSaveable { mutableStateOf<SettingsDestination?>(null) }
     var selectedMirrorIndex by rememberSaveable { mutableStateOf(-1) }
+    var selectedGarminPeerId by rememberSaveable { mutableStateOf(-1L) }
     var showAddEntrySheet by rememberSaveable { mutableStateOf(false) }
     var isFullscreenGraph by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -137,7 +141,11 @@ fun JugglucoApp(
                 SettingsDestination.WATCH -> WatchSettingsScreen(
                     repository = repository,
                     onNavigateBack = { activeSettingsDestination = null },
-                    onOpenMirrorConfig = { activeSettingsDestination = SettingsDestination.MIRROR }
+                    onOpenMirrorConfig = { activeSettingsDestination = SettingsDestination.MIRROR },
+                    onOpenGarminStatus = {
+                        selectedGarminPeerId = -1L
+                        activeSettingsDestination = SettingsDestination.GARMIN_STATUS
+                    }
                 )
                 SettingsDestination.BROADCASTS -> BroadcastsSettingsScreen(
                     repository = repository,
@@ -193,6 +201,23 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                 SettingsDestination.TURN_SERVER -> TurnServerSettingsScreen(
                     repository = repository,
                     onNavigateBack = { activeSettingsDestination = SettingsDestination.MIRROR }
+                )
+                SettingsDestination.GARMIN_STATUS -> GarminStatusScreen(
+                    repository = repository,
+                    selectedPeerId = selectedGarminPeerId,
+                    onSelectPeer = { selectedGarminPeerId = it },
+                    onOpenConfig = { activeSettingsDestination = SettingsDestination.GARMIN_CONFIG },
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.WATCH }
+                )
+                SettingsDestination.GARMIN_CONFIG -> GarminConfigScreen(
+                    repository = repository,
+                    peerId = selectedGarminPeerId,
+                    onOpenShortcuts = { activeSettingsDestination = SettingsDestination.GARMIN_SHORTCUTS },
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.GARMIN_STATUS }
+                )
+                SettingsDestination.GARMIN_SHORTCUTS -> GarminShortcutsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.GARMIN_CONFIG }
                 )
                 null -> {}
             }

@@ -47,6 +47,9 @@ import tk.glucodata.ui.screens.settings.CalibrationSettingsScreen
 import tk.glucodata.ui.screens.settings.DataSettingsScreen
 import tk.glucodata.ui.screens.settings.DisplaySettingsScreen
 import tk.glucodata.ui.screens.settings.FloatingWidgetSettingsScreen
+import tk.glucodata.ui.screens.settings.GarminConfigScreen
+import tk.glucodata.ui.screens.settings.GarminShortcutsScreen
+import tk.glucodata.ui.screens.settings.GarminStatusScreen
 import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
@@ -75,11 +78,14 @@ fun SettingsScreen(
     onNavigateToDestination: (SettingsDestination?) -> Unit = {},
     onSelectMirrorIndex: (Int) -> Unit = {},
     selectedMirrorIndex: Int = -1,
+    onSelectGarminPeerId: (Long) -> Unit = {},
+    selectedGarminPeerId: Long = -1L,
     modifier: Modifier = Modifier
 ) {
     // Internal state fallback if parent does not manage navigation
     var internalDestination by rememberSaveable { mutableStateOf<SettingsDestination?>(null) }
     var internalMirrorIndex by rememberSaveable { mutableStateOf(-1) }
+    var internalGarminPeerId by rememberSaveable { mutableStateOf(-1L) }
 
     // If parent handles destination, clear internal state when returning
     LaunchedEffect(currentDestination) {
@@ -90,6 +96,8 @@ fun SettingsScreen(
 
     val activeDestination = currentDestination ?: internalDestination
     val activeMirrorIndex = if (selectedMirrorIndex != -1) selectedMirrorIndex else internalMirrorIndex
+    val activeGarminPeerId =
+        if (selectedGarminPeerId != -1L) selectedGarminPeerId else internalGarminPeerId
 
     val handleNavigate: (SettingsDestination?) -> Unit = { dest ->
         internalDestination = dest
@@ -99,6 +107,11 @@ fun SettingsScreen(
     val handleMirrorSelect: (Int) -> Unit = { idx ->
         internalMirrorIndex = idx
         onSelectMirrorIndex(idx)
+    }
+
+    val handleGarminPeerSelect: (Long) -> Unit = { id ->
+        internalGarminPeerId = id
+        onSelectGarminPeerId(id)
     }
 
     if (activeDestination != null) {
@@ -134,7 +147,11 @@ fun SettingsScreen(
             SettingsDestination.WATCH -> WatchSettingsScreen(
                 repository = repository,
                 onNavigateBack = { handleNavigate(null) },
-                onOpenMirrorConfig = { handleNavigate(SettingsDestination.MIRROR) }
+                onOpenMirrorConfig = { handleNavigate(SettingsDestination.MIRROR) },
+                onOpenGarminStatus = {
+                    handleGarminPeerSelect(-1L)
+                    handleNavigate(SettingsDestination.GARMIN_STATUS)
+                }
             )
             SettingsDestination.BROADCASTS -> BroadcastsSettingsScreen(
                 repository = repository,
@@ -190,6 +207,23 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
             SettingsDestination.TURN_SERVER -> TurnServerSettingsScreen(
                 repository = repository,
                 onNavigateBack = { handleNavigate(SettingsDestination.MIRROR) }
+            )
+            SettingsDestination.GARMIN_STATUS -> GarminStatusScreen(
+                repository = repository,
+                selectedPeerId = activeGarminPeerId,
+                onSelectPeer = { handleGarminPeerSelect(it) },
+                onOpenConfig = { handleNavigate(SettingsDestination.GARMIN_CONFIG) },
+                onNavigateBack = { handleNavigate(SettingsDestination.WATCH) }
+            )
+            SettingsDestination.GARMIN_CONFIG -> GarminConfigScreen(
+                repository = repository,
+                peerId = activeGarminPeerId,
+                onOpenShortcuts = { handleNavigate(SettingsDestination.GARMIN_SHORTCUTS) },
+                onNavigateBack = { handleNavigate(SettingsDestination.GARMIN_STATUS) }
+            )
+            SettingsDestination.GARMIN_SHORTCUTS -> GarminShortcutsScreen(
+                repository = repository,
+                onNavigateBack = { handleNavigate(SettingsDestination.GARMIN_CONFIG) }
             )
         }
         return

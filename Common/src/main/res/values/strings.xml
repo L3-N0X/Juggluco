@@ -645,6 +645,39 @@
     <string name="garmin_alarm_invalid">Check the values: low must be below high; missing-value delay 1–4095 minutes, repeat 0–4095 minutes, duration 0–65535 seconds.</string>
     <string name="garmin_alarm_newer">The watch has newer alarm settings. Saving here replaces them.</string>
 
+    <!-- Garmin status, configuration and shortcuts (Compose). -->
+    <string name="loc_garmin_status_title">Garmin (Kerfstok)</string>
+    <string name="loc_garmin_config_title">Garmin configuration</string>
+    <string name="loc_garmin_status_desc">Devices, connection and sync</string>
+    <string name="loc_garmin_config_desc">Watch app, shortcuts and display</string>
+    <string name="loc_garmin_shortcuts_title">Shortcuts</string>
+    <string name="loc_garmin_shortcuts_desc">Amounts the watch offers on its own</string>
+    <string name="loc_garmin_shortcuts_hint">These amounts appear on the watch next to the glucose value, so a bolus or a meal can be logged without reaching for the phone.</string>
+    <string name="loc_garmin_shortcuts_saved">Shortcuts saved</string>
+    <string name="loc_garmin_unnamed_shortcut">Unnamed shortcut</string>
+    <string name="loc_garmin_watch_section">Watch</string>
+    <string name="loc_garmin_actions_section">Actions</string>
+    <string name="loc_garmin_details_section">Details</string>
+    <string name="loc_garmin_libre3_connection">Sensor connection (Libre 3)</string>
+    <string name="loc_garmin_transport_title">Connection method</string>
+    <string name="loc_garmin_transport_desc">How the phone reaches the watch. Changing this restarts the connection.</string>
+    <string name="loc_garmin_libre3_phone_desc">The phone keeps reading the sensor and sends the values to the watch.</string>
+    <string name="loc_garmin_libre3_watch_desc">The watch reads the sensor itself over direct Bluetooth.</string>
+    <string name="loc_garmin_not_available">Garmin is not available on this device</string>
+    <string name="loc_garmin_no_watches">No Garmin watch found</string>
+    <string name="loc_garmin_pair_instructions">Pair the watch with this phone in the Android Bluetooth settings, then look for watches again.</string>
+    <string name="loc_garmin_search_watches">Look for watches again</string>
+    <string name="loc_garmin_search_watches_desc">Re-reads the Garmin Connect devices paired with this phone</string>
+    <string name="loc_garmin_glucose_desc">Send glucose readings to this watch</string>
+    <string name="loc_garmin_numbers_desc">The watch this one receives stored numbers and history on</string>
+    <string name="loc_garmin_numbers_device">Numbers device: %1$s</string>
+    <string name="loc_garmin_app_id_dialog_title">Watch app ID</string>
+    <string name="loc_garmin_app_id_saved">Watch app ID changed</string>
+    <string name="loc_garmin_app_id_dialog_desc">The ID of the Kerfstok application the watch has to be running.</string>
+    <string name="loc_garmin_help_title">Help</string>
+    <string name="loc_garmin_connected_via">Connection: %1$s</string>
+    <string name="loc_garmin_default_app_id">Default application ID</string>
+
     <!-- Compose Modern UI & Landscape Enhancements -->
     <string name="tab_glucose">Glucose</string>
     <string name="tab_stats">Stats</string>

@@ -2,6 +2,7 @@ package tk.glucodata.ui.screens.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Code
@@ -12,10 +13,12 @@ import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Watch
+import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.ui.graphics.vector.ImageVector
 import tk.glucodata.R
 
@@ -132,5 +135,23 @@ UPLOADER(
         descRes = R.string.calibration_enable_desc,
         categoryRes = R.string.settings_calibration_section,
         icon = Icons.Default.Tune
+    ),
+    GARMIN_STATUS(
+        titleRes = R.string.loc_garmin_status_title,
+        descRes = R.string.settings_garmin_desc,
+        categoryRes = R.string.settings_cat_integrations,
+        icon = Icons.Default.WatchLater
+    ),
+    GARMIN_CONFIG(
+        titleRes = R.string.loc_garmin_config_title,
+        descRes = R.string.loc_garmin_config_desc,
+        categoryRes = R.string.settings_cat_integrations,
+        icon = Icons.Default.Settings
+    ),
+    GARMIN_SHORTCUTS(
+        titleRes = R.string.loc_garmin_shortcuts_title,
+        descRes = R.string.loc_garmin_shortcuts_desc,
+        categoryRes = R.string.settings_cat_integrations,
+        icon = Icons.Default.Bolt
     )
 }
