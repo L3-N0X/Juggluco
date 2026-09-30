@@ -223,8 +223,8 @@ int   listconnections() {
        showtreatments(false);
         cout<<"api/v1/treatments turned "<<(settings->data()->saytreatments?"on":"off")<<endl;
         if(settings->data()->apisecretlength) {
-            settings->data()->apisecret[settings->data()->apisecretlength]='\0';
-            cout<<"api_secret: "<<settings->data()->apisecret<<endl<<endl;
+            //Never print the secret itself, only that one is set and how long it is.
+            cout<<"api_secret set, "<<static_cast<int>(settings->data()->apisecretlength)<<" characters"<<endl<<endl;
         }else  {
             cout<<"No api_secret\n\n";
             }
@@ -621,8 +621,8 @@ static constexpr const    char defaultname[]="jugglucodata";
         }
     if(api_secret) {
         int len=strlen(api_secret);
-        if(len>80) {
-            cerr<<"Maximal api_secret is 80 bytes\n";
+        if(len<=0||len>maxapisecretlength||len>=static_cast<int>(sizeof(settings->data()->apisecret))) {
+            cerr<<"Maximal api_secret is "<<maxapisecretlength<<" bytes\n";
             return 10;
             }
         settings->data()->apisecretlength=len;

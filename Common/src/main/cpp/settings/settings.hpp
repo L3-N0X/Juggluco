@@ -117,6 +117,11 @@ struct authpair {
 constexpr static const int maxprofiles=5;
 constexpr static const int maxprofileMins=10;
 
+//Maximum number of characters accepted for the api secret of the xDrip/Nightscout
+//web server. Shared by the command line interface and the JNI entry points so every
+//writer agrees on the limit.
+constexpr static const int maxapisecretlength=80;
+
 struct AlarmProfile {
     uint32_t alow,ahigh,averylow,averyhigh,aprelow,aprehigh;
     struct ring alarms[maxalarms+maxextraalarms];
@@ -230,6 +235,7 @@ struct Tings {
     int64_t libreaccountIDnum;
     uint8_t apisecretlength;
     char apisecret[183];
+    static_assert(maxapisecretlength<sizeof(apisecret),"api secret limit does not fit in storage");
     int8_t unit;
     bool gadgetbridge;
     bool nochangenum;

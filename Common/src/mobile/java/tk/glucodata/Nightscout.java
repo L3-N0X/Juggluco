@@ -29,7 +29,6 @@ import static tk.glucodata.MainActivity.PRIVATE_REQUEST;
 import static tk.glucodata.MainActivity.doonback;
 import static tk.glucodata.MainActivity.poponback;
 import static tk.glucodata.MainActivity.setonback;
-import static tk.glucodata.Natives.getreceiveport;
 import static tk.glucodata.RingTones.EnableControls;
 import static tk.glucodata.help.hidekeyboard;
 import static tk.glucodata.settings.Settings.editoptions;
@@ -73,7 +72,76 @@ static private void openfile(Activity act,int requestid) {
 		}
     }
 
-static final private int MAXKEY=80;
+static final private int defaulthttpport=17580;
+
+//Parse a port from an edit field, -1 is returned (and shown to the user) when the
+//value is not a plain number in the valid port range.
+static private int getport(MainActivity context,EditText view,String which) {
+    final String portstr=view.getText().toString().trim();
+    int portnum;
+    try {
+        portnum=Integer.parseInt(portstr);
+        }
+    catch(Throwable e) {
+        Log.stack(LOG_ID,"parseInt "+which, e);
+        Applic.argToaster(context,portstr+context.getString(R.string.invalidport),Toast.LENGTH_LONG);
+        return -1;
+        }
+    if(portnum<Natives.WEBSERVER_MIN_PORT||portnum>Natives.WEBSERVER_MAX_PORT) {
+        Applic.argToaster(context,R.string.portrange,Toast.LENGTH_LONG);
+        return -1;
+        }
+    return portnum;
+    }
+
+static private int getinterval(MainActivity context,EditText view) {
+    final String intervalstr=view.getText().toString().trim();
+    int intervalnum;
+    try {
+        intervalnum=Integer.parseInt(intervalstr);
+        }
+    catch(Throwable e) {
+        Log.stack(LOG_ID,"parseInt interval", e);
+        Applic.argToaster(context,context.getString(R.string.invalid_value, intervalstr),Toast.LENGTH_LONG);
+        return -1;
+        }
+    if(intervalnum<1||intervalnum>Natives.WEBSERVER_MAX_INTERVAL) {
+        Applic.argToaster(context,context.getString(R.string.loc_interval_range,Natives.WEBSERVER_MAX_INTERVAL),Toast.LENGTH_LONG);
+        return -1;
+        }
+    return intervalnum;
+    }
+
+//Turn a rejected native configuration into a message, the secret itself is never
+//part of any message.
+static private void showconfigerror(MainActivity context,int status) {
+    switch(status) {
+        case Natives.WEBSERVERCONFIG_HTTPPORT:
+        case Natives.WEBSERVERCONFIG_SSLPORT:
+            Applic.argToaster(context,R.string.portrange,Toast.LENGTH_LONG);
+            break;
+        case Natives.WEBSERVERCONFIG_IDENTICAL:
+            Applic.argToaster(context,R.string.nohttpport,Toast.LENGTH_LONG);
+            break;
+        case Natives.WEBSERVERCONFIG_INTERVAL:
+            Applic.argToaster(context,context.getString(R.string.loc_interval_range,Natives.WEBSERVER_MAX_INTERVAL),Toast.LENGTH_LONG);
+            break;
+        case Natives.WEBSERVERCONFIG_SECRETLONG:
+            Applic.argToaster(context,context.getString(R.string.toolongsecret)+Natives.WEBSERVER_MAX_APISECRET,Toast.LENGTH_LONG);
+            break;
+        case Natives.WEBSERVERCONFIG_SECRETTYPE:
+            Applic.argToaster(context,R.string.loc_secret_charset,Toast.LENGTH_LONG);
+            break;
+        case Natives.WEBSERVERCONFIG_MIRRORPORT:
+            Applic.argToaster(context,R.string.nomirrorport,Toast.LENGTH_LONG);
+            break;
+        default:
+            Log.e(LOG_ID,"setWebServerConfig status "+status);
+            Applic.argToaster(context,context.getString(R.string.invalid_value,Integer.toString(status)),Toast.LENGTH_LONG);
+            break;
+        }
+    }
+
 public static void show(MainActivity context,View parent) {
    	EnableControls(parent,false);
 
@@ -119,79 +187,46 @@ public static void show(MainActivity context,View parent) {
 	save.setOnClickListener(
 		v -> {
 		 var newkey=editkey.getText().toString();
-		 if(newkey.length()>=MAXKEY) {
-			Applic.argToaster(context,context.getString(R.string.toolongsecret)+MAXKEY, Toast.LENGTH_LONG);
+		 if(newkey.length()>Natives.WEBSERVER_MAX_APISECRET) {
+			Applic.argToaster(context,context.getString(R.string.toolongsecret)+Natives.WEBSERVER_MAX_APISECRET, Toast.LENGTH_LONG);
 			return;
 		 	}
-		 var portstr=portview.getText().toString();
-		 int portnum=0;
-		 try {
-                        portnum=Integer.parseInt(portstr);
-                        }
-                catch(Throwable e) {
-                        Log.stack(LOG_ID,"parseInt", e);
-			Applic.argToaster(context,portstr+context.getString(R.string.invalidport), Toast.LENGTH_LONG);
+		 final int portnum=getport(context,portview,"SSL");
+		 if(portnum<0)
 			return;
-                        };
-
-		 var httpportstr=httpportview.getText().toString();
-		 int httpportnum=0;
-		 try {
-                        httpportnum=Integer.parseInt(httpportstr);
-                        }
-                catch(Throwable e) {
-                        Log.stack(LOG_ID,"parseInt HTTP", e);
-			Applic.argToaster(context,httpportstr+context.getString(R.string.invalidport), Toast.LENGTH_LONG);
+		 final int httpportnum=getport(context,httpportview,"HTTP");
+		 if(httpportnum<0)
 			return;
-                        };
-		if(portstr.equals(getreceiveport())||httpportstr.equals(getreceiveport())) {
-			Applic.argToaster(context,R.string.nomirrorport,Toast.LENGTH_LONG);
-			return;
-			}
-		if(portnum==httpportnum) {
+		 if(portnum==httpportnum) {
 			Applic.argToaster(context,R.string.nohttpport,Toast.LENGTH_LONG);
 			return;
-			}	
-		if(portnum<1024||portnum>65535||httpportnum<1024||httpportnum>65535) {
-			Applic.argToaster(context,R.string.portrange,Toast.LENGTH_LONG);
+			}
+		 final int intervalnum=getinterval(context,intervalview);
+		 if(intervalnum<0)
+			return;
+		 final boolean serveractive=Natives.getusexdripwebserver();
+		 //One native call validates everything and only stores when it is all acceptable.
+		 final int status=Natives.setWebServerConfig(httpportnum,portnum,intervalnum,newkey);
+		 if(status!=Natives.WEBSERVERCONFIG_OK) {
+			showconfigerror(context,status);
 			return;
 			}
 		 if(!newkey.equals(oldkey[0])) {
-		 	oldkey[0]=newkey;
-		 	Applic.argToaster(context,context.getString(R.string.newsecret), Toast.LENGTH_LONG);
-		 	Natives.setApiSecret(newkey);
+			oldkey[0]=newkey;
+			Applic.argToaster(context,context.getString(R.string.newsecret), Toast.LENGTH_LONG);
 			}
-		if(portnum!= Natives.getsslport()) {
-			Natives.setsslport(portnum);
-			Applic.argToaster(context,context.getString(R.string.newport)+portstr, Toast.LENGTH_LONG);
+		 if(portnum!=oldport) {
+			Applic.argToaster(context,context.getString(R.string.newport)+portnum, Toast.LENGTH_LONG);
 			if(Natives.getuseSSL())
 				Natives.setuseSSL(true);
 			}
-
-		boolean warnhttpport=false;
-		if(httpportnum!=Natives.gethttpport()) {
-			boolean serveractive=Natives.getusexdripwebserver();
-			Natives.sethttpport(httpportnum);
-			Applic.argToaster(context,context.getString(R.string.newport)+httpportstr, Toast.LENGTH_LONG);
-			if(serveractive) {
-				Natives.setusexdripwebserver(false);
-                util.sleep(1000);
-				Natives.setusexdripwebserver(true);
-				}
-			warnhttpport=httpportnum!=17580;
+		 final boolean httpportchanged=httpportnum!=oldhttpport;
+		 if(httpportchanged&&serveractive) {
+			Natives.setusexdripwebserver(false);
+			util.sleep(1000);
+			Natives.setusexdripwebserver(true);
 			}
-
-		 var intervalstr=intervalview.getText().toString();
-		 int intervalnum=0;
-		 try {
-                        intervalnum=Integer.parseInt(intervalstr);
-                        }
-                catch(Throwable e) {
-                        Log.stack(LOG_ID,"parseInt", e);
-			Applic.argToaster(context,context.getString(R.string.invalid_value, intervalstr), Toast.LENGTH_LONG);
-			return;
-                        };
-		Natives.setinterval(intervalnum);
+		 final boolean warnhttpport=httpportchanged&&httpportnum!=defaulthttpport;
 		tk.glucodata.help.hidekeyboard(context);
 		if(warnhttpport)
 			Applic.argToaster(context,R.string.httpportxdripwarning,Toast.LENGTH_LONG);
