@@ -1367,7 +1367,6 @@
     <string name="alerts_on">Alerts on</string>
     <string name="alerts_snoozed">Alerts snoozed</string>
     <string name="alerts_off">Alerts off</string>
-    <string name="snooze_minutes_short">Snooze %1$d min</string>
     <string name="alerts_turn_off">Turn alerts off</string>
     <string name="alerts_snoozed_until">Snoozed until %1$s</string>
     <string name="alerts_resume">Resume alerts</string>
