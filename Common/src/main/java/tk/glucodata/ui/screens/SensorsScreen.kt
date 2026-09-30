@@ -218,7 +218,7 @@ fun SensorsScreen(
                 Toast.makeText(context, context.getString(R.string.sensor_connection_paused), Toast.LENGTH_SHORT).show()
             },
             onEndSensorPermanently = {
-                repository.forgetAndRescan(activeSensor.id)
+                repository.endSensorPermanently(activeSensor)
                 Toast.makeText(context, context.getString(R.string.sensor_session_ended), Toast.LENGTH_LONG).show()
             }
         )

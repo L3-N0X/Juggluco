@@ -1141,7 +1141,8 @@ class GlucoseRepository(
             publishedSensorDetailsFingerprint = detailsHash
             _sensorDetails.value = details
         }
-        _previousSensors.value = emptyList()
+        val activeIds = details.mapTo(HashSet(details.size)) { it.id }
+        _previousSensors.value = _previousSensors.value.filterNot { it.id in activeIds }
     }
 
     private fun legacyFingerprint(sensors: List<SensorInfo>): Long {
@@ -1686,6 +1687,27 @@ class GlucoseRepository(
                 SensorBridge.forgetDevice(sensorId)
             } catch (_: Throwable) {}
             loadSensorsFromNative()
+        }
+    }
+
+    fun endSensorPermanently(sensor: SensorDetail) {
+        scope.launch(Dispatchers.IO) {
+            val ended = try {
+                Applic.Nativesloaded && SensorBridge.finishSensor(sensor.id, sensor.sensorPtr)
+            } catch (_: Throwable) {
+                false
+            }
+            loadSensorsFromNative()
+            if (ended) {
+                val previous = sensor.copy(
+                    status = SensorStatus.ENDED,
+                    isConnected = false,
+                    isStreaming = false,
+                    rssi = null,
+                    signalQuality = SignalQuality.LOST
+                )
+                _previousSensors.value = listOf(previous) + _previousSensors.value.filterNot { it.id == sensor.id }
+            }
         }
     }
 
