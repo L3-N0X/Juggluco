@@ -66,6 +66,7 @@ import java.util.Queue;
 
 import androidx.annotation.NonNull;
 import tk.glucodata.Applic;
+import tk.glucodata.R;
 import tk.glucodata.BuildConfig;
 import tk.glucodata.GarminLibre3;
 import tk.glucodata.GarminAlarms;
@@ -1482,10 +1483,10 @@ private void applicationOpened(GarminPeer gp,IQOpenApplicationStatus status) {
            gp.applicationBootstrapPending=false;
            ++gp.applicationBootstrapGeneration;
            if (status == IQOpenApplicationStatus.APP_IS_ALREADY_RUNNING) {
-                Applic.argToaster(getApplication(), "APP_IS_ALREADY_RUNNING", Toast.LENGTH_SHORT);
+                Applic.argToaster(getApplication(), Applic.getContext().getString(R.string.app_is_already_running), Toast.LENGTH_SHORT);
                 mAppIsOpen = true;
             } else {
-                Applic.argToaster(getApplication(), "Open App", Toast.LENGTH_SHORT);
+                Applic.argToaster(getApplication(), Applic.getContext().getString(R.string.open_app), Toast.LENGTH_SHORT);
                 mAppIsOpen = false;
             }
            // Bootstrap this peer independently.  START's reply marks it ready

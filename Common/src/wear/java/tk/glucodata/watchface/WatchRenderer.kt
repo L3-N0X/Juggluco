@@ -70,6 +70,7 @@ import tk.glucodata.watchface.data.watchface.WatchFaceData
 import tk.glucodata.watchface.utils.COLOR_STYLE_SETTING
 import tk.glucodata.watchface.utils.ratTimebaseY
 import java.time.LocalTime
+import java.util.Locale
 import java.time.ZonedDateTime
 
 // Default for how Long each frame is displayed at expected frame rate.
@@ -277,7 +278,9 @@ private fun watchtime(canvas:Canvas,localtime: LocalTime) {
         } else {
             val timex = width * 0.71f
             val hour = localtime.getHour();
-            val daypart = if (hour >= 12) "pm" else "am"
+            // Locale-aware AM/PM marker instead of a hardcoded "am"/"pm".
+            val daypart = java.text.DateFormatSymbols.getInstance(Locale.getDefault())
+                .amPmStrings[if (hour >= 12) 1 else 0]
             var hour12 = hour % 12
             if (hour12 == 0)
                 hour12 = 12;

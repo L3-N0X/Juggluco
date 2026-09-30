@@ -228,7 +228,7 @@ void showinfo(final SuperGattCallback gatt,MainActivity act) {
 //    var visi=gatt.sensorgen==3?INVISIBLE:VISIBLE;
     final int rssi=gatt.readrssi;
     if (rssi < 0) {
-        rssiview.setText("Rssi = " + rssi);
+        rssiview.setText(act.getString(R.string.rssi_equals, rssi));
         rssiview.setVisibility(VISIBLE);
     } else {
         rssiview.setText("");
@@ -250,7 +250,7 @@ void showinfo(final SuperGattCallback gatt,MainActivity act) {
             }
         }
 
-    address.setText(gatt.mActiveDeviceAddress == null?"Address unknown":gatt.mActiveDeviceAddress);
+    address.setText(gatt.mActiveDeviceAddress == null?act.getString(R.string.address_unknown):gatt.mActiveDeviceAddress);
     if(gatt.sensorgen == 2) {
 //        address.setBackgroundColor(RED); address.setTextColor(BLACK);
         address.setTextColor(RED);
@@ -1136,7 +1136,7 @@ else {
                     Log.i(LOG_ID,"resetbutton");
                     Natives.setResetSibionics2(gatt.dataptr,true);
     //                Log.showbytes("Reset Bytes",Natives.getSIResetBytes());
-                    Applic.Toaster("Resetted ");
+                    Applic.Toaster(act.getString(R.string.resetted_suffix));
                     }
                 });
             });

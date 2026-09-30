@@ -53,6 +53,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.Calendar;
+import java.util.Locale;
 
 import androidx.annotation.Keep;
 import androidx.annotation.UiThread;
@@ -1003,12 +1004,17 @@ private void mktimedialog( Button but,final int num ,View parent) {
         searchStateValid=true;
     }
 
+    /** Locale-aware AM/PM marker for the 12-hour search time buttons (0 = am, 1 = pm). */
+    private static String amPm(int index) {
+        return java.text.DateFormatSymbols.getInstance(Locale.getDefault()).getAmPmStrings()[index];
+    }
+
     private void setSearchTimeButton(Button button,int minute) {
         if(minute<0) {
             if(Applic.hour24)
                 button.setText(button==fromtime?"00:00":"23:59");
             else
-                button.setText(button==fromtime?"12:00am":"12:59pm");
+                button.setText(button==fromtime?"12:00"+amPm(0):"12:59"+amPm(1));
             button.setTextColor(oldColors);
             button.setTextSize(COMPLEX_UNIT_PX,oldsize);
             button.setTypeface(null,Typeface.NORMAL);
@@ -1093,8 +1099,8 @@ if(!isWearable) {
         totime.setText("23:59");
         }
     else {
-        fromtime.setText("12:00am");
-        totime.setText("12:59pm");
+        fromtime.setText("12:00"+amPm(0));
+        totime.setText("12:59"+amPm(1));
         }
     fromtime.setTextColor(oldColors);
     totime.setTextColor(oldColors);

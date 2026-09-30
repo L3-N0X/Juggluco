@@ -71,7 +71,7 @@ public class DeviceList {
                             MeterConfig.config((MainActivity)view.getContext(),meterIndex,parent,device,null);
                             }
                          else {
-                            Applic.Toaster("Adding meter "+deviceName+" failed");
+                            Applic.Toaster(view.getContext().getString(R.string.adding_meter_failed, deviceName));
                             }
                          }
                      }

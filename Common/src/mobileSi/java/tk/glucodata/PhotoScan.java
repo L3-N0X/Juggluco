@@ -310,7 +310,7 @@ private static void scanGoogle(MainActivity act,int type,long sensorptr) {
             if(doLog) {Log.i(LOG_ID,message);};
             Toast.makeText(act, message, Toast.LENGTH_SHORT).show();  
             if(useZXing) {
-                Toast.makeText(act, "Move to zXing", Toast.LENGTH_SHORT).show();
+                Toast.makeText(act, act.getString(R.string.move_to_zxing), Toast.LENGTH_SHORT).show();
                 scanZXingAlg(act,type,sensorptr);
                 }
         

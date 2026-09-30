@@ -473,7 +473,7 @@ CheckDirectionBox ICE;
 
        checkhostname.setOnCheckedChangeListener( (buttonView,  isChecked)-> {
          if(isChecked) {
-            Applic.argToaster(act,"hostname is slow",Toast.LENGTH_LONG);
+            Applic.argToaster(act,act.getString(R.string.hostname_is_slow),Toast.LENGTH_LONG);
             doHasName.run();
             }
          else {
@@ -558,7 +558,7 @@ CheckDirectionBox ICE;
        fromrow=new View[]{startlabel, alldata,fromnow,screenpos};
 
       setradio(sendfrom);
-      CheckDirectionBox restore=new CheckDirectionBox(act);restore.setText("Restore");
+      CheckDirectionBox restore=new CheckDirectionBox(act);restore.setText(act.getString(R.string.restore));
       if(!Natives.backuphasrestore( ))
          restore.setVisibility(GONE);
 
@@ -1091,7 +1091,7 @@ ViewGroup.LayoutParams params;
            closemar.setMarginEnd(hormar);
            View[] firstrow;
            if(BuildConfig.minSDK>=20) {
-                Button qr=getbutton(act,"QR");
+                Button qr=getbutton(act,act.getString(R.string.qr));
                 qr.setOnClickListener(v->  {
                       if(pos>=0) {
                             String jsonstr=getbackJson(pos);

@@ -14,10 +14,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.IconButtonDefaults
 import androidx.wear.compose.material3.MaterialTheme
+import tk.glucodata.R
 import tk.glucodata.alerts.AlertPlayer
 import tk.glucodata.alerts.AlertStatus
 import tk.glucodata.alerts.rememberAlertIndicatorState
@@ -46,7 +48,10 @@ fun WearAlertIcon(
         ) {
             Icon(
                 imageVector = Icons.Default.NotificationsActive,
-                contentDescription = "Dismiss ${state.ringingName ?: "alert"}",
+                contentDescription = stringResource(
+                    R.string.wear_ui_dismiss_named,
+                    state.ringingName ?: stringResource(R.string.wear_ui_alert)
+                ),
                 modifier = Modifier.graphicsLayer { rotationZ = swing }
             )
         }
@@ -56,17 +61,17 @@ fun WearAlertIcon(
     val (icon, contentDescription, contentColor) = when (state.status) {
         AlertStatus.SNOOZED -> Triple(
             Icons.Default.NotificationsPaused,
-            "Alerts snoozed",
+            stringResource(R.string.alerts_snoozed),
             MaterialTheme.colorScheme.onSurfaceVariant
         )
         AlertStatus.OFF -> Triple(
             Icons.Default.NotificationsOff,
-            "Alerts off",
+            stringResource(R.string.alerts_off),
             MaterialTheme.colorScheme.onSurfaceVariant
         )
         else -> Triple(
             Icons.Outlined.Notifications,
-            "Alerts on",
+            stringResource(R.string.alerts_on),
             MaterialTheme.colorScheme.onSurface
         )
     }
