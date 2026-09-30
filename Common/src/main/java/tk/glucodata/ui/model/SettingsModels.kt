@@ -179,8 +179,138 @@ data class MirrorConnection(
     val isActive: Boolean,
     val isPassive: Boolean,
     val isDeactivated: Boolean,
-    val status: String
+    val status: String,
+    val transport: Int = 0,
+    val isIce: Boolean = false
 )
+
+/** How far back a sender connection pushes data on its very first sync. */
+enum class MirrorDataStart(@StringRes val labelRes: Int) {
+    ALL(R.string.loc_mirror_data_start_all),
+    FROM_NOW(R.string.loc_mirror_data_start_now),
+    SCREEN_POSITION(R.string.loc_mirror_data_start_screen)
+}
+
+/**
+ * Everything a mirror connection can be configured with. The editor edits one
+ * of these and hands it to the repository in one go, so no stored field can be
+ * lost because a screen forgot about it.
+ */
+data class MirrorConnectionDraft(
+    val transport: Int = tk.glucodata.BleMirror.TRANSPORT_AUTOMATIC,
+    val label: String = "",
+    val addresses: List<String> = emptyList(),
+    val port: String = "",
+    val detectIp: Boolean = false,
+    val testIp: Boolean = true,
+    val useHostname: Boolean = false,
+    val activeOnly: Boolean = false,
+    val passiveOnly: Boolean = false,
+    val ice: Boolean = false,
+    val iceLabel: String = "",
+    val iceSide: Boolean = false,
+    val receiveFrom: Boolean = true,
+    val sendAmounts: Boolean = true,
+    val sendStream: Boolean = true,
+    val sendScans: Boolean = true,
+    val restore: Boolean = false,
+    val dataStart: MirrorDataStart = MirrorDataStart.ALL,
+    val startTime: Long = 0L,
+    val usePassword: Boolean = false,
+    val password: String = "",
+    val side: Boolean = false,
+    val bleReverse: Boolean = false,
+    val bleClient: Boolean = true
+) {
+    val isNetworkTransport: Boolean
+        get() = transport == tk.glucodata.BleMirror.TRANSPORT_AUTOMATIC ||
+                transport == tk.glucodata.BleMirror.TRANSPORT_TCP
+
+    /** Bluetooth and Messages identify a peer by label, so it is mandatory there. */
+    val needsLabel: Boolean
+        get() = transport == tk.glucodata.BleMirror.TRANSPORT_BLUETOOTH ||
+                transport == tk.glucodata.BleMirror.TRANSPORT_MESSAGES
+
+    val sendsAnything: Boolean get() = sendAmounts || sendStream || sendScans
+
+    val hasAddresses: Boolean get() = addresses.any { it.isNotBlank() }
+}
+
+/** Why saving or importing a mirror connection did not work. */
+enum class MirrorSaveError(@StringRes val messageRes: Int) {
+    NONE(R.string.loc_connection_saved),
+    FAILED(R.string.loc_failed_save_connection),
+    NOT_AVAILABLE(R.string.loc_failed_load_connection),
+    INVALID_PORT(R.string.loc_invalid_mirror_port),
+    PARSE_ADDRESS(R.string.parseip),
+    TOO_MANY_ADDRESSES(R.string.toomanyhosts),
+    TOO_MANY_SENDERS(R.string.senthosts),
+    HOSTNAME_TOO_LONG(R.string.loc_mirror_hostname_too_long),
+    DATABASE_BUSY(R.string.loc_mirror_database_busy),
+    INVALID_TRANSPORT(R.string.loc_mirror_invalid_transport),
+    LABEL_IN_USE(R.string.loc_mirror_label_in_use),
+    LABEL_TOO_LONG(R.string.loc_mirror_label_too_long),
+    PASSWORD_TOO_LONG(R.string.loc_mirror_password_too_long),
+    NO_ADDRESS(R.string.specifyip),
+    LABEL_REQUIRED(R.string.transport_needs_label),
+    PASSWORD_REQUIRED(R.string.transport_needs_password),
+    ICE_LABEL_TOO_SHORT(R.string.ICElabeltooshort),
+    ICE_LABEL_TOO_LONG(R.string.loc_mirror_ice_label_too_long),
+    NOTHING_SELECTED(R.string.specifyreceiveordata),
+    ALL_DATA_SENT(R.string.allsentnoreceive);
+
+    companion object {
+        /** Maps the native `changehost_*` result codes onto user facing errors. */
+        fun fromNative(code: Int): MirrorSaveError = when (code) {
+            -1 -> INVALID_PORT
+            -2 -> PARSE_ADDRESS
+            -3 -> TOO_MANY_ADDRESSES
+            -4 -> TOO_MANY_SENDERS
+            -5 -> HOSTNAME_TOO_LONG
+            -6 -> DATABASE_BUSY
+            -7 -> INVALID_TRANSPORT
+            -9 -> LABEL_IN_USE
+            -10 -> LABEL_TOO_LONG
+            -11 -> PASSWORD_TOO_LONG
+            -12 -> NO_ADDRESS
+            else -> FAILED
+        }
+    }
+}
+
+/** A payload read from a connection code, ready to become a real connection. */data class MirrorImportPreview(
+    val draft: MirrorConnectionDraft,
+    val presentAmounts: Boolean = false,
+    val presentScans: Boolean = false,
+    val presentStream: Boolean = false
+) {
+    val overwritesData: Boolean get() = presentAmounts || presentScans || presentStream
+}
+
+/** The four one-tap connections a device can hand out as a connection code. */
+enum class MirrorQuickCode(@StringRes val titleRes: Int, @StringRes val subtitleRes: Int) {
+    LOCAL_SENDER(R.string.loc_mirror_code_local_sender, R.string.loc_mirror_code_local_sender_desc),
+    LOCAL_RECEIVER(R.string.loc_mirror_code_local_receiver, R.string.loc_mirror_code_local_receiver_desc),
+    INTERNET_SENDER(R.string.loc_mirror_code_internet_sender, R.string.loc_mirror_code_internet_sender_desc),
+    INTERNET_RECEIVER(R.string.loc_mirror_code_internet_receiver, R.string.loc_mirror_code_internet_receiver_desc)
+}
+
+/**
+ * Outcome of writing a mirror connection. [code] carries the connection code of a
+ * freshly created connection, [blocker] explains why a carrier cannot start yet and
+ * [needsBluetoothPermission] tells the caller to ask for the nearby devices
+ * permission before the mirror tries to use Bluetooth.
+ */
+data class MirrorSaveResult(
+    val index: Int = -1,
+    val error: MirrorSaveError = MirrorSaveError.FAILED,
+    val code: String? = null,
+    val partialData: Boolean = false,
+    val blocker: String? = null,
+    val needsBluetoothPermission: Boolean = false
+) {
+    val ok: Boolean get() = index >= 0
+}
 
 data class MirrorHostEditState(
     val index: Int,
@@ -211,4 +341,81 @@ data class MirrorHostEditState(
 ) {
     val isReceiver: Boolean get() = (receiveFrom and 2) != 0
     val isIce: Boolean get() = iceLabel.isNotEmpty()
+}
+
+/**
+ * The LibreLink configuration region a LibreView account lives in. Abbott ships one
+ * configuration file per region, so the region decides which upload endpoints are used.
+ * The order is the native `librecountry` order, which the native side also uses to
+ * derive the glucose unit (even index mmol/L, odd index mg/dL).
+ */
+enum class LibreRegion(val nativeIndex: Int, @StringRes val labelRes: Int) {
+    UNITED_KINGDOM(0, R.string.loc_libreview_region_uk),
+    FRANCE(1, R.string.loc_libreview_region_fr),
+    NETHERLANDS(2, R.string.loc_libreview_region_nl),
+    POLAND(3, R.string.loc_libreview_region_pl),
+    RUSSIA(4, R.string.loc_libreview_region_ru);
+
+    companion object {
+        fun fromNative(index: Int): LibreRegion = entries.find { it.nativeIndex == index } ?: UNITED_KINGDOM
+    }
+}
+
+/**
+ * What LibreView should do with the numbers of one logbook label. The values are the
+ * native `librenums[].kind` codes, where 0 means "not mapped yet" and every other value
+ * makes the native export write the entry as that kind of record.
+ */
+enum class LibreTreatmentKind(val nativeValue: Int, @StringRes val labelRes: Int) {
+    UNSET(0, R.string.loc_libreview_kind_unset),
+    RAPID_INSULIN(1, R.string.rapidinsulin),
+    LONG_INSULIN(2, R.string.longinsulin),
+    CARBS(3, R.string.carbo),
+    NOTE(4, R.string.comments);
+
+    val isMapped: Boolean get() = this != UNSET
+
+    companion object {
+        fun fromNative(value: Int): LibreTreatmentKind = entries.find { it.nativeValue == value } ?: UNSET
+    }
+}
+
+/** The LibreView treatment mapping of a single logbook label. */
+data class LibreLabelMapping(
+    val index: Int,
+    val label: String,
+    val kind: LibreTreatmentKind,
+    /** Grams of carbs a unit of this label stands for, only used for [LibreTreatmentKind.CARBS]. */
+    val weight: Float
+)
+
+/**
+ * The LibreView account and upload settings. The password is deliberately not part of
+ * this: it is typed on the screen and handed to the repository on save only, so it does
+ * not outlive the editor in a process wide state holder.
+ */
+data class LibreViewConfig(
+    val region: LibreRegion = LibreRegion.UNITED_KINGDOM,
+    /**
+     * The account id as native reports it: the hand written number when there is one, otherwise
+     * the value derived from the id LibreView sent after signing in. That derived value is a hash,
+     * so it can be negative and only [hasAccountId] says whether there is an id at all.
+     */
+    val accountId: Long = -1L,
+    val hasAccountId: Boolean = false,
+    val manualAccountId: Boolean = false,
+    val uploadCurrent: Boolean = false,
+    val uploadViewed: Boolean = false,
+    val sendAmounts: Boolean = false
+)
+
+/** Why saving the LibreView settings did not work. */
+enum class LibreSaveError(@StringRes val messageRes: Int) {
+    NONE(R.string.loc_libreview_saved),
+    EMAIL_TOO_SHORT(R.string.emailaddresstooshort),
+    EMAIL_TOO_LONG(R.string.emailaddresstoolong),
+    PASSWORD_TOO_SHORT(R.string.password8),
+    PASSWORD_TOO_LONG(R.string.password36),
+    ACCOUNT_ID_INVALID(R.string.wrongformat),
+    ACCOUNT_ID_MISSING(R.string.noaccountidspecified)
 }

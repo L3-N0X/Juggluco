@@ -134,7 +134,7 @@ class NotificationRenderer(private val context: Context) {
 
         val baseline = area.centerY() + digit / 2f
         var x = area.left
-        canvas.drawText(valueText, x, baseline, textPaint(valueTypeface, valueColor, digit / ratio))
+        drawValue(x, baseline, textPaint(valueTypeface, valueColor, digit / ratio), digit)
         x += valueWidth()
         trend?.let {
             val box = digit * 0.8f

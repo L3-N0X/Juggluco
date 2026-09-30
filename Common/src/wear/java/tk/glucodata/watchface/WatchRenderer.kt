@@ -413,8 +413,16 @@ private fun   showglucose(canvas:Canvas,glucosePaint:Paint,agePaint:Paint,getxin
                  drawText(sensorid,getx,yid, glucosePaint)
                  }
           }
+      else if(tk.glucodata.StaleReading.shown(age*1000L)) {
+         // No new reading: the last one greyed and struck through, without an arrow.
+         Log.i(LOG_ID,"age ($age) >= oldage ($oldage): struck through")
+         val color=glucosePaint.color
+         glucosePaint.color=tk.glucodata.glucosecomplication.ComplicationRenderer.COLOR_TEXT_MUTED
+         tk.glucodata.StaleReading.drawStruck(canvas,glucose.value,getx*0.82f,gety,glucosePaint)
+         glucosePaint.color=color
+         }
       else {
-         Log.i(LOG_ID,"age ($age) >= oldage ($oldage)")
+         Log.i(LOG_ID,"age ($age) too old to show")
          }
 
    }

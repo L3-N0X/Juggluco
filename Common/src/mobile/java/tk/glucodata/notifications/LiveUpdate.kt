@@ -68,7 +68,9 @@ object LiveUpdate {
     fun text(context: Context, config: NotificationConfig, snapshot: WidgetSnapshot, input: StatusIconInput, time: String): String? {
         val parts = ArrayList<String>(3)
         if (config.showDelta) input.deltaText?.let { parts += "Δ $it" }
-        if (config.showTime || snapshot.isStale) parts += time
+        // The template cannot strike the value through, so an old reading says so in words.
+        if (snapshot.isStale && snapshot.hasReading) parts += context.getString(R.string.nonewvalue).trim() + " " + time
+        else if (config.showTime) parts += time
         if (config.showTimeInRange) snapshot.stats(config.statsPeriod)?.let {
             parts += context.getString(R.string.widget_in_range) + " " + (it.inRange * 100f).roundToInt() + "%"
         }

@@ -54,6 +54,7 @@ import tk.glucodata.ui.screens.settings.FloatingWidgetSettingsScreen
 import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
+import tk.glucodata.ui.screens.settings.LibreViewTreatmentsScreen
 import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
 import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
 import tk.glucodata.ui.screens.settings.SettingsDestination
@@ -173,11 +174,16 @@ fun JugglucoApp(
                 )
                 SettingsDestination.LIBRE_VIEW -> LibreViewSettingsScreen(
                     repository = repository,
+                    onOpenTreatments = { activeSettingsDestination = SettingsDestination.LIBRE_VIEW_TREATMENTS },
                     onNavigateBack = { activeSettingsDestination = SettingsDestination.BROADCASTS }
                 )
-                SettingsDestination.UPLOADER -> UploaderSettingsScreen(
+SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                     repository = repository,
                     onNavigateBack = { activeSettingsDestination = SettingsDestination.BROADCASTS }
+                )
+                SettingsDestination.LIBRE_VIEW_TREATMENTS -> LibreViewTreatmentsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.LIBRE_VIEW }
                 )
                 SettingsDestination.MIRROR_CONNECTION_EDIT -> MirrorConnectionEditScreen(
                     repository = repository,

@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
@@ -68,7 +69,9 @@ fun CurrentGlucoseHeroCard(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    val trendArrow = if (currentReading != null) TrendArrow.fromRate(currentReading.rate) else TrendArrow.UNKNOWN
+    // No new reading: the last one stays, greyed and struck through, without arrow or change.
+    val isStale = rememberIsStale(currentReading?.timestamp) && currentReading != null
+    val trendArrow = if (currentReading != null && !isStale) TrendArrow.fromRate(currentReading.rate) else TrendArrow.UNKNOWN
 
     // Calculate time elapsed
     val timeAgoText = if (currentReading != null) {
@@ -84,7 +87,7 @@ fun CurrentGlucoseHeroCard(
 
     // Delta from the reference reading (clean number, omitting redundant unit). The window is a
     // display setting the user already chose, so it is not repeated on the value itself.
-    val deltaText = if (currentReading != null && deltaReference != null) {
+    val deltaText = if (currentReading != null && deltaReference != null && !isStale) {
         val deltaMgDl = currentReading.valueMgDl - deltaReference.reading.valueMgDl
         val sign = if (deltaMgDl >= 0) "+" else ""
         val numStr = when (unit) {
@@ -172,7 +175,8 @@ fun CurrentGlucoseHeroCard(
                     text = formattedValue,
                     fontSize = 50.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = if (isStale) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                    textDecoration = if (isStale) TextDecoration.LineThrough else null,
                     letterSpacing = (-1).sp
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -189,7 +193,7 @@ fun CurrentGlucoseHeroCard(
             // Trend Arrow Box
             Surface(
                 shape = CircleShape,
-                color = if (isConnected) statusColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
+                color = if (isConnected && !isStale) statusColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.size(52.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {

@@ -169,6 +169,20 @@ private fun AlertScreen(
                     }
                 }
                 Spacer(Modifier.height(ScreenLayout.SectionSpacing))
+                val history by rememberAlertHistory(alert)
+                if (!history.isEmpty) {
+                    AlertHistoryGraph(
+                        history = history,
+                        clinical = clinical,
+                        surfaceColor = scheme.background,
+                        highlightColor = glucoseColor,
+                        thresholdMgDl = rule.graphThresholdMgDl(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(AlertGraphDefaultHeight)
+                    )
+                    Spacer(Modifier.height(ScreenLayout.SectionSpacing))
+                }
                 Text(
                     text = AlertPlayer.detail(alert),
                     style = MaterialTheme.typography.bodyLarge,
