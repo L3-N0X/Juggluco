@@ -1137,7 +1137,7 @@ private void outofStorageSpace() {
         finish();    
     keeprunning.stop();
     System.exit(7);
-    }).setTitle("Juggluco has to exit").setMessage(message).show().setCanceledOnTouchOutside(false);
+    }).setTitle(R.string.juggluco_has_to_exit).setMessage(message).show().setCanceledOnTouchOutside(false);
    
    }
 private void makefilesfailed() {
@@ -1154,7 +1154,7 @@ String filespath=files.getAbsolutePath();
     var dialog=builder.setNegativeButton(R.string.ok, (dial, id) -> {
     end.run();
         // User cancelled the dialog
-    }).setTitle("Juggluco has to exit").setMessage(message).create();
+    }).setTitle(R.string.juggluco_has_to_exit).setMessage(message).create();
    dialog.setCanceledOnTouchOutside(false);
    dialog.setOnShowListener(d->{
        Log.e(LOG_ID,"setOnShowListener");
@@ -1542,7 +1542,7 @@ public void onRequestPermissionsResult(int requestCode, String[] permissions, in
             } else {
                 {if(doLog) {Log.i(LOG_ID,"denied");};};
                 //setbluetoothmain(false);
-                Applic.argToaster(this,"No permission. Sensor via Bluetooth turned off", Toast.LENGTH_LONG);
+                Applic.argToaster(this,getString(R.string.no_permission_sensor_via_bt_off), Toast.LENGTH_LONG);
 
                 if(!gaverational) {
                     bluediag.returntoblue=false;
@@ -1580,6 +1580,30 @@ public static final int CHAIN_REQUEST=0x81;
 private static  final int REQUEST_NOTIFICATION=0x50;
 static  final int REQUEST_BARCODE=0x10;
 static  final int REQUEST_BARCODE_SIB2=0x11;
+
+/** Extra the barcode scanner puts the scanned text in. */
+private static final String SCAN_RESULT_EXTRA="SCAN_RESULT";
+
+/**
+ * Set while a screen wants to read a scanned code itself, for instance the mirror
+ * editor importing a connection code. Without a listener the scan keeps its classic
+ * meaning and pairs a sensor.
+ */
+public interface QrCodeListener {
+    void onQrCode(String code);
+    }
+private static QrCodeListener qrCodeListener=null;
+
+public static void setQrCodeListener(QrCodeListener listener) {
+    qrCodeListener=listener;
+    }
+
+/** Opens the camera scanner; the result goes to the registered listener when there is one. */
+public static void scanQrCode(MainActivity act) {
+    if(act!=null)
+        PhotoScan.scan(act,REQUEST_BARCODE);
+    }
+
 public static final int REQUEST_EXPORT=0x70;
 //public static final int REQUEST_EXPORT=0x54e806d0;
 public static final int REQUEST_RINGTONE=0x60;
@@ -1643,7 +1667,7 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                  case Activity.RESULT_CANCELED:
                      // The user was asked to change settings, but chose not to
                      {if(doLog) {Log.i(LOG_ID,"REQUEST_CHECK_SETTINGS CANCELLED");};};
-                     Applic.Toaster("Location is turned off, can't scan for devices");
+                     Applic.Toaster(getString(R.string.location_off_cant_scan));
                      break;
                  default: break;
              }; break; */
@@ -1688,11 +1712,24 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
             }
          return;
       case REQUEST_BARCODE_SIB2: 
-      case REQUEST_BARCODE: 
+      case REQUEST_BARCODE: {
+         final QrCodeListener listener=qrCodeListener;
+         if(listener!=null) {
+            qrCodeListener=null;
+            if(resultCode==Activity.RESULT_OK&&data!=null) {
+               final String scanned=data.getStringExtra(SCAN_RESULT_EXTRA);
+               if(scanned!=null) {
+                  RunOnUiThread(()-> listener.onQrCode(scanned));
+                  return;
+                  }
+               }
+            return;
+            }
          if(SiBionics==1 &&!isWearable&&useZXing) {
            ZXing.zXingResult(resultCode, data,this,requestCode);
            return;
            };break;
+     }
     case REQUEST_WEBPAGES:
     case REQUEST_WEBTREE: {
             WebPageUpload.onActivityResult(this,requestCode,resultCode,data);
@@ -1746,9 +1783,9 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                             fd = parcelFileDescriptor.detachFd();
                         else {
                             if (curve != null && curve.dialogs != null && curve.dialogs.exportlabel != null) {
-                                curve.dialogs.exportlabel.setText("Can't save: parcelFileDescriptor == null");
+                                curve.dialogs.exportlabel.setText(getString(R.string.cant_save_null_fd));
                             } else {
-                                Applic.argToaster(this, "Can't save: parcelFileDescriptor == null", Toast.LENGTH_SHORT);
+                                Applic.argToaster(this, getString(R.string.cant_save_null_fd), Toast.LENGTH_SHORT);
                             }
                             return;
                         }
@@ -2059,8 +2096,8 @@ private static void needsLocation() {
      MainActivity main=thisone;
     if(main!=null) {
         AlertDialog.Builder builder = new AlertDialog.Builder(main);
-        builder.setTitle("Location").
-         setMessage("System Location needs to be turned on to find Bluetooth devices").
+        builder.setTitle(R.string.location).
+         setMessage(main.getString(R.string.system_location_needed_for_bt)).
            setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -2069,7 +2106,7 @@ private static void needsLocation() {
    }).setOnCancelListener(l->enableLocationSettings()).show().setCanceledOnTouchOutside(false);
          }
      else {
-      Applic.Toaster("Turn on Location in System settings"); 
+      Applic.Toaster(Applic.getContext().getString(R.string.turn_on_location_in_system_settings)); 
        }
    }
 
@@ -2124,7 +2161,7 @@ private boolean systemlocation() {
                  case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
                      // Location settings are not satisfied. However, we have no way to fix the
                      // settings so we won't show the dialog.
-                     Applic.Toaster("No location, don't know how to fix it");
+                     Applic.Toaster(getString(R.string.no_location_unknown_fix));
                      break;
               }
          }

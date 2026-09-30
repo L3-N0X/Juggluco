@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Home screen widgets (tk.glucodata.widgets) -->
+    <string name="app_widget_description">Glukose-Widget</string>
     <string name="widget_classic">Klassisch</string>
     <string name="widget_minimal">Minimal</string>
     <string name="widget_minimal_description">Nur der Wert und sein Trend. Standardmäßig transparent, für aufgeräumte Startbildschirme.</string>

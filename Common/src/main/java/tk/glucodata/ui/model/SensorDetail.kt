@@ -38,6 +38,8 @@ enum class SignalQuality(@StringRes val labelRes: Int, val bars: Int) {
 data class ConnectionStep(
     @StringRes val titleRes: Int,
     @StringRes val descriptionRes: Int,
+    /** Localized override for [descriptionRes]; wins over it when set. */
+    @StringRes val dynamicDescriptionRes: Int? = null,
     val dynamicDescription: String? = null,
     val isCompleted: Boolean,
     val timestamp: Long? = null,
@@ -64,10 +66,13 @@ data class SensorDetail(
     val isHidden: Boolean = false,
     val hasCalibration: Boolean = false,
     val batteryPercent: Int? = null,
-    val connectionStatusStr: String = "Disconnected",
+    @StringRes val connectionStatusRes: Int? = null,
+    val connectionStatusStr: String = "",
     val lastConnectTime: Long = 0L,
     val lastDisconnectTime: Long = 0L,
     val handshakeStatusStr: String = "",
+    /** Localized label for the handshake step, for the states Juggluco itself produces. */
+    @StringRes val handshakeStatusRes: Int? = null,
     val lastHandshakeTime: Long = 0L,
     val rawDiagnosticText: String = "",
     val isMirrored: Boolean = false
@@ -136,6 +141,7 @@ data class SensorDetail(
             ConnectionStep(
                 titleRes = R.string.connection_security_handshake,
                 descriptionRes = R.string.connection_keys_exchanged,
+                dynamicDescriptionRes = handshakeStatusRes,
                 dynamicDescription = handshakeStatusStr.takeIf { it.isNotEmpty() },
                 isCompleted = isConnected && handshakeStatusStr.contains("Fail", ignoreCase = true).not(),
                 timestamp = if (lastHandshakeTime > 0) lastHandshakeTime else null,

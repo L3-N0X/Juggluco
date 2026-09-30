@@ -1,7 +1,9 @@
 package tk.glucodata.ui.screens.settings
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
@@ -94,6 +96,18 @@ enum class SettingsDestination(
         descRes = R.string.settings_desc_libre_view,
         categoryRes = R.string.settings_cat_integrations,
         icon = Icons.Default.CloudSync
+    ),
+UPLOADER(
+        titleRes = R.string.settings_title_uploader,
+        descRes = R.string.settings_desc_uploader,
+        categoryRes = R.string.settings_cat_integrations,
+        icon = Icons.Default.CloudUpload
+    ),
+    LIBRE_VIEW_TREATMENTS(
+        titleRes = R.string.loc_libreview_treatments,
+        descRes = R.string.loc_libreview_treatments_desc,
+        categoryRes = R.string.settings_cat_integrations,
+        icon = Icons.Default.Assignment
     ),
     MIRROR_CONNECTION_EDIT(
         titleRes = R.string.settings_title_mirror_edit,

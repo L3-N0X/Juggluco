@@ -62,6 +62,18 @@ private  static Bitmap bitmap(String myStringToEncode,int width,int height) thro
  public   static ImageBitmap imagebitmap(String myStringToEncode) throws WriterException {
         return bitmap(name).asImageBitmap();
         } */
+/** Renders a connection code as a QR bitmap, or null when it cannot be encoded. */
+public static Bitmap qrbitmap(String code,int size) {
+     if(code==null||code.isEmpty())
+        return null;
+     try {
+        return bitmap(code,size,size);
+        }
+     catch(Throwable th) {
+        Log.stack(LOG_ID,"qrbitmap",th);
+        return null;
+        }
+     }
 public static void show(MainActivity act, String code) {
      var image=new ImageView(act);
      int height= GlucoseCurve.getheight()-MainActivity.systembarTop-MainActivity.systembarBottom;

@@ -294,7 +294,7 @@ private fun NfcScanBanner(onScanClick: () -> Unit) {
             ) {
                 Icon(
                     imageVector = Icons.Default.Nfc,
-                    contentDescription = "NFC",
+                    contentDescription = stringResource(R.string.content_desc_nfc),
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(24.dp)
                 )

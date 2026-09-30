@@ -125,6 +125,24 @@ static JSONObject  readJSONObject(HttpURLConnection urlConnection)  throws IOExc
 
 private static String librestatus=nothing;
 
+/**
+ * Publishes a status line to every listener, keeping the field the uploader itself compares
+ * against. The Compose settings screen shows the same text the legacy dialog did.
+ */
+private static void setStatus(final String status) {
+   librestatus=status;
+   LibreViewStatus.setStatus(displayStatus());
+}
+
+/**
+ * The status as the user reads it: a finished upload is prefixed with the time it completed.
+ */
+public static String displayStatus() {
+   if(librestatus==success&&posttime!=null)
+      return posttime+": "+librestatus;
+   return librestatus;
+}
+
 /*
  * Keep retrying failures that can reasonably disappear when connectivity returns,
  * but stop LibreView uploads after a permanent rejection or a local/configuration
@@ -152,7 +170,7 @@ private static boolean temporaryNetworkProblem(Throwable th) {
 
 private static boolean libreFailure(final String status,final boolean permanent) {
    lastFailurePermanent=permanent;
-   librestatus=status;
+   setStatus(status);
    Log.e(LOG_ID,status);
    return false;
    }
@@ -163,7 +181,7 @@ private static boolean libreFailure(final String status,final Throwable th) {
 
 private static boolean stopLibreviewUploads(final String status) {
    lastFailurePermanent=true;
-   librestatus=status+"; LibreView upload disabled";
+   setStatus(status+"; LibreView upload disabled");
    Log.e(LOG_ID,librestatus);
    setuselibreview(false);
    return false;
@@ -172,7 +190,7 @@ private static boolean stopLibreviewUploads(final String status) {
 @Keep
 static boolean putsensor(boolean libre3,byte[] textbytes) {
    if(librestatus==nothing||librestatus==success)
-      librestatus=datestr(System.currentTimeMillis())+" start putsensor";
+      setStatus(datestr(System.currentTimeMillis())+" start putsensor");
    try {
    for(int i=0;i<3;i++) {
       final String gateway=getlibregateway(libre3);
@@ -206,7 +224,7 @@ static boolean putsensor(boolean libre3,byte[] textbytes) {
                         return false;
                      };break;
                   default: {
-                     librestatus="putsensor  reason="+reason;
+                     setStatus("putsensor  reason="+reason);
                      return false;
                      }
 
@@ -215,14 +233,14 @@ static boolean putsensor(boolean libre3,byte[] textbytes) {
                }
             }
 
-         librestatus="putsensor: status="+status+(reason==null?"":(" reason="+reason));
+         setStatus("putsensor: status="+status+(reason==null?"":(" reason="+reason)));
          }
       return status==0;
         }
    return false;
       }  
    catch(Throwable th) {
-      librestatus="putsensor "+ stackline(th);
+      setStatus("putsensor "+ stackline(th));
       Log.e(LOG_ID,librestatus);
       return false;
       }
@@ -345,7 +363,7 @@ static boolean postgetauth(boolean libre3) {
          Natives.setlibreUserToken(libre3,usertoken);
          String accountid=result.getString("AccountId");
          setlibreAccountID(accountid);
-         librestatus="Received AccountID";
+         setStatus("Received AccountID");
          if(libre3) {//TODO enkel als send to libreview aanstaat?
             String DateOfBirth=result.getString("DateOfBirth");
             int dat=Integer.parseInt(DateOfBirth);
@@ -377,7 +395,7 @@ static boolean postgetauth(boolean libre3) {
             final int code2=urlConnection2.getResponseCode();
             {if(doLog) {Log.i(LOG_ID,"ResponseCode="+code2);};};
             if(code2!=HTTP_OK) {
-                  librestatus="getAccountInfo: getResponseCode()="+code2;
+                  setStatus("getAccountInfo: getResponseCode()="+code2);
                   }
             }
          return true;
@@ -403,7 +421,7 @@ static boolean postmeasurements(boolean libre3,byte[] measurementdata) {
    lastFailurePermanent=false;
    String nowstr=datestr(System.currentTimeMillis());
    if(librestatus==nothing||librestatus==success)
-      librestatus=nowstr+" start posting";
+      setStatus(nowstr+" start posting");
    try {
    for(int i=0;i<3;i++) {
       final String baseurl=getlibrebaseurl(libre3);
@@ -473,7 +491,7 @@ static boolean postmeasurements(boolean libre3,byte[] measurementdata) {
             return stopLibreviewUploads("postmeasurements2 status="+status+" reason="+reason);
             }
          posttime=nowstr;
-         librestatus=success;
+         setStatus(success);
          return true;
          }
       else {
@@ -497,7 +515,7 @@ static boolean postmeasurements(boolean libre3,byte[] measurementdata) {
            ProviderInstaller.installIfNeeded(Applic.app);
         }
       catch(Throwable th) {
-         librestatus= "ProviderInstaller.installIfNeeded: \n"+stackline(th);
+         setStatus( "ProviderInstaller.installIfNeeded: \n"+stackline(th));
           Log.e(LOG_ID,librestatus);
            }
 */
@@ -519,7 +537,7 @@ private static String  libre3getconfigURL() {
             termsofuseversionurl=object.getString( "TermsOfUseVersion");
           }
           catch(Throwable th) {
-            librestatus="libre3getconfigURL 1:\n"+stackline(th);
+            setStatus("libre3getconfigURL 1:\n"+stackline(th));
             Log.e(LOG_ID,librestatus);
             }
          finally {
@@ -547,13 +565,13 @@ public static void testlibre3() {
 public static boolean libreconfig(boolean libre3,boolean restart){
    lastFailurePermanent=false;
    if(restart||librestatus==nothing||librestatus==success)
-      librestatus=datestr(System.currentTimeMillis())+" libreconfig";
+      setStatus(datestr(System.currentTimeMillis())+" libreconfig");
    {if(doLog) {Log.i(LOG_ID,librestatus);};};
      try {
         ProviderInstaller.installIfNeeded(Applic.app);
      }
    catch(Throwable th) {
-      librestatus= "ProviderInstaller.installIfNeeded: \n"+stackline(th);
+      setStatus( "ProviderInstaller.installIfNeeded: \n"+stackline(th));
        Log.e(LOG_ID,librestatus);
         }
 
@@ -856,7 +874,7 @@ public static void  config(MainActivity act, View settingsview,CheckDirectionBox
       }); */
    var clear=getbutton(act,act.getString(R.string.changestartbutton));
 
-     var statusview=getlabel(act,librestatus==success?(posttime+": "+librestatus):librestatus);
+     var statusview=getlabel(act,displayStatus());
      int statuspad=  (int)tk.glucodata.GlucoseCurve.metrics.density*7;
    statusview.setPadding(statuspad,statuspad,statuspad,statuspad);
    

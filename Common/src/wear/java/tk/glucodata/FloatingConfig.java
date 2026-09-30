@@ -280,7 +280,7 @@ static public void showcolors(MainActivity act) {
     act.addMyContentView(layout,  new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
     layout.setBackgroundColor(Applic.backgroundcolor);
     layout.setOnTouchListener(new BackGesture(act));
-    var ok=useclose?getbutton(act,"Ok"):null;
+    var ok=useclose?getbutton(act,act.getString(R.string.ok)):null;
     if(ok!=null) {
         ok.setOnClickListener(v->MainActivity.doonback());
         //act.addMyContentView(ok, new ViewGroup.LayoutParams(WRAP_CONTENT,WRAP_CONTENT));

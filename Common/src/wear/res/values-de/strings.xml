@@ -1,6 +1,117 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-<string name="libresetalllabels">Geben Sie zunächst (auf dem Begleittelefon) für jedes Etikett an, was damit geschehen soll.</string>
+
+    <string name="libresetalllabels">Geben Sie zunächst (auf dem Begleittelefon) für jedes Etikett an, was damit geschehen soll.</string>
+
+    <!-- Watch face style names [CHAR LIMIT=20] -->
+    <string name="ambient_style_name">Ambient-Stil</string>
+    <string name="red_style_name">Roter Stil</string>
+    <string name="green_style_name">Grüner Stil</string>
+    <string name="blue_style_name">Blauer Stil</string>
+    <string name="gray_style_name">Grauer Stil</string>
+    <string name="yellow_style_name">Gelber Stil</string>
+    <string name="white_style_name">Weißer Stil</string>
+    <string name="title_activity_watch_face_config">Konfiguration</string>
+    <string name="colors_style_setting">@string/colors</string>
+    <string name="talkhelp"></string>
+    <string name="heart_rate_attribution_label">Zugriff auf den Herzfrequenzsensor</string>
+
+    <!-- Sensor status and phone sync -->
+    <string name="wear_sensors_status_title">Sensoren &amp; Status</string>
+    <string name="wear_scan_sensor">Sensor scannen</string>
+    <string name="wear_scan_or_pair_sensor">Sensor scannen oder koppeln</string>
+    <string name="wear_no_active_sensor">Kein aktiver Sensor</string>
+    <string name="wear_sensor_days_remaining">Noch %1$.1f T</string>
+    <string name="wear_phone_connection">Telefonverbindung</string>
+    <string name="wear_sync_with_phone">Mit Telefon synchronisieren</string>
+    <string name="wear_phone_receiving">Sensordaten werden empfangen</string>
+    <string name="wear_phone_unavailable">Nicht verfügbar • Zum Wiederholen tippen</string>
+    <string name="wear_phone_no_link">Keine Telefonverbindung</string>
+    <string name="wear_sync_requested">Aktuelle Daten werden angefordert…</string>
+    <string name="wear_phone_sync_started">Synchronisierung mit dem Telefon angefordert</string>
+    <string name="wear_phone_sync_error">Synchronisierung mit dem Telefon fehlgeschlagen: %1$s</string>
+
+    <!-- Wear OS Compose UI -->
+    <string name="wear_ui_settings">Einstellungen</string>
+    <string name="wear_ui_alerts">Alarme</string>
+    <string name="wear_ui_voice">Stimme</string>
+    <string name="wear_ui_speak_readings">Werte vorlesen</string>
+    <string name="wear_ui_appearance">Erscheinungsbild</string>
+    <string name="wear_ui_color">Farbe</string>
+    <string name="wear_ui_display">Anzeige</string>
+    <string name="wear_ui_24h_clock">24-Stunden-Anzeige</string>
+    <string name="wear_ui_nfc_sound">NFC-Ton</string>
+    <string name="wear_ui_glucose_unit">Glukoseeinheit</string>
+    <string name="wear_ui_complications">Komplikationen</string>
+    <string name="wear_ui_watch_face">Zifferblatt</string>
+    <string name="wear_ui_watch_face_desc">Füge Glukose-Komplikationen über das Zifferblatt-Anpassungsmenü deiner Uhr hinzu.</string>
+    <string name="wear_ui_on">An</string>
+    <string name="wear_ui_off">Aus</string>
+
+    <string name="wear_color_watch_default">Standard der Uhr</string>
+    <string name="wear_color_blue">Blau</string>
+    <string name="wear_color_teal">Türkis</string>
+    <string name="wear_color_purple">Violett</string>
+    <string name="wear_color_orange">Orange</string>
+    <string name="wear_color_green">Grün</string>
+    <string name="wear_color_pink">Rosa</string>
+
+    <string name="wear_ui_quick_log">Schnell erfassen</string>
+    <string name="wear_ui_graph">Graph</string>
+    <string name="wear_ui_sensors">Sensoren</string>
+    <string name="wear_ui_trend_tap_for_graph">%1$s Trend • Tippen für Graph</string>
+    <string name="wear_ui_history_hours">Verlauf (%1$dh)</string>
+    <string name="wear_ui_now">JETZT</string>
+    <string name="wear_ui_hours_short">%1$dh</string>
+    <string name="wear_ui_minutes_short">%1$d Min.</string>
+    <string name="wear_ui_minutes_unit">Min.</string>
+    <string name="wear_ui_label_value">%1$s: %2$s</string>
+
+    <string name="wear_ui_dismiss">Verwerfen</string>
+    <string name="wear_ui_alert">Alarm</string>
+    <string name="wear_ui_alerts_on_watch">Alarme auf der Uhr</string>
+    <string name="wear_ui_alerts_n_on">%1$d aktiv</string>
+    <string name="wear_ui_snoozed_until">Schläft bis %1$s</string>
+    <string name="wear_ui_resume_alerts">Alarme fortsetzen</string>
+    <string name="wear_ui_snooze_all">Alle schlummern</string>
+    <string name="wear_ui_alert_list">Alarmliste</string>
+    <string name="wear_ui_use_phone_alerts">Alarme des Telefons verwenden</string>
+    <string name="wear_ui_edit_on_phone">Auf dem Telefon bearbeiten</string>
+    <string name="wear_ui_watch_keeps_own">Die Uhr behält ihre eigenen</string>
+    <string name="wear_ui_sync_now">Jetzt synchronisieren</string>
+    <string name="wear_ui_on_this_watch">Auf dieser Uhr</string>
+    <string name="wear_ui_kind_low">Niedrig</string>
+    <string name="wear_ui_kind_high">Hoch</string>
+    <string name="wear_ui_kind_loss">Ausfall</string>
+    <string name="wear_ui_sound">Ton</string>
+    <string name="wear_ui_alerts_ring">Alarme klingeln</string>
+    <string name="wear_ui_vibrate_only">Nur vibrieren</string>
+    <string name="wear_ui_phone_alerts">Telefonalarme</string>
+    <string name="wear_ui_also_ring_here">Hier ebenfalls klingeln</string>
+    <string name="wear_ui_phone_only">Nur am Telefon</string>
+    <string name="wear_ui_full_screen_in_use">Vollbild bei Nutzung</string>
+    <string name="wear_ui_cover_watch_screen">Alarme überdecken den Uhrenbildschirm</string>
+    <string name="wear_ui_only_lock_screen">Nur auf dem Sperrbildschirm</string>
+    <string name="wear_ui_value_chime">Wertton</string>
+    <string name="wear_ui_alert_on">Alarm bei</string>
+    <string name="wear_ui_at_or_below">Bei diesem Wert oder darunter</string>
+    <string name="wear_ui_at_or_above">Bei diesem Wert oder darüber</string>
+    <string name="wear_ui_rate">Rate</string>
+    <string name="wear_ui_per_min">%1$s/Min.</string>
+    <string name="wear_ui_no_reading_for">Kein Wert für</string>
+    <string name="wear_ui_repeat">Wiederholen</string>
+    <string name="wear_ui_ring_for">Klingeln für</string>
+    <string name="wear_ui_until_dismissed">Bis zum Verwerfen</string>
+    <string name="wear_ui_alarm_volume">%1$s-Lautstärke</string>
+    <string name="wear_ui_vibrate">Vibration</string>
+    <string name="wear_ui_pattern">Muster</string>
+    <string name="wear_ui_override_dnd">Nicht-stören-Modus übersteuern</string>
+    <string name="wear_ui_more_options_hint">Weitere Optionen (Zeitplan, Töne, Verzögerungen) findest du in der Telefon-App.</string>
+    <string name="wear_ui_dismiss_named">%1$s verwerfen</string>
+    <string name="wear_ui_just_now">gerade eben</string>
+    <string name="wear_ui_mins_ago">vor %1$d Min.</string>
+    <string name="wear_ui_hours_ago">vor %1$d Std.</string>
+    <string name="wear_ui_delta">Δ %1$s</string>
+    <string name="wear_ui_unit_and_subtitle">%1$s • %2$s</string>
+
 </resources>
-
-

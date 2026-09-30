@@ -35,6 +35,7 @@ import android.widget.FrameLayout;
 
 import tk.glucodata.MainActivity;
 import tk.glucodata.Natives;
+import tk.glucodata.R;
 import yuku.ambilwarna.AmbilWarnaDialog;
 
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -80,7 +81,7 @@ static void show(MainActivity act) {
         var params= new FrameLayout.LayoutParams((int)(width*0.65), (int)(height*0.65), Gravity.RIGHT| Gravity.CENTER);
         params.rightMargin=(int)(width*.03f);
         act.addMyContentView(view, params);
-    var ok=useclose?getbutton(act,"Ok"):null;
+    var ok=useclose?getbutton(act,act.getString(R.string.ok)):null;
     if(ok!=null) {
         ok.setOnClickListener(v->MainActivity.doonback());
         var okparams= new FrameLayout.LayoutParams( WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP|Gravity.CENTER_HORIZONTAL);

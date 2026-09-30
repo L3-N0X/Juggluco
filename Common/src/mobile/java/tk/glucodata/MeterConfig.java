@@ -157,7 +157,7 @@ static void config(MainActivity context, int meterIndex, View parent, BluetoothD
    cancel.setOnClickListener(v -> {
            MainActivity.doonback();
            Natives.GlucoseMeterSetActive(meterIndex,false); //TODO: only when new meter? Remove altogether?
-           Applic.argToaster(context,"Glucose meter will not be used", Toast.LENGTH_LONG);
+           Applic.argToaster(context,context.getString(R.string.glucose_meter_not_used), Toast.LENGTH_LONG);
            if(adapter!=null)
                adapter.notifyDataSetChanged();
            BluetoothGlucoseMeter.restartDevices();

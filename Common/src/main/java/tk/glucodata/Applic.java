@@ -390,6 +390,19 @@ static String[] refreshBluetoothPermissions(Context context) {
     return missing;
     }
 
+/**
+ * Asks for the permissions a nearby Bluetooth mirror link needs. The Compose UI
+ * has no MainActivity.finepermission() to fall back on, so it goes through here.
+ */
+public static void requestBluetoothPermissions(Activity act) {
+    if(act==null)
+        return;
+    final String[] noperm=refreshBluetoothPermissions(act);
+    if(noperm.length==0)
+        return;
+    RunOnUiThread(()-> act.requestPermissions(noperm,MainActivity.BLUETOOTH_PERMISSION_REQUEST_CODE));
+    }
+
 static void ensureBluetoothPermissions(Context context) {
     if(bluetoothPermissionSnapshotValid)
         return;

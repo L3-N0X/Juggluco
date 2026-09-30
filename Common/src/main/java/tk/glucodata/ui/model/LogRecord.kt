@@ -6,13 +6,13 @@ import tk.glucodata.R
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 
-enum class LogType(@StringRes val labelRes: Int, val unitLabel: String) {
-    RAPID_INSULIN(R.string.log_type_rapid_insulin, "U"),
-    BASAL_INSULIN(R.string.log_type_basal_insulin, "U"),
-    CARBS(R.string.log_type_carbs, "g"),
-    BLOOD_GLUCOSE(R.string.log_type_finger_prick, ""),
-    MEAL(R.string.log_type_meal, "g"),
-    NOTE(R.string.log_type_note, "");
+enum class LogType(@StringRes val labelRes: Int, @StringRes val unitLabelRes: Int?) {
+    RAPID_INSULIN(R.string.log_type_rapid_insulin, R.string.unit_insulin_short),
+    BASAL_INSULIN(R.string.log_type_basal_insulin, R.string.unit_insulin_short),
+    CARBS(R.string.log_type_carbs, R.string.unit_carbs_short),
+    BLOOD_GLUCOSE(R.string.log_type_finger_prick, null),
+    MEAL(R.string.log_type_meal, R.string.unit_carbs_short),
+    NOTE(R.string.log_type_note, null);
 }
 
 enum class NumberStore(val nativeIndex: Int) {

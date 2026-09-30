@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.MaterialTheme
@@ -70,22 +71,22 @@ fun WearGlucoseHero(
             }
         } else null
     }
-    // Time elapsed string
-    val timeAgo = remember(currentReading?.timestamp) {
-        val ts = currentReading?.timestamp ?: return@remember "--"
+    // Time elapsed string. The elapsed minutes are remembered, the wording comes from resources.
+    val minutesAgo = remember(currentReading?.timestamp) {
+        val ts = currentReading?.timestamp ?: return@remember -1
         val elapsed = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
-        val mins = (elapsed / 60_000L).toInt()
-        when {
-            mins <= 0 -> "just now"
-            mins < 60 -> "${mins}m ago"
-            else -> "${mins / 60}h ago"
-        }
+        (elapsed / 60_000L).toInt()
+    }
+    val justNowLabel = stringResource(R.string.wear_ui_just_now)
+    val timeAgo = when {
+        minutesAgo < 0 -> "--"
+        minutesAgo == 0 -> justNowLabel
+        minutesAgo < 60 -> stringResource(R.string.wear_ui_mins_ago, minutesAgo)
+        else -> stringResource(R.string.wear_ui_hours_ago, minutesAgo / 60)
     }
 
-    val isStale = remember(currentReading?.timestamp) {
-        val ts = currentReading?.timestamp ?: return@remember true
-        System.currentTimeMillis() - ts > 15 * 60 * 1000L
-    }
+    // No new reading: the last one stays, greyed and struck through, without arrow or change.
+    val isStale = rememberIsStale(currentReading?.timestamp)
 
     Column(
         modifier = modifier
@@ -104,10 +105,11 @@ fun WearGlucoseHero(
                 fontSize = 44.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (isStale) MaterialTheme.colorScheme.onSurfaceVariant else statusColor,
+                textDecoration = if (isStale && currentReading != null) TextDecoration.LineThrough else null,
                 letterSpacing = (-1).sp
             )
 
-            if (arrow != TrendArrow.UNKNOWN) {
+            if (arrow != TrendArrow.UNKNOWN && !isStale) {
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = arrow.symbol,
@@ -125,7 +127,7 @@ fun WearGlucoseHero(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            if (deltaText != null) {
+            if (deltaText != null && !isStale) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
@@ -133,7 +135,7 @@ fun WearGlucoseHero(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "Δ $deltaText",
+                        text = stringResource(R.string.wear_ui_delta, deltaText.orEmpty()),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface

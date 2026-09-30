@@ -447,6 +447,21 @@ private static float valueWidth;
     floatPaint.setTextSize(fontsize);
     }
 
+/** No new reading: the last one greyed and struck through, without an arrow. */
+private void stalefloat(Canvas floatCanvas,strGlucose glucose) {
+    floatCanvas.drawColor(floatingbackground);
+    final int alpha=(floatingforeground>>>24)*0x73/0xFF;
+    floatPaint.setColor((floatingforeground&0xFFFFFF)|(alpha<<24));
+    final var gety = (floatCanvas.getHeight()-timeHeight) * 0.98f;
+    StaleReading.drawStruck(floatCanvas,glucose.value,floatglucosex,gety*.9659f,floatPaint);
+    floatPaint.setColor(floatingforeground);
+    if(showtime)  {
+        floatPaint.setTextSize(timesize);
+        floatCanvas.drawText(minhourstr(glucose.time*1000L), density, gety+timeHeight, floatPaint);
+        floatPaint.setTextSize(floatfontsize);
+        }
+    }
+
 static boolean hide=false;
 /*
 public void drawRect (float left, 
@@ -518,7 +533,10 @@ protected void onDraw(Canvas floatCanvas) {
         }
         else {
             if(!hide) {
-                oldfloatmessage(floatCanvas,glucose.time);
+                if(StaleReading.shown(age*1000L))
+                    stalefloat(floatCanvas,glucose);
+                else
+                    oldfloatmessage(floatCanvas,glucose.time);
                 return;
                 }
             }

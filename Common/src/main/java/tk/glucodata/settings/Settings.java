@@ -562,7 +562,7 @@ static private void changeProfile(MainActivity act,int wasindex, ProfileSchedule
     if(wasindex<0) {
         index=Natives.nrScheduledProfiles( );
         if(index>=10) {
-                Applic.argToaster(act,"Too many schedules",Toast.LENGTH_LONG);
+                Applic.argToaster(act,act.getString(R.string.too_many_schedules),Toast.LENGTH_LONG);
                 return;
                 }
           }
@@ -624,7 +624,7 @@ static private void changeProfile(MainActivity act,int wasindex, ProfileSchedule
             return;
             }
         else {
-            Applic.argToaster(act,"Too many schedules",Toast.LENGTH_SHORT);
+            Applic.argToaster(act,act.getString(R.string.too_many_schedules),Toast.LENGTH_SHORT);
             }
     	});
 //    Button help=getbutton(act,R.string.helpname);
@@ -909,7 +909,7 @@ new View[]{isvalue},new View[]{ringisvalue},new View[]{alarmis,alarmtype},new Vi
                         }
                     }
                   else {
-                        Applic.argToaster(context,context.getString(R.string.cantsetminutes)+" nothing",Toast.LENGTH_SHORT);
+                        Applic.argToaster(context,context.getString(R.string.cantsetminutes)+context.getString(R.string.nothing_suffix),Toast.LENGTH_SHORT);
                         return false;
                         }
                 } catch(Throwable e) {
@@ -1142,7 +1142,7 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
          }
       else {    
 //      var iob=getcheckbox(context,"IOB",Natives.getIOB());
-      var iob=getbutton(context,"IOB");
+      var iob=getbutton(context,context.getString(R.string.iob));
       iob.setOnClickListener(v-> {
         tk.glucodata.IOB.mkview(context);
         });
@@ -1279,7 +1279,7 @@ Runnable closerun= () -> {
       if(!thresstring.equals(newthreshold)) {
         float thres=str2float(newthreshold);
         if(thres>0.8f||thres<0.0f) {
-          Applic.argToaster(context, "A threshold should 0.0 - 0.8",Toast.LENGTH_LONG);
+          Applic.argToaster(context, context.getString(R.string.threshold_should_be),Toast.LENGTH_LONG);
            }
          else
            setthreshold(thres);
@@ -1501,7 +1501,7 @@ private    void mksettings(MainActivity context) {
         View[] row9;
         var about=getbutton(context,R.string.aboutname);
            about.setOnClickListener(v-> tk.glucodata.GlucoseCurve.doabout(context));
-        var intro=getbutton(context,"Intro");
+        var intro=getbutton(context,context.getString(R.string.intro));
          intro.setOnClickListener(v-> help(R.string.introhelp,context));
         if(advhelp!=null) {
             advanced=new Button(context);
@@ -1644,14 +1644,14 @@ static private void exchanges(MainActivity context, View parent) {
     final CheckDirectionBox jugglucobroadcast = new CheckDirectionBox(context);
 
    if(isWearable)
-      xdripbroadcast.setText("xDrip broadcast");
+      xdripbroadcast.setText(context.getString(R.string.xdrip_broadcast_label));
    else
       xdripbroadcast.setText(R.string.xdripbroadcast);
     xdripbroadcast.setChecked(Natives.getxbroadcast());
    if(isWearable)
-      jugglucobroadcast.setText("Glucodata");
+      jugglucobroadcast.setText(context.getString(R.string.glucodata_broadcast_label));
    else
-      jugglucobroadcast.setText("Glucodata broadcast");
+      jugglucobroadcast.setText(context.getString(R.string.glucodata_broadcast_full_label));
     jugglucobroadcast.setChecked(Natives.getJugglucobroadcast());
    var mirrorview=getbutton(context,R.string.mirror);
    mirrorview.setOnClickListener(v ->{ (new Backup()).realmkbackupview(context,false); });
@@ -1696,7 +1696,7 @@ static private void exchanges(MainActivity context, View parent) {
         lay.setPadding((int)(density*8.0),(int)(density*25.0),(int)(density*8.0),(int)(density*2.0));
     } else {
     /*
-        var nfcemu=getbutton(context,"NFC emu");
+        var nfcemu=getbutton(context,context.getString(R.string.nfc_emulator));
         nfcemu.setOnClickListener(v -> tk.glucodata.Libre3NfcEmulator.starttestemu());
         */
         var uploader = getbutton(context, R.string.uploader);

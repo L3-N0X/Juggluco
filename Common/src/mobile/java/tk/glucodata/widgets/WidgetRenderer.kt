@@ -16,6 +16,7 @@ import android.os.Build
 import android.text.format.DateFormat
 import androidx.core.graphics.ColorUtils
 import tk.glucodata.R
+import tk.glucodata.StaleReading
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.TrendArrow
@@ -199,6 +200,12 @@ class WidgetRenderer(private val context: Context) {
 
         fun capHeight(typeface: Typeface, size: Float) = digitRatio(typeface) * size
 
+        /** The value; an old reading is struck through so it never passes for a current one. */
+        fun drawValue(x: Float, baseline: Float, paint: Paint, digitHeight: Float) {
+            if (stale && snapshot.hasReading) StaleReading.drawStruck(canvas, valueText, x, baseline, paint, digitHeight)
+            else canvas.drawText(valueText, x, baseline, paint)
+        }
+
         fun drawArrow(cx: Float, cy: Float, box: Float, arrow: TrendArrow, color: Int) {
             drawTrendArrow(canvas, strokePaint(color, box * 0.14f), cx, cy, box, arrow)
         }
@@ -261,7 +268,7 @@ class WidgetRenderer(private val context: Context) {
             val arrowGap = digitHeight * 0.2f
             val lineWidth = valueWidth + if (trend != null) arrowGap + arrowBox else 0f
             val lineX = if (alignment == WidgetAlignment.CENTER) area.centerX() - lineWidth / 2f else area.left
-            canvas.drawText(valueText, lineX, baseline, valuePaint)
+            drawValue(lineX, baseline, valuePaint, digitHeight)
             trend?.let { drawArrow(lineX + valueWidth + arrowGap + arrowBox / 2f, baseline - digitHeight / 2f, arrowBox, it, arrowColor) }
 
             if (details != null && detailPaint != null) {
@@ -292,7 +299,7 @@ class WidgetRenderer(private val context: Context) {
             val valuePaint = textPaint(valueTypeface, valueColor, size)
             val realDigit = ratio * size
             val baseline = area.centerY() + realDigit / 2f
-            canvas.drawText(valueText, area.left, baseline, valuePaint)
+            drawValue(area.left, baseline, valuePaint, realDigit)
             val valueWidth = valuePaint.measureText(valueText)
             trend?.let {
                 val box = realDigit * 0.8f
@@ -367,7 +374,7 @@ class WidgetRenderer(private val context: Context) {
                 x += chip * 1.32f
             }
             val valuePaint = textPaint(valueTypeface, valueColor, digitHeight / ratio)
-            canvas.drawText(valueText, x, cy + digitHeight / 2f, valuePaint)
+            drawValue(x, cy + digitHeight / 2f, valuePaint, digitHeight)
             if (!showDetails) return
             val detailPaint = textPaint(labelTypeface, palette.contentVariant, detailSize)
             val cap = capHeight(labelTypeface, detailSize)
@@ -621,7 +628,7 @@ class WidgetRenderer(private val context: Context) {
             val realDigit = ratio * size
             val valuePaint = textPaint(valueTypeface, valueColor, size).apply { textAlign = Paint.Align.CENTER }
             val baseline = cy + realDigit * 0.42f
-            canvas.drawText(valueText, cx, baseline, valuePaint)
+            drawValue(cx, baseline, valuePaint, realDigit)
 
             val smallSize = (realDigit * 0.34f / digitRatio(labelTypeface)).coerceIn(dp(9f), dp(18f))
             val smallCap = capHeight(labelTypeface, smallSize)

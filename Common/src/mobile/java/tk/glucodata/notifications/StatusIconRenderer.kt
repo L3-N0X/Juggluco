@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import tk.glucodata.StaleReading
 import tk.glucodata.ui.model.TrendArrow
 import tk.glucodata.widgets.WidgetFont
 import tk.glucodata.widgets.WidgetRenderer
@@ -48,10 +49,12 @@ object StatusIconRenderer {
         val s = size.toFloat()
         val scale = config.iconScale / 100f
         val alpha = if (input.stale) 0x8C else 0xFF
+        // An old reading is still shown, but struck through so it never passes for a current one.
+        val struck = input.stale && input.valueText != null
         val typeface = WidgetRenderer.typeface(WidgetFont.MODERN, config.iconWeight.weight)
         val box = RectF(0f, 0f, s, s)
         when (kind) {
-            StatusIconKind.VALUE -> drawText(canvas, input.valueText ?: DASH, typeface, box, s * DIGIT_SHARE * scale, s * TEXT_WIDTH * scale, alpha)
+            StatusIconKind.VALUE -> drawText(canvas, input.valueText ?: DASH, typeface, box, s * DIGIT_SHARE * scale, s * TEXT_WIDTH * scale, alpha, struck)
             StatusIconKind.DELTA -> drawText(canvas, input.deltaText ?: DASH, typeface, box, s * DIGIT_SHARE * scale, s * TEXT_WIDTH * scale, alpha)
             StatusIconKind.ARROW -> {
                 val arrow = input.arrow
@@ -67,7 +70,7 @@ object StatusIconRenderer {
                 val arrow = input.arrow
                 if (arrow != null) drawArrow(canvas, s / 2f, top + arrowBox / 2f, arrowBox, arrow, config.iconWeight, alpha)
                 val valueBox = RectF(0f, top + arrowBox + gap, s, top + arrowBox + gap + digit)
-                drawText(canvas, input.valueText ?: DASH, typeface, if (arrow != null) valueBox else box, digit, s, alpha)
+                drawText(canvas, input.valueText ?: DASH, typeface, if (arrow != null) valueBox else box, digit, s, alpha, struck)
             }
             StatusIconKind.APP -> Unit
         }
@@ -77,7 +80,7 @@ object StatusIconRenderer {
     private const val DASH = "–"
 
     /** Text whose digits are [digitHeight] tall and at most [maxWidth] wide, centred in [box]. */
-    private fun drawText(canvas: Canvas, text: String, typeface: android.graphics.Typeface, box: RectF, digitHeight: Float, maxWidth: Float, alpha: Int) {
+    private fun drawText(canvas: Canvas, text: String, typeface: android.graphics.Typeface, box: RectF, digitHeight: Float, maxWidth: Float, alpha: Int, struck: Boolean = false) {
         val ratio = WidgetRenderer.digitRatio(typeface)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
             this.typeface = typeface
@@ -93,6 +96,7 @@ object StatusIconRenderer {
         }
         val digit = ratio * paint.textSize
         canvas.drawText(text, box.centerX() - bounds.width() / 2f - bounds.left, box.centerY() + digit / 2f, paint)
+        if (struck) StaleReading.strike(canvas, box.centerX() - bounds.width() / 2f, box.centerX() + bounds.width() / 2f, box.centerY(), digit, paint)
     }
 
     private fun drawArrow(canvas: Canvas, cx: Float, cy: Float, box: Float, arrow: TrendArrow, weight: StatusIconWeight, alpha: Int) {

@@ -115,7 +115,9 @@ object GlucoseNotificationStyler {
     fun postStatusIcons(context: Context, config: NotificationConfig, snapshot: WidgetSnapshot?, valueText: String?) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val canShow = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-        val input = if (snapshot != null && snapshot.hasReading && !snapshot.isStale) iconInput(context, snapshot, valueText) else null
+        val input = if (snapshot != null && snapshot.hasRecentReading) iconInput(context, snapshot, valueText) else null
+        // A current reading goes when it gets old; an old one, struck through, stays until it is too old to show.
+        val timeout = if (snapshot != null && snapshot.isStale) snapshot.lastReadingShownFor else Notify.glucosetimeout
         config.extraIcons.forEachIndexed { slot, kind ->
             val id = STATUS_ICON_IDS[slot]
             val summaryId = STATUS_ICON_SUMMARY_IDS[slot]
@@ -132,13 +134,13 @@ object GlucoseNotificationStyler {
                 val title = statusIconTitle(context, kind, snapshot, input)
                 // Posted afresh once per process, so an icon Android had already bundled is let go.
                 if (!statusIconsReposted) manager.cancel(id)
-                manager.notify(id, statusIconBuilder(context, icon, title, snapshot.currentTime - slot)
+                manager.notify(id, statusIconBuilder(context, icon, title, snapshot.currentTime - slot, timeout)
                     // Its own group each, or Android bundles the icons into one.
                     .setGroup(group)
                     .build())
                 // Android 16 bundles group children without a summary like ungrouped ones. With a
                 // summary and a single child the shade shows only the child, so the summary is never seen.
-                val summary = statusIconBuilder(context, icon, title, snapshot.currentTime - slot)
+                val summary = statusIconBuilder(context, icon, title, snapshot.currentTime - slot, timeout)
                     .setGroup(group)
                     .setGroupSummary(true)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) summary.setGroupAlertBehavior(Notification.GROUP_ALERT_CHILDREN)
@@ -150,7 +152,7 @@ object GlucoseNotificationStyler {
         if (input != null) statusIconsReposted = true
     }
 
-    private fun statusIconBuilder(context: Context, icon: Icon, title: String, time: Long): Notification.Builder {
+    private fun statusIconBuilder(context: Context, icon: Icon, title: String, time: Long, timeout: Long): Notification.Builder {
         @Suppress("DEPRECATION")
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, STATUS_ICON_CHANNEL)
         else Notification.Builder(context).setPriority(Notification.PRIORITY_DEFAULT)
@@ -166,7 +168,7 @@ object GlucoseNotificationStyler {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             // Watches get the glucose notification already.
             .setLocalOnly(true)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) builder.setTimeoutAfter(Notify.glucosetimeout)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) builder.setTimeoutAfter(timeout)
         return builder
     }
 
@@ -174,6 +176,7 @@ object GlucoseNotificationStyler {
         val unit = context.getString(snapshot.unit.labelRes)
         val trend = context.getString((input.arrow ?: TrendArrow.UNKNOWN).labelRes)
         val value = "${snapshot.unit.format(snapshot.currentMgDl)} $unit"
+        if (snapshot.isStale) return "$value · " + context.getString(R.string.nonewvalue).trim() + " " + WidgetRenderer(context).timeText(snapshot)
         return when (kind) {
             StatusIconKind.VALUE, StatusIconKind.APP -> value
             StatusIconKind.VALUE_ARROW -> "$value · $trend"

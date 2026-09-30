@@ -44,9 +44,20 @@ object WearComposeUiBridge {
                 onTriggerNfcScan = {
                     try {
                         activity.setnfc()
-                        Applic.argToaster(activity, "NFC ready: Hold watch to sensor", Toast.LENGTH_SHORT)
+                        Applic.argToaster(
+                            activity,
+                            activity.getString(R.string.nfc_ready_instruction),
+                            Toast.LENGTH_SHORT
+                        )
                     } catch (e: Throwable) {
-                        Applic.argToaster(activity, "NFC error: ${e.message}", Toast.LENGTH_SHORT)
+                        Applic.argToaster(
+                            activity,
+                            activity.getString(
+                                R.string.nfc_unavailable_error,
+                                e.message ?: activity.getString(R.string.failed)
+                            ),
+                            Toast.LENGTH_SHORT
+                        )
                     }
                 },
                 onSyncPhone = {

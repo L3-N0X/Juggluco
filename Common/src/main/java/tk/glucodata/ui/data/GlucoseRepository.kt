@@ -27,7 +27,10 @@ import tk.glucodata.MainActivity
 import tk.glucodata.JugglucoSend
 import tk.glucodata.MessageSender
 import tk.glucodata.Natives
+import tk.glucodata.NightPost
 import tk.glucodata.Nightscout
+import androidx.annotation.StringRes
+import tk.glucodata.R
 import tk.glucodata.Notify
 import tk.glucodata.SensorBridge
 import tk.glucodata.SendLikexDrip
@@ -48,10 +51,20 @@ import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HardwareConfig
+import tk.glucodata.ui.model.LibreLabelMapping
+import tk.glucodata.ui.model.LibreRegion
+import tk.glucodata.ui.model.LibreSaveError
+import tk.glucodata.ui.model.LibreTreatmentKind
+import tk.glucodata.ui.model.LibreViewConfig
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.model.MirrorConnection
+import tk.glucodata.ui.model.MirrorConnectionDraft
+import tk.glucodata.ui.model.MirrorDataStart
 import tk.glucodata.ui.model.MirrorHostEditState
+import tk.glucodata.ui.model.MirrorImportPreview
+import tk.glucodata.ui.model.MirrorQuickCode
+import tk.glucodata.ui.model.MirrorSaveError
 import tk.glucodata.ui.model.MirrorSaveResult
 import tk.glucodata.ui.model.NumberStore
 import tk.glucodata.ui.model.NumberStoreSource
@@ -63,6 +76,9 @@ import tk.glucodata.ui.model.SensorStatus
 import tk.glucodata.ui.model.SignalQuality
 import tk.glucodata.ui.model.StatsPeriod
 import tk.glucodata.ui.model.TimeRange
+import tk.glucodata.ui.model.TreatmentMapping
+import tk.glucodata.ui.model.UploaderConfig
+import tk.glucodata.ui.model.UploaderStatus
 import tk.glucodata.ui.model.WatchConfig
 import tk.glucodata.ui.model.WearDiagnosticInfo
 import tk.glucodata.ui.model.WearWatchDevice
@@ -90,6 +106,9 @@ sealed interface SensorActivationState {
 class GlucoseRepository(
     private val scope: CoroutineScope
 ) {
+
+    /** Resolves a string resource outside of Compose (the repository has no context of its own). */
+    private fun res(@StringRes id: Int): String = Applic.getContext().getString(id)
     private data class NativeEntryIdentity(
         val store: NumberStore,
         val timeSeconds: Long,
@@ -204,6 +223,12 @@ class GlucoseRepository(
     private val _exchanges = MutableStateFlow(ExchangesConfig())
     val exchanges: StateFlow<ExchangesConfig> = _exchanges.asStateFlow()
 
+    private val _uploader = MutableStateFlow(UploaderConfig())
+    val uploader: StateFlow<UploaderConfig> = _uploader.asStateFlow()
+
+    private val _uploaderStatus = MutableStateFlow(UploaderStatus())
+    val uploaderStatus: StateFlow<UploaderStatus> = _uploaderStatus.asStateFlow()
+
     private val _xdripReceiverApps = MutableStateFlow<List<BroadcastReceiverApp>>(emptyList())
     val xdripReceiverApps: StateFlow<List<BroadcastReceiverApp>> = _xdripReceiverApps.asStateFlow()
 
@@ -237,6 +262,19 @@ class GlucoseRepository(
 
     private val _wearDiagnosticInfo = MutableStateFlow(WearDiagnosticInfo())
     val wearDiagnosticInfo: StateFlow<WearDiagnosticInfo> = _wearDiagnosticInfo.asStateFlow()
+
+    private val _libreView = MutableStateFlow(LibreViewConfig())
+    val libreView: StateFlow<LibreViewConfig> = _libreView.asStateFlow()
+
+    private val _libreTreatments = MutableStateFlow<List<LibreLabelMapping>>(emptyList())
+    val libreTreatments: StateFlow<List<LibreLabelMapping>> = _libreTreatments.asStateFlow()
+
+    /**
+     * Whether "send amounts" may be switched on: either it already is, or every label has been
+     * given a treatment kind. Read from native so it keeps agreeing with the uploader.
+     */
+    private val _libreAmountsAllowed = MutableStateFlow(false)
+    val libreAmountsAllowed: StateFlow<Boolean> = _libreAmountsAllowed.asStateFlow()
 
     init {
         DisplaySync.install(this)
@@ -457,6 +495,16 @@ class GlucoseRepository(
                     xdripWebServer = Natives.getusexdripwebserver()
                 )
 
+                // Read Nightscout uploader
+                _uploader.value = UploaderConfig(
+                    url = try { Natives.getnightuploadurl().orEmpty() } catch (_: Throwable) { "" },
+                    active = try { Natives.getuseuploader() } catch (_: Throwable) { false },
+                    v3 = try { Natives.getnightscoutV3() } catch (_: Throwable) { false },
+                    postTreatments = try { Natives.getpostTreatments() } catch (_: Throwable) { false },
+                    canSendTreatments = try { Natives.canSendNumbers(1) } catch (_: Throwable) { false }
+                )
+                refreshUploaderStatus()
+
                 val savedMinimalistUnits = try {
                     Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
                         .getBoolean(KEY_MINIMALIST_UNITS, true)
@@ -530,8 +578,58 @@ class GlucoseRepository(
                 _alarmBehavior.value = readAlarmBehavior()
                 _voiceAnnounce.value = try { Natives.getVoiceActive() } catch (_: Throwable) { false }
                 _speakAlarms.value = try { Natives.speakalarms() } catch (_: Throwable) { true }
+
+                // Read LibreView
+                readLibreViewState()
             }
         } catch (_: Throwable) {}
+    }
+
+    /**
+     * Reloads the LibreView account, upload and treatment-mapping state from native. The mapping
+     * is one kind lookup and one weight lookup per label, and the weight is only needed for labels
+     * that map to carbs, so this stays cheap enough to run in the settings pass.
+     */
+    private fun readLibreViewState() {
+        val manualAccountId = try { Natives.manualLibreAccountIDnumber() != -1L } catch (_: Throwable) { false }
+        _libreView.value = LibreViewConfig(
+            region = LibreRegion.fromNative(
+                try { Natives.getLibreCountry() } catch (_: Throwable) { LibreRegion.UNITED_KINGDOM.nativeIndex }
+            ),
+            accountId = try { Natives.getlibreAccountIDnumber() } catch (_: Throwable) { -1L },
+            hasAccountId = manualAccountId ||
+                (try { !Natives.getlibreAccountID().isNullOrBlank() } catch (_: Throwable) { false }),
+            manualAccountId = manualAccountId,
+            uploadCurrent = try { Natives.getLibreCurrent() } catch (_: Throwable) { false },
+            uploadViewed = try { Natives.getLibreIsViewed() } catch (_: Throwable) { false },
+            sendAmounts = try { Natives.getSendNumbers() } catch (_: Throwable) { false }
+        )
+        _libreTreatments.value = readLibreTreatments()
+        _libreAmountsAllowed.value = try { Natives.canSendNumbers(LIBRE_NIGHT) } catch (_: Throwable) { false }
+    }
+
+    private fun readLibreTreatments(): List<LibreLabelMapping> {
+        val labels = try { Natives.getLabels().toList() } catch (_: Throwable) { return emptyList() }
+        // The last label is the reserved blood label, which is never mapped to a treatment.
+        return labels.dropLast(1).mapIndexed { index, label ->
+            val kind = LibreTreatmentKind.fromNative(
+                try { Natives.getlibrenumkind(LIBRE_NIGHT, index) } catch (_: Throwable) { 0 }
+            )
+            LibreLabelMapping(
+                index = index,
+                label = label,
+                kind = kind,
+                weight = if (kind == LibreTreatmentKind.CARBS) {
+                    try { Natives.getlibrefoodweight(LIBRE_NIGHT, index) } catch (_: Throwable) { 1f }
+                } else {
+                    1f
+                }
+            )
+        }
+    }
+
+    fun refreshLibreView() {
+        scope.launch(Dispatchers.IO) { readLibreViewState() }
     }
 
     fun refreshAll() {
@@ -877,7 +975,7 @@ class GlucoseRepository(
                             0x10 -> "SiBionics (GS1 / GS3)"
                             0x30, 0x40 -> "Dexcom G7 / ONE+"
                             0x50 -> "Accu-Chek SmartGuide"
-                            else -> "CGM Sensor"
+                            else -> res(R.string.cgm_sensor)
                         }
 
                         val status = when {
@@ -908,7 +1006,7 @@ class GlucoseRepository(
 
                         detailsList.add(
                             SensorDetail(
-                                id = info.serial ?: "Unknown",
+                                id = info.serial ?: res(R.string.sensor_id_unknown),
                                 name = info.serial ?: typeName,
                                 sensorPtr = info.sensorptr,
                                 status = status,
@@ -926,14 +1024,17 @@ class GlucoseRepository(
                                 isHidden = info.isHidden,
                                 hasCalibration = info.hasCalibration,
                                 batteryPercent = null,
-                                connectionStatusStr = info.statusStr ?: if (info.isConnected) "Connected" else "Disconnected",
+                                connectionStatusStr = info.statusStr ?: res(
+                                    if (info.isConnected) R.string.sensor_handshake_connected
+                                    else R.string.sensor_handshake_disconnected
+                                ),
                                 handshakeStatusStr = info.handshakeStr ?: "",
                                 rawDiagnosticText = info.infoHtml ?: ""
                             )
                         )
                         legacyList.add(
                             SensorInfo(
-                                id = info.serial ?: "Unknown",
+                                id = info.serial ?: res(R.string.sensor_id_unknown),
                                 name = info.serial ?: typeName,
                                 state = if (info.isConnected) SensorState.ACTIVE else SensorState.DISCONNECTED,
                                 startTime = start,
@@ -953,7 +1054,7 @@ class GlucoseRepository(
                     if (ptrs != null && ptrs.isNotEmpty()) {
                         for (ptr in ptrs) {
                             if (ptr == 0L) continue
-                            val name = Natives.namefromSensorptr(ptr) ?: "Sensor"
+                            val name = Natives.namefromSensorptr(ptr) ?: res(R.string.sensor_name_generic)
                             val infoText = Natives.sensortextfromSensorptr(ptr) ?: ""
                             val warmup = SensorBridge.warmupMinutes(ptr)
                             val isHidden = try { Natives.getHidefromSensorptr(ptr) } catch (_: Throwable) { false }
@@ -998,8 +1099,9 @@ class GlucoseRepository(
                                     isHidden = isHidden,
                                     hasCalibration = hasCali,
                                     batteryPercent = null,
-                                    connectionStatusStr = "Connected",
-                                    handshakeStatusStr = "Authenticated",
+                                    connectionStatusStr = res(R.string.sensor_handshake_connected),
+                                    handshakeStatusStr = res(R.string.sensor_handshake_authenticated),
+                                    handshakeStatusRes = R.string.sensor_handshake_authenticated,
                                     rawDiagnosticText = infoText
                                 )
                             )
@@ -1011,7 +1113,7 @@ class GlucoseRepository(
                                     startTime = start,
                                     endTime = end,
                                     lastReadingTime = lastKnownReading,
-                                    sensorType = if (infoText.isNotEmpty()) infoText else "Active Sensor",
+                                    sensorType = if (infoText.isNotEmpty()) infoText else res(R.string.sensor_name_active),
                                     isConnected = true,
                                     isStreaming = true
                                 )
@@ -1859,6 +1961,150 @@ class GlucoseRepository(
         }
     }
 
+    /**
+     * Writes the LibreView account. Credentials are length checked here, before anything reaches
+     * JNI: `libreemail` and `librepass` are fixed size fields in the settings struct that native
+     * fills without a bounds check. The email is required to look like an account and the
+     * password to be non-trivial as soon as [validateCredentials] is set, which is what the
+     * user turning LibreView uploads on means.
+     */
+    fun saveLibreViewAccount(
+        email: String,
+        password: String,
+        region: LibreRegion,
+        accountId: Long,
+        manualAccountId: Boolean,
+        sendAmounts: Boolean,
+        validateCredentials: Boolean
+    ): LibreSaveError {
+        val address = email.trim()
+        // The upper bounds always apply: a longer credential would be copied past a fixed size
+        // field in the settings struct. The lower bounds only matter once the user has switched
+        // LibreView uploads on, which is what [validateCredentials] says.
+        if (address.length > LIBRE_EMAIL_MAX_LENGTH) return LibreSaveError.EMAIL_TOO_LONG
+        if (password.length > LIBRE_PASSWORD_MAX_LENGTH) return LibreSaveError.PASSWORD_TOO_LONG
+        if (validateCredentials) {
+            if (address.length < LIBRE_EMAIL_MIN_LENGTH) return LibreSaveError.EMAIL_TOO_SHORT
+            if (password.length < LIBRE_PASSWORD_MIN_LENGTH) return LibreSaveError.PASSWORD_TOO_SHORT
+        }
+        if (manualAccountId && accountId <= 0L) return LibreSaveError.ACCOUNT_ID_MISSING
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (!Applic.Nativesloaded) return@launch
+                Natives.setlibreemail(address)
+                Natives.setlibrepass(password)
+                Natives.setLibreCountry(region.nativeIndex)
+                Natives.setlibreAccountIDnumber(if (manualAccountId) accountId else -1L)
+                Natives.setSendNumbers(sendAmounts)
+                // Both fields empty means the account was removed: forget what was uploaded
+                // for it, exactly like the legacy dialog did.
+                if (address.isEmpty() && password.isEmpty()) {
+                    Natives.clearlibreFromMSec(0L)
+                }
+                readLibreViewState()
+            } catch (_: Throwable) {}
+        }
+        return LibreSaveError.NONE
+    }
+
+    /** Asks LibreView for the account id belonging to the saved credentials. */
+    fun requestLibreViewAccountId() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setlibreAccountIDnumber(-1L)
+                    Natives.askServerforAccountID()
+                }
+            } catch (_: Throwable) {}
+            readLibreViewState()
+        }
+    }
+
+    fun setLibreViewRegion(region: LibreRegion) {
+        _libreView.value = _libreView.value.copy(region = region)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setLibreCountry(region.nativeIndex)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setLibreViewUploadCurrent(enabled: Boolean) {
+        _libreView.value = _libreView.value.copy(uploadCurrent = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setLibreCurrent(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setLibreViewUploadViewed(enabled: Boolean) {
+        _libreView.value = _libreView.value.copy(uploadViewed = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setLibreIsViewed(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setLibreViewSendAmounts(enabled: Boolean) {
+        _libreView.value = _libreView.value.copy(sendAmounts = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setSendNumbers(enabled)
+                }
+            } catch (_: Throwable) {}
+            readLibreViewState()
+        }
+    }
+
+    /** Maps one logbook label onto a LibreView record kind, with the carbs weight it is stored with. */
+    fun setLibreLabelMapping(index: Int, kind: LibreTreatmentKind, weight: Float) {
+        _libreTreatments.value = _libreTreatments.value.map { mapping ->
+            if (mapping.index == index) mapping.copy(kind = kind, weight = weight) else mapping
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setlibrenum(LIBRE_NIGHT, index, kind.nativeValue, weight)
+                }
+            } catch (_: Throwable) {}
+            readLibreViewState()
+        }
+    }
+
+    /** Starts a LibreView upload in the background, like the uploader does after a scan. */
+    fun startLibreViewUpload() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.wakelibreview(0)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    /**
+     * Resends everything from [fromMsec] onwards: everything older than that is forgotten, so the
+     * next upload starts over from the chosen moment.
+     */
+    fun resendLibreViewFrom(fromMsec: Long) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.clearlibreFromMSec(fromMsec.coerceAtLeast(0L))
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
     fun setXdripWebServer(enabled: Boolean) {
         _exchanges.value = _exchanges.value.copy(xdripWebServer = enabled)
         scope.launch(Dispatchers.IO) {
@@ -1878,6 +2124,98 @@ class GlucoseRepository(
                     Natives.setusexdripwebserver(true)
                 }
             } catch (_: Throwable) {}
+        }
+    }
+
+    fun uploaderSecret(): String {
+        return try { Natives.getnightuploadsecret().orEmpty() } catch (_: Throwable) { "" }
+    }
+
+    fun saveUploaderConfig(url: String, secret: String, active: Boolean, v3: Boolean) {
+        _uploader.value = _uploader.value.copy(url = url, active = active, v3 = v3)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setNightUploader(url, secret, active, v3)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setUploaderActive(enabled: Boolean) {
+        val current = _uploader.value
+        saveUploaderConfig(current.url, uploaderSecret(), enabled, current.v3)
+    }
+
+    fun setUploaderPostTreatments(enabled: Boolean) {
+        _uploader.value = _uploader.value.copy(postTreatments = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setpostTreatments(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun sendUploaderNow() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.wakeuploader()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun resendUploaderData() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.resetuploader()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    suspend fun testUploader(url: String, secret: String): String = withContext(Dispatchers.IO) {
+        val result = try {
+            if (Applic.Nativesloaded) NightPost.testconnection(url, secret) else "test failure: not initialized"
+        } catch (e: Throwable) {
+            e.message.orEmpty()
+        }
+        _uploaderStatus.value = UploaderStatus(text = result, timeMillis = System.currentTimeMillis())
+        result
+    }
+
+    fun refreshUploaderStatus() {
+        val text = try { NightPost.getstatus() } catch (_: Throwable) { "" }
+        val time = try { NightPost.getuploadtime() } catch (_: Throwable) { 0L }
+        _uploaderStatus.value = UploaderStatus(text = text.orEmpty(), timeMillis = time)
+    }
+
+    fun uploaderTreatmentMappings(): List<TreatmentMapping> {
+        val labels = try { Natives.getLabels() } catch (_: Throwable) { null } ?: return emptyList()
+        if (labels.size < 2) return emptyList()
+        return (0 until labels.size - 1).map { index ->
+            TreatmentMapping(
+                index = index,
+                label = labels[index].orEmpty(),
+                kind = try { Natives.getlibrenumkind(1, index) } catch (_: Throwable) { 0 },
+                weight = try { Natives.getlibrefoodweight(1, index) } catch (_: Throwable) { 1f }
+            )
+        }
+    }
+
+    fun setUploaderTreatmentMapping(index: Int, kind: Int, weight: Float) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setlibrenum(1, index, kind, weight)
+                }
+            } catch (_: Throwable) {}
+            val canSend = try { Natives.canSendNumbers(1) } catch (_: Throwable) { false }
+            _uploader.value = _uploader.value.copy(canSendTreatments = canSend)
         }
     }
 
@@ -1923,6 +2261,7 @@ class GlucoseRepository(
                         val isPassive = try { Natives.getbackuphostpassive(i) } catch (_: Throwable) { false }
                         val isDeactivated = try { Natives.getHostDeactivated(i) } catch (_: Throwable) { false }
                         val status = try { Natives.mirrorStatus(i) ?: "" } catch (_: Throwable) { "" }
+                        val iceLabel = try { Natives.getICElabel(i) } catch (_: Throwable) { null }
                         list.add(
                             MirrorConnection(
                                 index = i,
@@ -1936,7 +2275,13 @@ class GlucoseRepository(
                                 isActive = isActive,
                                 isPassive = isPassive,
                                 isDeactivated = isDeactivated,
-                                status = status
+                                status = status,
+                                transport = try {
+                                    Natives.getbackuptransport(i)
+                                } catch (_: Throwable) {
+                                    BleMirror.TRANSPORT_AUTOMATIC
+                                },
+                                isIce = !iceLabel.isNullOrEmpty()
                             )
                         )
                     }
@@ -1946,7 +2291,7 @@ class GlucoseRepository(
         }
     }
 
-    fun addLocalReceiverConnection(targetPort: String = "17580", label: String = "Local Prod Sync"): Boolean {
+    fun addLocalReceiverConnection(targetPort: String = "17580", label: String = res(R.string.loc_local_production_app)): Boolean {
         return try {
             if (!Applic.Nativesloaded) return false
             val portStr = targetPort.trim().ifEmpty { "17580" }
@@ -1965,7 +2310,7 @@ class GlucoseRepository(
                 false,
                 null,
                 0L,
-                label.trim().ifEmpty { "Local Prod Sync" },
+                label.trim().ifEmpty { res(R.string.loc_local_production_app) },
                 false,
                 false,
                 null,
@@ -1987,7 +2332,7 @@ class GlucoseRepository(
         }
     }
 
-    fun addLocalSenderConnection(targetPort: String = "17581", label: String = "Local Dev Build"): Boolean {
+    fun addLocalSenderConnection(targetPort: String = "17581", label: String = res(R.string.loc_local_dev_build)): Boolean {
         return try {
             if (!Applic.Nativesloaded) return false
             val portStr = targetPort.trim().ifEmpty { "17581" }
@@ -2006,7 +2351,7 @@ class GlucoseRepository(
                 false,
                 null,
                 0L,
-                label.trim().ifEmpty { "Local Dev Build" },
+                label.trim().ifEmpty { res(R.string.loc_local_dev_build) },
                 false,
                 false,
                 null,
@@ -2056,7 +2401,7 @@ class GlucoseRepository(
                 false,
                 null,
                 0L,
-                label.trim().ifEmpty { if (isReceiver) "Receiver" else "Sender" },
+                label.trim().ifEmpty { res(if (isReceiver) R.string.loc_mirror_receiver else R.string.loc_mirror_sender) },
                 false,
                 false,
                 null,
@@ -2119,197 +2464,374 @@ class GlucoseRepository(
         }
     }
 
-    /**
-     * The complete connection as it will be stored after a save. Every value is already
-     * merged, so the caller never has to repeat a field it does not own and a save can
-     * only ever replace what the user actually edited.
-     */
-    private data class MirrorHostRecord(
-        val label: String,
-        val ips: List<String>,
-        val port: String,
-        val isReceiver: Boolean,
-        val sendStream: Boolean,
-        val sendScans: Boolean,
-        val sendAmounts: Boolean,
-        val password: String?,
-        val passwordAction: Int,
-        val usesNetworkPort: Boolean,
-        val addressEdited: Boolean,
-        val isIce: Boolean
-    ) {
-        val sendsAnything: Boolean get() = sendStream || sendScans || sendAmounts
-    }
-
-    /**
-     * Checks the merged record before it is handed to the native layer, so a rejected
-     * edit leaves the stored connection exactly as it was.
-     */
-    private fun validateMirrorRecord(record: MirrorHostRecord): MirrorSaveResult? = when {
-        record.label.length > Natives.MAXMIRRORLABELLENGTH -> MirrorSaveResult.LabelTooLong
-        record.password != null && record.password.length > Natives.MAXMIRRORPASSLENGTH ->
-            MirrorSaveResult.PasswordTooLong
-        record.addressEdited && record.isIce -> MirrorSaveResult.InvalidAddress
-        record.addressEdited && (record.ips.isEmpty() ||
-                record.ips.size > Natives.MAXMIRRORADDRESSES ||
-                record.ips.any { it.isBlank() }) -> MirrorSaveResult.InvalidAddress
-        record.usesNetworkPort -> {
-            val port = record.port.toIntOrNull()
-            if (port == null || port !in 1024..65535) MirrorSaveResult.InvalidPort else null
+    suspend fun saveMirrorConnectionDraft(
+        index: Int,
+        draft: MirrorConnectionDraft
+    ): MirrorSaveResult = withContext(Dispatchers.IO) {
+        if (!Applic.Nativesloaded) {
+            return@withContext MirrorSaveResult(error = MirrorSaveError.NOT_AVAILABLE)
         }
-        !record.isReceiver && !record.sendsAnything -> MirrorSaveResult.NoRoleOrData
-        else -> null
-    }
-
-    /**
-     * Reads the stored connection and folds the user's explicit changes into it. Anything
-     * left out of [changedFields] keeps its stored value, including the fields the editor
-     * has no control over (transport, ICE peer, side, active/passive, restore, deactivation).
-     */
-    private fun mergeMirrorRecord(
-        stored: MirrorHostEditState,
-        changedFields: Int,
-        ips: List<String>,
-        port: String,
-        isReceiver: Boolean,
-        label: String,
-        sendStream: Boolean,
-        sendScans: Boolean,
-        sendAmounts: Boolean,
-        password: String?,
-        passwordAction: Int
-    ): MirrorHostRecord {
-        val cleanPassword = password?.takeIf { it.isNotEmpty() }
-        return MirrorHostRecord(
-            label = if (changedFields and Natives.MIRRORFIELD_LABEL != 0) label.trim()
-            else if (stored.hasLabel) stored.label else "",
-            ips = if (changedFields and Natives.MIRRORFIELD_IPS != 0) {
-                ips.map { it.trim() }.filter { it.isNotEmpty() }
-            } else {
-                stored.ips.map { it.trim() }.filter { it.isNotEmpty() }
+        val stored = if (index >= 0) mirrorHostEditState(index) else null
+        if (index >= 0 && stored == null) {
+            return@withContext MirrorSaveResult(error = MirrorSaveError.NOT_AVAILABLE)
+        }
+        validateMirrorDraft(draft)?.let { error ->
+            return@withContext MirrorSaveResult(error = error)
+        }
+        val usesNetwork = draft.isNetworkTransport
+        val ice = usesNetwork && draft.ice
+        // The ICE path writes the name unconditionally and would read a null string,
+        // so a relay connection without a name still gets an empty one.
+        val label = draft.label.trim().ifEmpty { if (ice) "" else null }
+        val cleanAddresses = if (usesNetwork && !ice) {
+            draft.addresses.map { it.trim() }.filter { it.isNotEmpty() }
+        } else {
+            emptyList()
+        }
+        val useHostname = usesNetwork && !ice && draft.useHostname
+        val detect = usesNetwork && !ice && !useHostname && draft.detectIp && !draft.activeOnly
+        val port = if (usesNetwork && !ice) draft.port.trim() else "0"
+        val restore = draft.restore && mirrorRestoreSupported()
+        val startTime = when {
+            !draft.sendsAnything -> 0L
+            draft.dataStart == MirrorDataStart.ALL -> 0L
+            draft.dataStart == MirrorDataStart.FROM_NOW -> System.currentTimeMillis() / 1000L
+            draft.startTime > 0L -> draft.startTime
+            else -> safeStartTime()
+        }
+        // "side" is the permanent identity of a pair: an edit keeps it, a new
+        // connection takes it from the draft (or from the ICE side field).
+        val side = if (ice) draft.iceSide else (stored?.side ?: draft.side)
+        // Ordinary nearby mirrors on a phone keep their direction for the whole pair.
+        val ordinaryNearby = !ice && !Applic.isWearable && !(stored?.wearOs ?: false)
+        val bleReverse = if (ordinaryNearby) (stored?.bleReverse ?: draft.bleReverse) else draft.bleReverse
+        val bleClient = when {
+            Applic.isWearable -> true
+            stored?.wearOs == true -> false
+            ordinaryNearby -> (!side) xor bleReverse
+            stored != null -> stored.bleClient
+            else -> !draft.sendScans
+        }
+        val pos = try {
+            Natives.changebackuphost(
+                index,
+                cleanAddresses.toTypedArray(),
+                cleanAddresses.size,
+                detect,
+                port,
+                draft.sendAmounts,
+                draft.sendStream,
+                draft.sendScans,
+                restore,
+                draft.receiveFrom,
+                draft.activeOnly && !ice,
+                draft.passiveOnly && !ice,
+                if (draft.usePassword) draft.password else null,
+                startTime,
+                label,
+                draft.testIp && !ice,
+                useHostname,
+                if (ice) draft.iceLabel else null,
+                side,
+                draft.transport,
+                bleClient
+            )
+        } catch (_: Throwable) {
+            -1
+        }
+        if (pos < 0) return@withContext MirrorSaveResult(error = MirrorSaveError.fromNative(pos))
+        if (ordinaryNearby) {
+            try {
+                Natives.setbackupblereverse(pos, bleReverse)
+            } catch (_: Throwable) {}
+        }
+        BleMirror.configurationChanged(pos, true)
+        MessageSender.reinit()
+        Applic.switchSync()
+        refreshMirrorConnections()
+        MirrorSaveResult(
+            index = pos,
+            error = MirrorSaveError.NONE,
+            partialData = !draft.receiveFrom && !(draft.sendAmounts && draft.sendStream && draft.sendScans),
+            blocker = try {
+                BleMirror.blockingStatusForConnection(pos)
+            } catch (_: Throwable) {
+                null
             },
-            port = if (changedFields and Natives.MIRRORFIELD_PORT != 0) port.trim() else stored.port,
-            isReceiver = if (changedFields and Natives.MIRRORFIELD_RECEIVEFROM != 0) isReceiver
-            else stored.isReceiver,
-            sendStream = if (changedFields and Natives.MIRRORFIELD_SENDSTREAM != 0) sendStream
-            else stored.sendStream,
-            sendScans = if (changedFields and Natives.MIRRORFIELD_SENDSCANS != 0) sendScans
-            else stored.sendScans,
-            sendAmounts = if (changedFields and Natives.MIRRORFIELD_SENDNUMS != 0) sendAmounts
-            else stored.sendAmounts,
-            password = cleanPassword,
-            passwordAction = when {
-                passwordAction == Natives.MIRRORPASS_CLEAR -> Natives.MIRRORPASS_CLEAR
-                cleanPassword != null -> Natives.MIRRORPASS_SET
-                else -> Natives.MIRRORPASS_PRESERVE
-            },
-            usesNetworkPort = stored.usesNetworkPort,
-            addressEdited = changedFields and Natives.MIRRORFIELD_IPS != 0,
-            isIce = stored.isIce
+            needsBluetoothPermission = draft.transport == BleMirror.TRANSPORT_BLUETOOTH ||
+                    (draft.transport == BleMirror.TRANSPORT_AUTOMATIC && !Applic.isWearable && !isWearOsHost(pos))
         )
     }
 
-    suspend fun saveMirrorConnection(
-        index: Int,
-        ips: List<String>,
-        port: String,
-        isReceiver: Boolean,
-        label: String,
-        sendStream: Boolean = true,
-        sendScans: Boolean = true,
-        sendAmounts: Boolean = true,
-        changedFields: Int = 0,
-        password: String? = null,
-        passwordAction: Int = Natives.MIRRORPASS_PRESERVE
-    ): MirrorSaveResult = withContext(Dispatchers.IO) {
-        if (!Applic.Nativesloaded) return@withContext MirrorSaveResult.Failed
-        try {
-            if (index < 0) {
-                val record = MirrorHostRecord(
-                    label = label.trim(),
-                    ips = ips.map { it.trim() }.filter { it.isNotEmpty() },
-                    port = port.trim(),
-                    isReceiver = isReceiver,
-                    sendStream = sendStream,
-                    sendScans = sendScans,
-                    sendAmounts = sendAmounts,
-                    password = password?.takeIf { it.isNotEmpty() },
-                    passwordAction = Natives.MIRRORPASS_PRESERVE,
-                    usesNetworkPort = true,
-                    addressEdited = true,
-                    isIce = false
-                )
-                validateMirrorRecord(record)?.let { return@withContext it }
-                val pos = Natives.changebackuphost(
-                    -1,
-                    record.ips.toTypedArray(),
-                    record.ips.size,
-                    false,
-                    record.port,
-                    if (record.isReceiver) false else record.sendAmounts,
-                    if (record.isReceiver) false else record.sendStream,
-                    if (record.isReceiver) false else record.sendScans,
-                    false,
-                    record.isReceiver,
-                    record.isReceiver,
-                    false,
-                    record.password,
-                    0L,
-                    record.label.ifEmpty { if (record.isReceiver) "Receiver" else "Sender" },
-                    false,
-                    false,
-                    null,
-                    false,
-                    BleMirror.TRANSPORT_TCP,
-                    false
-                )
-                if (pos < 0) return@withContext MirrorSaveResult.Failed
-                BleMirror.configurationChanged(pos, true)
-                MessageSender.reinit()
-                Applic.switchSync()
-                refreshMirrorConnections()
-                return@withContext MirrorSaveResult.Saved
-            }
-            val stored = mirrorHostEditState(index)
-                ?: return@withContext MirrorSaveResult.NotFound
-            if (changedFields == 0) {
-                refreshMirrorConnections()
-                return@withContext MirrorSaveResult.Unchanged
-            }
-            val record = mergeMirrorRecord(
-                stored, changedFields, ips, port, isReceiver, label,
-                sendStream, sendScans, sendAmounts, password, passwordAction
-            )
-            validateMirrorRecord(record)?.let { return@withContext it }
-            val pos = Natives.patchbackuphost(
-                index,
-                changedFields,
-                record.ips.toTypedArray(),
-                record.ips.size,
-                record.port,
-                if (record.isReceiver) 2 else 0,
-                record.sendAmounts,
-                record.sendStream,
-                record.sendScans,
-                record.label.ifEmpty { null },
-                record.password,
-                record.passwordAction
-            )
-            if (pos < 0) return@withContext MirrorSaveResult.Failed
-            // A rename or a password change never touched the socket, the send thread or
-            // the receiver, so the connection only has to be re-announced in the list.
-            val needsReconnect = changedFields and
-                    (Natives.MIRRORFIELD_LABEL or Natives.MIRRORFIELD_PASSWORD) != changedFields
-            if (needsReconnect) {
-                BleMirror.configurationChanged(pos, true)
-                MessageSender.reinit()
-                Applic.switchSync()
-            }
-            refreshMirrorConnections()
-            MirrorSaveResult.Saved
-        } catch (_: Throwable) {
-            MirrorSaveResult.Failed
+    /** Turns a stored connection into the editable draft the editor works on. */
+    suspend fun mirrorConnectionDraft(index: Int): MirrorConnectionDraft? = withContext(Dispatchers.IO) {
+        val state = mirrorHostEditState(index) ?: return@withContext null
+        val storedStart = state.startTime
+        val dataStart = when {
+            storedStart <= 0L -> MirrorDataStart.ALL
+            Math.abs(System.currentTimeMillis() / 1000L - storedStart) < MIRROR_NOW_SECONDS -> MirrorDataStart.FROM_NOW
+            else -> MirrorDataStart.SCREEN_POSITION
         }
+        MirrorConnectionDraft(
+            transport = state.transport,
+            label = if (state.hasLabel) state.label else "",
+            addresses = if (state.isIce) emptyList() else state.ips.filter { it.isNotBlank() },
+            port = state.port,
+            detectIp = state.detect,
+            testIp = state.testIp,
+            useHostname = state.hasHostname,
+            activeOnly = state.activeReceive > 0,
+            passiveOnly = if (state.isReceiver) state.receiveFrom == 2 else state.sendPassive,
+            ice = state.isIce,
+            iceLabel = state.iceLabel,
+            iceSide = state.side,
+            receiveFrom = state.isReceiver,
+            sendAmounts = state.sendAmounts,
+            sendStream = state.sendStream,
+            sendScans = state.sendScans,
+            restore = state.restore,
+            dataStart = dataStart,
+            startTime = storedStart,
+            usePassword = state.hasPassword,
+            // The editor shows the stored password so it can be replaced or removed,
+            // which is how the classic editor has always handled it.
+            password = if (state.hasPassword) {
+                try {
+                    Natives.getbackuppassword(index).orEmpty()
+                } catch (_: Throwable) {
+                    ""
+                }
+            } else {
+                ""
+            },
+            side = state.side,
+            bleReverse = state.bleReverse,
+            bleClient = state.bleClient
+        )
+    }
+
+    /** The connection code of a stored connection, or null when codes are unavailable. */
+    suspend fun mirrorConnectionCode(index: Int): String? = withContext(Dispatchers.IO) {
+        if (!mirrorCodesAvailable) return@withContext null
+        try {
+            Natives.getbackJson(index)?.takeIf { it.isNotBlank() }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /** Creates one of the four ready made connections and returns its connection code. */
+    suspend fun createMirrorQuickCode(kind: MirrorQuickCode): MirrorSaveResult = withContext(Dispatchers.IO) {
+        if (!Applic.Nativesloaded || !mirrorCodesAvailable) {
+            return@withContext MirrorSaveResult(error = MirrorSaveError.NOT_AVAILABLE)
+        }
+        val pos = try {
+            when (kind) {
+                MirrorQuickCode.LOCAL_SENDER -> Natives.makeHomeSender()
+                MirrorQuickCode.LOCAL_RECEIVER -> Natives.makeHomeReceiver()
+                MirrorQuickCode.INTERNET_SENDER -> Natives.makeICESender()
+                MirrorQuickCode.INTERNET_RECEIVER -> Natives.makeICEReceiver()
+            }
+        } catch (_: Throwable) {
+            -1
+        }
+        if (pos < 0) return@withContext MirrorSaveResult(error = MirrorSaveError.fromNative(pos))
+        BleMirror.configurationChanged(pos, true)
+        MessageSender.reinit()
+        Applic.switchSync()
+        refreshMirrorConnections()
+        MirrorSaveResult(
+            index = pos,
+            error = MirrorSaveError.NONE,
+            code = mirrorConnectionCode(pos),
+            needsBluetoothPermission = !Applic.isWearable && !isWearOsHost(pos)
+        )
+    }
+
+    /**
+     * Reads a connection code without changing anything, so the caller can show what
+     * will be imported and ask before the data of an existing receiver is replaced.
+     */
+    suspend fun previewMirrorImport(payload: String): MirrorImportPreview? = withContext(Dispatchers.IO) {
+        if (!Applic.Nativesloaded) return@withContext null
+        val text = payload.trim()
+        val marker = text.lastIndexOf(MIRROR_CODE_SUFFIX)
+        if (marker < 0) return@withContext null
+        val json = try {
+            JSONObject(text.substring(0, marker).trim())
+        } catch (_: Throwable) {
+            return@withContext null
+        }
+        fun flag(name: String, fallback: Boolean = false) = json.optBoolean(name, fallback)
+        fun text(name: String): String? =
+            if (json.isNull(name)) null else json.optString(name).takeIf { it.isNotEmpty() }
+        val iceLabel = text("ICElabel")
+        val side = if (json.has("side")) flag("side") else flag("scans")
+        val namesJson = json.optJSONArray("names")
+        val names = if (namesJson == null) {
+            emptyList()
+        } else {
+            (0 until namesJson.length()).map { namesJson.optString(it) }
+        }
+        val transport = json.optInt("transport", BleMirror.TRANSPORT_AUTOMATIC)
+            .takeIf { it in BleMirror.TRANSPORT_AUTOMATIC..BleMirror.TRANSPORT_BLUETOOTH }
+            ?: BleMirror.TRANSPORT_AUTOMATIC
+        val nums = flag("nums")
+        val stream = flag("stream")
+        val scans = flag("scans")
+        val receive = flag("receive")
+        val activeOnly = flag("activeonly")
+        val passiveOnly = flag("passiveonly")
+        val bleClient = if (json.has("bleclient")) {
+            flag("bleclient")
+        } else {
+            if (iceLabel == null) !side else (activeOnly || (!passiveOnly && receive))
+        }
+        val bleReverse = if (iceLabel != null) {
+            false
+        } else if (json.has("blereverse")) {
+            flag("blereverse")
+        } else {
+            bleClient != !side
+        }
+        MirrorImportPreview(
+            draft = MirrorConnectionDraft(
+                transport = transport,
+                label = text("label").orEmpty(),
+                // A code never carries the hostname itself: the peer is told to
+                // detect the address instead, so an imported connection looks up.
+                addresses = names,
+                port = if (iceLabel == null) json.optString("port", "17580") else "0",
+                detectIp = flag("detect"),
+                testIp = flag("testip"),
+                useHostname = false,
+                activeOnly = activeOnly,
+                passiveOnly = passiveOnly,
+                ice = iceLabel != null,
+                iceLabel = iceLabel.orEmpty(),
+                iceSide = side,
+                receiveFrom = receive,
+                sendAmounts = nums,
+                sendStream = stream,
+                sendScans = scans,
+                restore = false,
+                dataStart = MirrorDataStart.ALL,
+                usePassword = text("pass") != null,
+                password = text("pass").orEmpty(),
+                side = side,
+                bleReverse = bleReverse,
+                bleClient = bleClient
+            ),
+            presentAmounts = !nums && numio.hasNumdata(),
+            presentScans = !scans && nativeHasScans(),
+            presentStream = !stream && nativeHasStream()
+        )
+    }
+
+    /** Adds the connection described by a code the user confirmed to import. */
+    suspend fun importMirrorCode(preview: MirrorImportPreview): MirrorSaveResult {
+        val result = saveMirrorConnectionDraft(-1, preview.draft)
+        if (result.ok && !preview.draft.ice) {
+            // A code carries the pair direction and the preferred role of the peer.
+            // The editor derives both itself, an import takes them over as given.
+            try {
+                Natives.setbackupblereverse(result.index, preview.draft.bleReverse)
+                if (Applic.isWearable) {
+                    Natives.setbackupbleclient(result.index, preview.draft.bleClient)
+                }
+            } catch (_: Throwable) {}
+            BleMirror.configurationChanged(result.index, true)
+            refreshMirrorConnections()
+        }
+        return result
+    }
+
+    fun setMirrorConnectionDeactivated(index: Int, deactivated: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded && index >= 0) {
+                    Natives.setHostDeactivated(index, deactivated)
+                    BleMirror.configurationChanged()
+                    refreshMirrorConnections()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    /** Whether this build can hand out and read connection codes (not on the watch). */
+    fun mirrorCodesSupported(): Boolean = mirrorCodesAvailable
+
+    fun mirrorRestoreSupported(): Boolean = try {
+        Applic.Nativesloaded && Natives.backuphasrestore()
+    } catch (_: Throwable) {
+        false
+    }
+
+    private fun validateMirrorDraft(draft: MirrorConnectionDraft): MirrorSaveError? {
+        val label = draft.label.trim()
+        if (draft.needsLabel && label.isEmpty()) return MirrorSaveError.LABEL_REQUIRED
+        if (label.length > MIRROR_LABEL_MAX_LENGTH) return MirrorSaveError.LABEL_TOO_LONG
+        if (draft.transport == BleMirror.TRANSPORT_BLUETOOTH &&
+            (!draft.usePassword || draft.password.isEmpty())
+        ) {
+            return MirrorSaveError.PASSWORD_REQUIRED
+        }
+        if (draft.usePassword && draft.password.length > MIRROR_PASSWORD_MAX_LENGTH) {
+            return MirrorSaveError.PASSWORD_TOO_LONG
+        }
+        if (!draft.receiveFrom && !draft.sendsAnything) return MirrorSaveError.NOTHING_SELECTED
+        if (draft.receiveFrom && draft.sendAmounts && draft.sendStream && draft.sendScans) {
+            return MirrorSaveError.ALL_DATA_SENT
+        }
+        if (!draft.isNetworkTransport) return null
+        val ice = draft.ice
+        if (ice) {
+            if (draft.iceLabel.length < MIRROR_ICE_LABEL_MIN_LENGTH) return MirrorSaveError.ICE_LABEL_TOO_SHORT
+            if (draft.iceLabel.length > MIRROR_ICE_LABEL_MAX_LENGTH) return MirrorSaveError.ICE_LABEL_TOO_LONG
+            return null
+        }
+        val detect = draft.detectIp && !draft.activeOnly
+        val used = draft.addresses.count { it.isNotBlank() }
+        val maxAddresses = MIRROR_MAX_ADDRESSES - (if (label.isEmpty()) 0 else 1) - (if (detect) 1 else 0)
+        if (used > maxAddresses) return MirrorSaveError.TOO_MANY_ADDRESSES
+        if (draft.useHostname) {
+            val hostname = draft.addresses.firstOrNull { it.isNotBlank() }.orEmpty()
+            if (hostname.isEmpty()) return MirrorSaveError.NO_ADDRESS
+            if (hostname.length > MIRROR_HOSTNAME_MAX_LENGTH) return MirrorSaveError.HOSTNAME_TOO_LONG
+            return null
+        }
+        if ((draft.testIp && !detect) || draft.activeOnly) {
+            if (used == 0) return MirrorSaveError.NO_ADDRESS
+        }
+        if (!draft.passiveOnly) {
+            val portNumber = draft.port.trim().toIntOrNull()
+            if (portNumber == null || portNumber !in 1024..65535) return MirrorSaveError.INVALID_PORT
+        }
+        return null
+    }
+
+    private fun isWearOsHost(index: Int): Boolean = try {
+        Natives.isWearOS(index)
+    } catch (_: Throwable) {
+        false
+    }
+
+    private fun safeStartTime(): Long = try {
+        Natives.getstarttime() / 1000L
+    } catch (_: Throwable) {
+        0L
+    }
+
+    private fun nativeHasScans(): Boolean = try {
+        Natives.hasscans()
+    } catch (_: Throwable) {
+        false
+    }
+
+    private fun nativeHasStream(): Boolean = try {
+        Natives.hasstreamed()
+    } catch (_: Throwable) {
+        false
     }
 
     fun deleteMirrorConnection(index: Int) {
@@ -3077,6 +3599,43 @@ class GlucoseRepository(
 
     private companion object {
         const val NFC_LAUNCH_COMPONENT = "tk.glucodata.glucodata"
+        const val MIRROR_MAX_ADDRESSES = 4
+        // Taken from the native storage sizes, so a draft can never be built that the
+        // native side would reject after the editor already accepted it.
+        const val MIRROR_LABEL_MAX_LENGTH = Natives.MAXMIRRORLABELLENGTH
+        const val MIRROR_PASSWORD_MAX_LENGTH = Natives.MAXMIRRORPASSLENGTH
+        const val MIRROR_ICE_LABEL_MIN_LENGTH = 16
+        const val MIRROR_ICE_LABEL_MAX_LENGTH = 32
+        const val MIRROR_HOSTNAME_MAX_LENGTH = 81
+        const val MIRROR_NOW_SECONDS = 300L
+        const val MIRROR_CODE_SUFFIX = "MirrorJuggluco"
+
+        /**
+         * The `night` index of the native treatment mappings: 0 is the LibreView export, 1 the
+         * Nightscout one. Only the LibreView half belongs to this screen.
+         */
+        const val LIBRE_NIGHT = 0
+
+        /**
+         * Limits of the fixed size credential fields in the settings struct (`char libreemail[256]`,
+         * `char librepass[36]`). Native copies straight into them without a bounds check, so
+         * anything longer has to be refused before it gets there.
+         */
+        const val LIBRE_EMAIL_MIN_LENGTH = 3
+        const val LIBRE_EMAIL_MAX_LENGTH = 255
+        const val LIBRE_PASSWORD_MIN_LENGTH = 3
+        const val LIBRE_PASSWORD_MAX_LENGTH = 36
+
+        /**
+         * Connection codes are a phone feature: the native side does not export
+         * them on Wear OS, so the editor hides everything that needs one.
+         */
+        val mirrorCodesAvailable: Boolean = try {
+            Natives.getbackJson(0)
+            true
+        } catch (_: Throwable) {
+            false
+        }
         const val CALIBRATION_PREFS = "calibration_prefs"
         const val KEY_CALIBRATION_PROMPT_SHOWN = "calibration_prompt_shown"
         const val UI_PREFS = "ui_prefs"
