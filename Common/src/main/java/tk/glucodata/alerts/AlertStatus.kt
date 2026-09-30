@@ -24,7 +24,8 @@ enum class AlertStatus {
 data class AlertIndicatorState(
     val status: AlertStatus,
     val snoozedUntil: Long,
-    val ringingName: String?
+    val ringingName: String?,
+    val snoozeOptions: List<Int>
 )
 
 /** Current indicator state, re-evaluated when a snooze runs out. */
@@ -49,5 +50,5 @@ fun rememberAlertIndicatorState(): AlertIndicatorState {
         settings.snoozeAllUntil > now -> AlertStatus.SNOOZED
         else -> AlertStatus.ACTIVE
     }
-    return AlertIndicatorState(status, settings.snoozeAllUntil, ringing?.rule?.name)
+    return AlertIndicatorState(status, settings.snoozeAllUntil, ringing?.rule?.name, settings.snoozeOptions)
 }

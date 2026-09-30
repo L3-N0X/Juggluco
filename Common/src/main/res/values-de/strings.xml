@@ -1153,7 +1153,6 @@
     <string name="alerts_on">Alarme aktiv</string>
     <string name="alerts_snoozed">Alarme schlummern</string>
     <string name="alerts_off">Alarme aus</string>
-    <string name="snooze_minutes_short">Schlummern %1$d Min.</string>
     <string name="alerts_turn_off">Alarme ausschalten</string>
     <string name="alerts_snoozed_until">Schlummern bis %1$s</string>
     <string name="alerts_resume">Alarme fortsetzen</string>
