@@ -1423,6 +1423,28 @@ int patchhost(int index,JNIEnv *env,jobjectArray jnames,int nr,int mask,string_v
             }
         return index;
         }
+    // A rename or a credential change carries no address, port, role, sync or
+    // mode information. Apply just those two so the live socket, the send
+    // thread, the restore marker and the deactivation state are all left
+    // running untouched.
+    if(!(mask&~(mirrorfield_label|mirrorfield_password))) {
+        auto &onlymeta=getupdatedata()->allhosts[index];
+        if(mask&mirrorfield_password) {
+            setpass(onlymeta.pass,mergedpass);
+            LOGGER("patchhost: password %s for %s(%d)\n",mergedpass.empty()?"cleared":"set",onlymeta.getnameif(),index);
+            }
+        if(mask&mirrorfield_label) {
+            LOGGER("patchhost: rename %s(%d) to %s\n",state.label.c_str(),index,newlabel?newlabel:"");
+            if(newlabel)
+                onlymeta.setname(newlabel);
+            else {
+                memset(const_cast<char *>(onlymeta.getname()),0,passhost_t::maxnamelen);
+                onlymeta.hasname=false;
+                }
+            }
+        deupdated();
+        return index;
+        }
     if((mask&mirrorfield_ips)&&(!jnames||nr<1)) {
         LOGAR("patchhost: address change without addresses");
         return changehost_invalidaddress;
@@ -1445,10 +1467,20 @@ int patchhost(int index,JNIEnv *env,jobjectArray jnames,int nr,int mask,string_v
         getport(index,portbuf);
     const int mergedreceivefrom=(mask&mirrorfield_receivefrom)?receivefrom:state.receivefrom;
     const bool mergedreceive=(mergedreceivefrom&2)!=0;
-    const bool mergedactiveonly=(mask&mirrorfield_receivefrom)?mergedreceive:state.activereceive>0;
-    const bool mergedpassiveonly=(mask&mirrorfield_receivefrom)?false:
-        (mergedreceive?state.receivefrom==2:state.sendpassive);
-    const bool mergedsendto=sendnums||sendstream||sendscans;
+    // The send flags are a merged record as well: a field the caller did not
+    // touch keeps whatever the host already had, so a partial save can never
+    // silently drop a stream/scan/amount sync.
+    const bool mergedsendnums=(mask&mirrorfield_sendnums)?sendnums:state.sendnums;
+    const bool mergedsendstream=(mask&mirrorfield_sendstream)?sendstream:state.sendstream;
+    const bool mergedsendscans=(mask&mirrorfield_sendscans)?sendscans:state.sendscans;
+    // Active/passive is a host property the editor cannot express, so it is
+    // always carried over. Toggling only the receive/send role must not move a
+    // passive peer to active, nor an active peer to passive. For a receiver the
+    // mode lives in receivefrom==2 (receive without reconnect), for a sender in
+    // sendpassive.
+    const bool mergedactiveonly=state.activereceive>0;
+    const bool mergedpassiveonly=mergedreceive?state.receivefrom==2:state.sendpassive;
+    const bool mergedsendto=mergedsendnums||mergedsendstream||mergedsendscans;
     const bool mergedreconnect=(mergedreceive&&!mergedpassiveonly)||(mergedsendto&&!mergedactiveonly);
     const int wantreceivefrom=mergedreceive?(mergedreconnect?3:2):((mergedsendto&&mergedreconnect)?1:0);
     const bool mergedsendpassive=mergedsendto&&mergedpassiveonly;
@@ -1470,8 +1502,8 @@ int patchhost(int index,JNIEnv *env,jobjectArray jnames,int nr,int mask,string_v
         updateone *savedsender=savedindex>=0&&savedindex<getupdatedata()->sendnr?
             getupdatedata()->tosend+savedindex:nullptr;
         const bool savedrestore=savedsender&&savedsender->restore;
-        const int iceret=changeICEhost(state.icelabel.c_str(),index,sendnums,sendstream,sendscans,mergedreceive,
-                mergedpass,mergedstarttime,newlabel,state.side,true,state.transport,state.bleclient);
+        const int iceret=changeICEhost(state.icelabel.c_str(),index,mergedsendnums,mergedsendstream,mergedsendscans,
+                mergedreceive,mergedpass,mergedstarttime,newlabel,state.side,true,state.transport,state.bleclient);
         if(iceret<0) {
             LOGGER("patchhost: changeICEhost=%d\n",iceret);
             return iceret;
@@ -1497,7 +1529,7 @@ int patchhost(int index,JNIEnv *env,jobjectArray jnames,int nr,int mask,string_v
         return index;
         }
     const int ret=changehost(index,env,jnames,nr,state.detect,string_view(portbuf,strlen(portbuf)),
-            sendnums,sendstream,sendscans,mergedrestore,mergedreceive,mergedactiveonly,mergedpass,
+            mergedsendnums,mergedsendstream,mergedsendscans,mergedrestore,mergedreceive,mergedactiveonly,mergedpass,
             mergedstarttime,mergedpassiveonly,newlabel,state.testip,true,state.hashostname,
             state.transport,state.bleclient,keepaddresses);
     if(ret<0) {

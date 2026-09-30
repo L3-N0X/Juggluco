@@ -191,4 +191,21 @@ data class MirrorHostEditState(
 ) {
     val isReceiver: Boolean get() = (receiveFrom and 2) != 0
     val isIce: Boolean get() = iceLabel.isNotEmpty()
+    /** True when the connection reaches the network, so its port has to be a real port. */
+    val usesNetworkPort: Boolean
+        get() = !isIce && (transport == tk.glucodata.BleMirror.TRANSPORT_AUTOMATIC ||
+                transport == tk.glucodata.BleMirror.TRANSPORT_TCP)
+}
+
+/** Outcome of a mirror connection save, so the screen can say what actually went wrong. */
+enum class MirrorSaveResult {
+    Saved,
+    Unchanged,
+    InvalidPort,
+    InvalidAddress,
+    LabelTooLong,
+    PasswordTooLong,
+    NoRoleOrData,
+    NotFound,
+    Failed
 }

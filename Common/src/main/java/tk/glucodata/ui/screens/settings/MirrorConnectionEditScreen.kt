@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Sync
@@ -48,14 +49,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import tk.glucodata.BleMirror
 import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.MirrorHostEditState
+import tk.glucodata.ui.model.MirrorSaveResult
 import tk.glucodata.ui.screens.ScreenLayout
 
 private data class MirrorConnectionEditor(
@@ -73,27 +75,46 @@ private data class MirrorConnectionEditor(
     val isReceiver: Boolean = initialIsReceiver,
     val sendStream: Boolean = initialSendStream,
     val sendScans: Boolean = initialSendScans,
-    val sendAmounts: Boolean = initialSendAmounts
+    val sendAmounts: Boolean = initialSendAmounts,
+    val password: String = "",
+    val clearPassword: Boolean = false
 ) {
     val hasSnapshot: Boolean get() = snapshot != null
+    val storesPassword: Boolean get() = snapshot?.hasPassword == true
+
+    /**
+     * An ICE peer has no address and a nearby Bluetooth or messages peer reaches its partner
+     * by label, so those fields are shown for information only and are never part of a save.
+     */
     val addressEditable: Boolean
         get() {
             val state = snapshot ?: return true
-            if (state.isIce) return false
-            return state.transport == BleMirror.TRANSPORT_AUTOMATIC ||
-                    state.transport == BleMirror.TRANSPORT_TCP
+            return state.usesNetworkPort
         }
 
+    val passwordAction: Int
+        get() = when {
+            clearPassword -> Natives.MIRRORPASS_CLEAR
+            password.isNotEmpty() -> Natives.MIRRORPASS_SET
+            else -> Natives.MIRRORPASS_PRESERVE
+        }
+
+    /**
+     * Only the fields the user actually touched are handed to the native layer. Everything
+     * else - password, transport, ICE peer, side, active/passive, restore and the
+     * deactivation state - is read from the native connection and written back untouched.
+     */
     val changedFields: Int
         get() {
             var mask = 0
             if (label.trim() != initialLabel) mask = mask or Natives.MIRRORFIELD_LABEL
-            if (hostIp.trim() != initialHost) mask = mask or Natives.MIRRORFIELD_IPS
-            if (port.trim() != initialPort) mask = mask or Natives.MIRRORFIELD_PORT
+            if (addressEditable && hostIp.trim() != initialHost) mask = mask or Natives.MIRRORFIELD_IPS
+            if (addressEditable && port.trim() != initialPort) mask = mask or Natives.MIRRORFIELD_PORT
             if (isReceiver != initialIsReceiver) mask = mask or Natives.MIRRORFIELD_RECEIVEFROM
             if (sendStream != initialSendStream) mask = mask or Natives.MIRRORFIELD_SENDSTREAM
             if (sendScans != initialSendScans) mask = mask or Natives.MIRRORFIELD_SENDSCANS
             if (sendAmounts != initialSendAmounts) mask = mask or Natives.MIRRORFIELD_SENDNUMS
+            if (passwordAction != Natives.MIRRORPASS_PRESERVE) mask = mask or Natives.MIRRORFIELD_PASSWORD
             return mask
         }
 }
@@ -126,8 +147,19 @@ fun MirrorConnectionEditScreen(
             return@LaunchedEffect
         }
         val storedLabel = snapshot?.label?.trim() ?: ""
-        val storedHost = snapshot?.ips?.firstOrNull { it.isNotBlank() } ?: "127.0.0.1"
-        val storedPort = snapshot?.port?.takeIf { it.isNotBlank() } ?: "17580"
+        // Show what is really stored. An ICE peer is identified by its own label and has no
+        // address, so a made up 127.0.0.1 would otherwise be compared against, and written
+        // back as if it were, the connection's address.
+        val storedHost = when {
+            snapshot == null -> "127.0.0.1"
+            snapshot.isIce -> snapshot.iceLabel
+            else -> snapshot.ips.firstOrNull { it.isNotBlank() } ?: ""
+        }
+        val storedPort = when {
+            snapshot == null -> "17580"
+            snapshot.isIce -> ""
+            else -> snapshot.port.ifBlank { "17580" }
+        }
         editor = MirrorConnectionEditor(
             snapshot = snapshot,
             initialLabel = storedLabel.ifEmpty {
@@ -225,6 +257,14 @@ fun MirrorConnectionEditScreen(
                             )
                         }
                     }
+                } else {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = stringResource(R.string.loc_mirror_address_preserved),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -287,6 +327,41 @@ fun MirrorConnectionEditScreen(
                 checked = state.sendAmounts,
                 onCheckedChange = { editor = state.copy(sendAmounts = it) }
             )
+        }
+
+        SettingsSection(title = stringResource(R.string.loc_connection_security)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = ScreenLayout.CardPadding, vertical = 14.dp)
+            ) {
+                OutlinedTextField(
+                    value = state.password,
+                    onValueChange = { editor = state.copy(password = it, clearPassword = false) },
+                    label = { Text(stringResource(R.string.loc_connection_password)) },
+                    singleLine = true,
+                    enabled = !state.clearPassword,
+                    visualTransformation = PasswordVisualTransformation(),
+                    supportingText = {
+                        Text(
+                            text = stringResource(
+                                when {
+                                    state.clearPassword -> R.string.loc_connection_password_will_remove
+                                    state.storesPassword -> R.string.loc_connection_password_kept
+                                    else -> R.string.loc_connection_password_none
+                                }
+                            )
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (state.storesPassword && !state.clearPassword) {
+                    TextButton(onClick = { editor = state.copy(password = "", clearPassword = true) }) {
+                        Text(stringResource(R.string.loc_connection_password_remove))
+                    }
+                }
+            }
         }
 
         if (existingConn != null && existingConn.status.isNotBlank()) {
@@ -391,7 +466,7 @@ fun MirrorConnectionEditScreen(
                                 }
                                 saving = true
                                 scope.launch {
-                                    val ok = repository.saveMirrorConnection(
+                                    val result = repository.saveMirrorConnection(
                                         index = if (isEditing) connectionIndex else -1,
                                         ips = listOf(state.hostIp.trim()),
                                         port = cleanPort,
@@ -400,14 +475,25 @@ fun MirrorConnectionEditScreen(
                                         sendStream = state.sendStream,
                                         sendScans = state.sendScans,
                                         sendAmounts = state.sendAmounts,
-                                        changedFields = if (isEditing) state.changedFields else 0
+                                        changedFields = if (isEditing) state.changedFields else 0,
+                                        password = state.password,
+                                        passwordAction = state.passwordAction
                                     )
                                     saving = false
-                                    if (ok) {
-                                        Toast.makeText(context, context.getString(R.string.loc_connection_saved), Toast.LENGTH_SHORT).show()
+                                    val message = when (result) {
+                                        MirrorSaveResult.Saved -> R.string.loc_connection_saved
+                                        MirrorSaveResult.Unchanged -> R.string.loc_connection_unchanged
+                                        MirrorSaveResult.InvalidPort -> R.string.loc_invalid_mirror_port
+                                        MirrorSaveResult.InvalidAddress -> R.string.loc_invalid_mirror_address
+                                        MirrorSaveResult.LabelTooLong -> R.string.loc_mirror_label_too_long
+                                        MirrorSaveResult.PasswordTooLong -> R.string.loc_mirror_password_too_long
+                                        MirrorSaveResult.NoRoleOrData -> R.string.specifyreceiveordata
+                                        MirrorSaveResult.NotFound -> R.string.loc_failed_load_connection
+                                        MirrorSaveResult.Failed -> R.string.loc_failed_save_connection
+                                    }
+                                    Toast.makeText(context, context.getString(message), Toast.LENGTH_SHORT).show()
+                                    if (result == MirrorSaveResult.Saved || result == MirrorSaveResult.Unchanged) {
                                         onNavigateBack()
-                                    } else {
-                                        Toast.makeText(context, context.getString(R.string.loc_failed_save_connection), Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
@@ -422,6 +508,13 @@ fun MirrorConnectionEditScreen(
                     }
                 }
             }
+        }
+
+        if (isEditing) {
+            SettingsInfoCard(
+                text = stringResource(R.string.loc_mirror_preserved_fields),
+                icon = Icons.Default.Lock
+            )
         }
 
         SettingsInfoCard(

@@ -52,6 +52,7 @@ import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.model.MirrorConnection
 import tk.glucodata.ui.model.MirrorHostEditState
+import tk.glucodata.ui.model.MirrorSaveResult
 import tk.glucodata.ui.model.NumberStore
 import tk.glucodata.ui.model.NumberStoreSource
 import tk.glucodata.ui.model.RangeLevel
@@ -2118,6 +2119,96 @@ class GlucoseRepository(
         }
     }
 
+    /**
+     * The complete connection as it will be stored after a save. Every value is already
+     * merged, so the caller never has to repeat a field it does not own and a save can
+     * only ever replace what the user actually edited.
+     */
+    private data class MirrorHostRecord(
+        val label: String,
+        val ips: List<String>,
+        val port: String,
+        val isReceiver: Boolean,
+        val sendStream: Boolean,
+        val sendScans: Boolean,
+        val sendAmounts: Boolean,
+        val password: String?,
+        val passwordAction: Int,
+        val usesNetworkPort: Boolean,
+        val addressEdited: Boolean,
+        val isIce: Boolean
+    ) {
+        val sendsAnything: Boolean get() = sendStream || sendScans || sendAmounts
+    }
+
+    /**
+     * Checks the merged record before it is handed to the native layer, so a rejected
+     * edit leaves the stored connection exactly as it was.
+     */
+    private fun validateMirrorRecord(record: MirrorHostRecord): MirrorSaveResult? = when {
+        record.label.length > Natives.MAXMIRRORLABELLENGTH -> MirrorSaveResult.LabelTooLong
+        record.password != null && record.password.length > Natives.MAXMIRRORPASSLENGTH ->
+            MirrorSaveResult.PasswordTooLong
+        record.addressEdited && record.isIce -> MirrorSaveResult.InvalidAddress
+        record.addressEdited && (record.ips.isEmpty() ||
+                record.ips.size > Natives.MAXMIRRORADDRESSES ||
+                record.ips.any { it.isBlank() }) -> MirrorSaveResult.InvalidAddress
+        record.usesNetworkPort -> {
+            val port = record.port.toIntOrNull()
+            if (port == null || port !in 1024..65535) MirrorSaveResult.InvalidPort else null
+        }
+        !record.isReceiver && !record.sendsAnything -> MirrorSaveResult.NoRoleOrData
+        else -> null
+    }
+
+    /**
+     * Reads the stored connection and folds the user's explicit changes into it. Anything
+     * left out of [changedFields] keeps its stored value, including the fields the editor
+     * has no control over (transport, ICE peer, side, active/passive, restore, deactivation).
+     */
+    private fun mergeMirrorRecord(
+        stored: MirrorHostEditState,
+        changedFields: Int,
+        ips: List<String>,
+        port: String,
+        isReceiver: Boolean,
+        label: String,
+        sendStream: Boolean,
+        sendScans: Boolean,
+        sendAmounts: Boolean,
+        password: String?,
+        passwordAction: Int
+    ): MirrorHostRecord {
+        val cleanPassword = password?.takeIf { it.isNotEmpty() }
+        return MirrorHostRecord(
+            label = if (changedFields and Natives.MIRRORFIELD_LABEL != 0) label.trim()
+            else if (stored.hasLabel) stored.label else "",
+            ips = if (changedFields and Natives.MIRRORFIELD_IPS != 0) {
+                ips.map { it.trim() }.filter { it.isNotEmpty() }
+            } else {
+                stored.ips.map { it.trim() }.filter { it.isNotEmpty() }
+            },
+            port = if (changedFields and Natives.MIRRORFIELD_PORT != 0) port.trim() else stored.port,
+            isReceiver = if (changedFields and Natives.MIRRORFIELD_RECEIVEFROM != 0) isReceiver
+            else stored.isReceiver,
+            sendStream = if (changedFields and Natives.MIRRORFIELD_SENDSTREAM != 0) sendStream
+            else stored.sendStream,
+            sendScans = if (changedFields and Natives.MIRRORFIELD_SENDSCANS != 0) sendScans
+            else stored.sendScans,
+            sendAmounts = if (changedFields and Natives.MIRRORFIELD_SENDNUMS != 0) sendAmounts
+            else stored.sendAmounts,
+            password = cleanPassword,
+            passwordAction = when {
+                passwordAction == Natives.MIRRORPASS_CLEAR -> Natives.MIRRORPASS_CLEAR
+                cleanPassword != null -> Natives.MIRRORPASS_SET
+                else -> Natives.MIRRORPASS_PRESERVE
+            },
+            usesNetworkPort = stored.usesNetworkPort,
+            addressEdited = changedFields and Natives.MIRRORFIELD_IPS != 0,
+            isIce = stored.isIce
+        )
+    }
+
     suspend fun saveMirrorConnection(
         index: Int,
         ips: List<String>,
@@ -2127,34 +2218,44 @@ class GlucoseRepository(
         sendStream: Boolean = true,
         sendScans: Boolean = true,
         sendAmounts: Boolean = true,
-        isActiveOnly: Boolean = false,
-        isPassiveOnly: Boolean = false,
         changedFields: Int = 0,
         password: String? = null,
         passwordAction: Int = Natives.MIRRORPASS_PRESERVE
-    ): Boolean = withContext(Dispatchers.IO) {
+    ): MirrorSaveResult = withContext(Dispatchers.IO) {
+        if (!Applic.Nativesloaded) return@withContext MirrorSaveResult.Failed
         try {
-            if (!Applic.Nativesloaded) return@withContext false
-            val cleanIps = ips.map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { listOf("127.0.0.1") }
-            val cleanPort = port.trim().ifEmpty { "17580" }
-            val cleanLabel = label.trim()
             if (index < 0) {
+                val record = MirrorHostRecord(
+                    label = label.trim(),
+                    ips = ips.map { it.trim() }.filter { it.isNotEmpty() },
+                    port = port.trim(),
+                    isReceiver = isReceiver,
+                    sendStream = sendStream,
+                    sendScans = sendScans,
+                    sendAmounts = sendAmounts,
+                    password = password?.takeIf { it.isNotEmpty() },
+                    passwordAction = Natives.MIRRORPASS_PRESERVE,
+                    usesNetworkPort = true,
+                    addressEdited = true,
+                    isIce = false
+                )
+                validateMirrorRecord(record)?.let { return@withContext it }
                 val pos = Natives.changebackuphost(
                     -1,
-                    cleanIps.toTypedArray(),
-                    cleanIps.size,
+                    record.ips.toTypedArray(),
+                    record.ips.size,
                     false,
-                    cleanPort,
-                    if (isReceiver) false else sendAmounts,
-                    if (isReceiver) false else sendStream,
-                    if (isReceiver) false else sendScans,
+                    record.port,
+                    if (record.isReceiver) false else record.sendAmounts,
+                    if (record.isReceiver) false else record.sendStream,
+                    if (record.isReceiver) false else record.sendScans,
                     false,
-                    isReceiver,
-                    isActiveOnly || isReceiver,
-                    isPassiveOnly,
-                    null,
+                    record.isReceiver,
+                    record.isReceiver,
+                    false,
+                    record.password,
                     0L,
-                    cleanLabel.ifEmpty { if (isReceiver) "Receiver" else "Sender" },
+                    record.label.ifEmpty { if (record.isReceiver) "Receiver" else "Sender" },
                     false,
                     false,
                     null,
@@ -2162,52 +2263,52 @@ class GlucoseRepository(
                     BleMirror.TRANSPORT_TCP,
                     false
                 )
-                if (pos < 0) return@withContext false
+                if (pos < 0) return@withContext MirrorSaveResult.Failed
                 BleMirror.configurationChanged(pos, true)
                 MessageSender.reinit()
                 Applic.switchSync()
                 refreshMirrorConnections()
-                return@withContext true
+                return@withContext MirrorSaveResult.Saved
             }
+            val stored = mirrorHostEditState(index)
+                ?: return@withContext MirrorSaveResult.NotFound
             if (changedFields == 0) {
                 refreshMirrorConnections()
-                return@withContext true
+                return@withContext MirrorSaveResult.Unchanged
             }
-            if (mirrorHostEditState(index) == null) return@withContext false
-            val pass = password?.ifBlank { null }
-            val action = if (pass != null && passwordAction == Natives.MIRRORPASS_SET) {
-                Natives.MIRRORPASS_SET
-            } else if (passwordAction == Natives.MIRRORPASS_CLEAR) {
-                Natives.MIRRORPASS_CLEAR
-            } else {
-                Natives.MIRRORPASS_PRESERVE
-            }
+            val record = mergeMirrorRecord(
+                stored, changedFields, ips, port, isReceiver, label,
+                sendStream, sendScans, sendAmounts, password, passwordAction
+            )
+            validateMirrorRecord(record)?.let { return@withContext it }
             val pos = Natives.patchbackuphost(
                 index,
                 changedFields,
-                cleanIps.toTypedArray(),
-                cleanIps.size,
-                cleanPort,
-                if (isReceiver) 2 else 0,
-                sendAmounts,
-                sendStream,
-                sendScans,
-                cleanLabel.ifEmpty { null },
-                pass,
-                action
+                record.ips.toTypedArray(),
+                record.ips.size,
+                record.port,
+                if (record.isReceiver) 2 else 0,
+                record.sendAmounts,
+                record.sendStream,
+                record.sendScans,
+                record.label.ifEmpty { null },
+                record.password,
+                record.passwordAction
             )
-            if (pos < 0) return@withContext false
-            if (changedFields == Natives.MIRRORFIELD_LABEL) {
-                refreshMirrorConnections()
-                return@withContext true
+            if (pos < 0) return@withContext MirrorSaveResult.Failed
+            // A rename or a password change never touched the socket, the send thread or
+            // the receiver, so the connection only has to be re-announced in the list.
+            val needsReconnect = changedFields and
+                    (Natives.MIRRORFIELD_LABEL or Natives.MIRRORFIELD_PASSWORD) != changedFields
+            if (needsReconnect) {
+                BleMirror.configurationChanged(pos, true)
+                MessageSender.reinit()
+                Applic.switchSync()
             }
-            BleMirror.configurationChanged(pos, true)
-            MessageSender.reinit()
-            Applic.switchSync()
             refreshMirrorConnections()
-            true
+            MirrorSaveResult.Saved
         } catch (_: Throwable) {
-            false
+            MirrorSaveResult.Failed
         }
     }
 
