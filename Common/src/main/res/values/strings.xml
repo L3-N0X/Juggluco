@@ -1983,6 +1983,7 @@
     <string name="loc_mirror_label_too_long">Label too long, at most 15 characters</string>
     <string name="loc_mirror_password_too_long">Password too long, at most 16 characters</string>
     <string name="loc_mirror_data_start_from">From %1$s</string>
+    <string name="loc_mirror_bluetooth_status">Bluetooth mirror: %1$s</string>
 
     <string name="loc_graph_today">Today</string>
     <string name="loc_graph_yesterday">Yesterday</string>

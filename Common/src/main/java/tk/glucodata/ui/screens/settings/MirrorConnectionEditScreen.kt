@@ -135,6 +135,7 @@ fun MirrorConnectionEditScreen(
     var showResendConfirm by remember(connectionIndex) { mutableStateOf(false) }
     var passwordVisible by remember(connectionIndex) { mutableStateOf(false) }
     var shownCode by remember(connectionIndex) { mutableStateOf<String?>(null) }
+    var bluetoothStatus by remember(connectionIndex) { mutableStateOf<String?>(null) }
 
     val screenTitle = stringResource(
         if (isEditing) R.string.loc_mirror_edit_title else R.string.loc_mirror_edit_add
@@ -158,6 +159,7 @@ fun MirrorConnectionEditScreen(
             return@LaunchedEffect
         }
         editor = MirrorEditorState(draft, stored.wearOs)
+        bluetoothStatus = repository.mirrorBluetoothStatus(connectionIndex)
     }
 
     val state = editor
@@ -192,20 +194,26 @@ fun MirrorConnectionEditScreen(
         }
 
         // --- Connection method, the choice every other option depends on ---
-        SettingsSection(title = stringResource(R.string.loc_mirror_method)) {
-            val methods = mirrorTransportOptions(state)
-            methods.forEach { option ->
-                MirrorChoiceRow(
-                    title = stringResource(option.titleRes),
-                    subtitle = stringResource(option.subtitleRes),
-                    icon = option.icon,
-                    selected = draft.transport == option.transport,
-                    onClick = {
-                        editor = state.copy(
-                            draft = draft.applyTransport(option.transport)
-                        )
-                    }
-                )
+        // A relay is always a network connection, so there is no method to choose
+        // while it is on: Automatic and TCP both go through the relay, and the
+        // nearby methods cannot be used at all. A relay on a nearby method is
+        // impossible to save, so the methods stay visible to get out of it.
+        if (!draft.ice || !draft.isNetworkTransport) {
+            SettingsSection(title = stringResource(R.string.loc_mirror_method)) {
+                val methods = mirrorTransportOptions(state)
+                methods.forEach { option ->
+                    MirrorChoiceRow(
+                        title = stringResource(option.titleRes),
+                        subtitle = stringResource(option.subtitleRes),
+                        icon = option.icon,
+                        selected = draft.transport == option.transport,
+                        onClick = {
+                            editor = state.copy(
+                                draft = draft.applyTransport(option.transport)
+                            )
+                        }
+                    )
+                }
             }
         }
 
@@ -609,19 +617,32 @@ fun MirrorConnectionEditScreen(
             }
         }
 
-        if (snapshotStatus.isNotBlank()) {
+        if (snapshotStatus.isNotBlank() || bluetoothStatus != null) {
             SettingsSection(title = stringResource(R.string.loc_connection_diagnostics)) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = ScreenLayout.CardPadding, vertical = 14.dp)
+                        .padding(horizontal = ScreenLayout.CardPadding, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = remember(snapshotStatus) { htmlToAnnotatedString(snapshotStatus) },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 18.sp
-                    )
+                    if (snapshotStatus.isNotBlank()) {
+                        Text(
+                            text = remember(snapshotStatus) { htmlToAnnotatedString(snapshotStatus) },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                    // A nearby link says nothing in the native status, so without
+                    // this a Bluetooth connection looks silent even while it works.
+                    bluetoothStatus?.let { status ->
+                        Text(
+                            text = stringResource(R.string.loc_mirror_bluetooth_status, status),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
                 }
             }
         }
@@ -704,6 +725,15 @@ fun MirrorConnectionEditScreen(
                             onClick = {
                                 if (saving) return@Button
                                 saving = true
+                                // The native side refreshes the nearby permission
+                                // state before the save starts a link: a connection
+                                // that was just turned on must not be judged on a
+                                // stale answer to "may I scan?".
+                                if (draft.usesNearbyBluetooth(state.peerIsWearOs)) {
+                                    (context as? Activity)?.let { activity ->
+                                        Applic.requestBluetoothPermissions(activity)
+                                    }
+                                }
                                 scope.launch {
                                     val result = repository.saveMirrorConnectionDraft(
                                         index = if (isEditing) connectionIndex else -1,
@@ -865,6 +895,8 @@ private fun MirrorConnectionDraft.applyTransport(transport: Int): MirrorConnecti
         // The label travels over Bluetooth and Messages, so a peer that was named
         // for the network keeps its name and stays recognisable.
         label = label,
+        // A relay is a network connection, so a nearby method leaves it behind.
+        ice = if (isNetworkTransportFor(transport)) ice else false,
         usePassword = if (needsPassword) true else usePassword,
         addresses = addresses,
         detectIp = if (needsPassword || transport == BleMirror.TRANSPORT_MESSAGES) {
@@ -874,6 +906,20 @@ private fun MirrorConnectionDraft.applyTransport(transport: Int): MirrorConnecti
         }
     )
 }
+
+/** Whether a connection method talks to the other device over the network. */
+private fun isNetworkTransportFor(transport: Int): Boolean =
+    transport == BleMirror.TRANSPORT_AUTOMATIC || transport == BleMirror.TRANSPORT_TCP
+
+/**
+ * Whether saving this connection can start nearby Bluetooth work, which needs the
+ * Nearby Devices permissions on a phone. A Wear OS peer is reached over Messages,
+ * so it never asks.
+ */
+private fun MirrorConnectionDraft.usesNearbyBluetooth(peerIsWearOs: Boolean): Boolean =
+    transport == BleMirror.TRANSPORT_BLUETOOTH ||
+            (transport == BleMirror.TRANSPORT_AUTOMATIC &&
+                    !Applic.isWearable && !peerIsWearOs)
 
 /** After a successful save: ask for Bluetooth and say the one thing worth knowing. */
 private fun onMirrorSaved(context: Context, result: MirrorSaveResult) {
