@@ -325,6 +325,10 @@ public static final int MIRRORSTATE_HASPASS=23;
 public static final int MIRRORSTATE_SIZE=24;
 
 public static final int MAXMIRRORADDRESSES=4;
+/** passhost_t::maxnamelen, a stored label has to stay strictly below it. */
+public static final int MAXMIRRORLABELLENGTH=15;
+/** passhost_t::maxpasslen, a stored password may reach it exactly. */
+public static final int MAXMIRRORPASSLENGTH=16;
 public static native Object[] getMirrorHostEditState(int pos);
 public static native int patchbackuphost(int pos,int mask,String[] names,int nr,String port,int receivefrom,boolean nums,boolean stream,boolean scans,String label,String pass,int passaction);
 /**

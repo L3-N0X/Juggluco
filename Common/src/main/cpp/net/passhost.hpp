@@ -184,8 +184,16 @@ const char *getnameif() const {
 	return hasname?getname():"%NONAME%";
 	}
 void setnameGen(const char *label,const void *padding)  {
-	hasname=true;
 	char *name=reinterpret_cast<char *>(ips+maxip-1);
+	if(!label) {
+		// A nameless host has no label to write. Callers that patch an existing
+		// connection pass a null label to mean "leave the name alone", so this
+		// must never dereference it.
+		hasname=false;
+		memset(name,0,maxnamelen);
+		return;
+		}
+	hasname=true;
 	for(int i=0;i<maxnamelen;i++) {
 		if(!label[i]) {
             memcpy(name+i,padding,maxnamelen-i);

@@ -3600,8 +3600,10 @@ class GlucoseRepository(
     private companion object {
         const val NFC_LAUNCH_COMPONENT = "tk.glucodata.glucodata"
         const val MIRROR_MAX_ADDRESSES = 4
-        const val MIRROR_LABEL_MAX_LENGTH = 15
-        const val MIRROR_PASSWORD_MAX_LENGTH = 16
+        // Taken from the native storage sizes, so a draft can never be built that the
+        // native side would reject after the editor already accepted it.
+        const val MIRROR_LABEL_MAX_LENGTH = Natives.MAXMIRRORLABELLENGTH
+        const val MIRROR_PASSWORD_MAX_LENGTH = Natives.MAXMIRRORPASSLENGTH
         const val MIRROR_ICE_LABEL_MIN_LENGTH = 16
         const val MIRROR_ICE_LABEL_MAX_LENGTH = 32
         const val MIRROR_HOSTNAME_MAX_LENGTH = 81

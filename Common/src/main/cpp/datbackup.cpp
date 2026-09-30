@@ -969,8 +969,13 @@ int Backup::changeICEhost(const char *ICElabel,int index,const bool sendnums,con
     thehost.setICEname(ICElabel);
     thehost.noip=true;
     thehost.receivefrom=receive?3:1;
-    thehost.deactivated=false;
-    thehost.wearos=false;
+    if(newhost) {
+        // Deactivation and the Wear OS marker belong to the stored connection, not to the
+        // editor that rewrites it: saving an existing relay must not silently reactivate a
+        // connection the user disabled, nor forget that its peer runs on a watch.
+        thehost.deactivated=false;
+        thehost.wearos=false;
+        }
     const int selectedtransport=transport==passhost_t::transport_tcp?
             passhost_t::transport_tcp:passhost_t::transport_automatic;
     thehost.settransport(selectedtransport);
