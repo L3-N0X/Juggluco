@@ -1580,6 +1580,30 @@ public static final int CHAIN_REQUEST=0x81;
 private static  final int REQUEST_NOTIFICATION=0x50;
 static  final int REQUEST_BARCODE=0x10;
 static  final int REQUEST_BARCODE_SIB2=0x11;
+
+/** Extra the barcode scanner puts the scanned text in. */
+private static final String SCAN_RESULT_EXTRA="SCAN_RESULT";
+
+/**
+ * Set while a screen wants to read a scanned code itself, for instance the mirror
+ * editor importing a connection code. Without a listener the scan keeps its classic
+ * meaning and pairs a sensor.
+ */
+public interface QrCodeListener {
+    void onQrCode(String code);
+    }
+private static QrCodeListener qrCodeListener=null;
+
+public static void setQrCodeListener(QrCodeListener listener) {
+    qrCodeListener=listener;
+    }
+
+/** Opens the camera scanner; the result goes to the registered listener when there is one. */
+public static void scanQrCode(MainActivity act) {
+    if(act!=null)
+        PhotoScan.scan(act,REQUEST_BARCODE);
+    }
+
 public static final int REQUEST_EXPORT=0x70;
 //public static final int REQUEST_EXPORT=0x54e806d0;
 public static final int REQUEST_RINGTONE=0x60;
@@ -1688,11 +1712,24 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
             }
          return;
       case REQUEST_BARCODE_SIB2: 
-      case REQUEST_BARCODE: 
+      case REQUEST_BARCODE: {
+         final QrCodeListener listener=qrCodeListener;
+         if(listener!=null) {
+            qrCodeListener=null;
+            if(resultCode==Activity.RESULT_OK&&data!=null) {
+               final String scanned=data.getStringExtra(SCAN_RESULT_EXTRA);
+               if(scanned!=null) {
+                  RunOnUiThread(()-> listener.onQrCode(scanned));
+                  return;
+                  }
+               }
+            return;
+            }
          if(SiBionics==1 &&!isWearable&&useZXing) {
            ZXing.zXingResult(resultCode, data,this,requestCode);
            return;
            };break;
+     }
     case REQUEST_WEBPAGES:
     case REQUEST_WEBTREE: {
             WebPageUpload.onActivityResult(this,requestCode,resultCode,data);
