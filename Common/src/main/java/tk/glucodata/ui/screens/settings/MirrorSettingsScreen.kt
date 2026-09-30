@@ -1,5 +1,8 @@
 package tk.glucodata.ui.screens.settings
 
+import android.app.Activity
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -16,17 +19,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lan
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -40,28 +49,36 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import tk.glucodata.Applic
+import tk.glucodata.BleMirror
+import tk.glucodata.MainActivity
 import tk.glucodata.MessageSender
 import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.SensorBridge
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.MirrorConnection
+import tk.glucodata.ui.model.MirrorImportPreview
+import tk.glucodata.ui.model.MirrorQuickCode
+import tk.glucodata.ui.screens.ScreenLayout
 
 fun getMirrorConnectionStatusSummary(conn: MirrorConnection): String {
     val context = Applic.getContext()
@@ -133,8 +150,55 @@ fun MirrorSettingsScreen(
     // Listen Port state
     var editListenPort by remember { mutableStateOf(currentListenPort) }
 
-    // Inline deletion confirmation state
-    var pendingDeleteIndex by remember { mutableIntStateOf(-1) }
+    // Connection code import and quick code creation
+    val codesSupported = repository.mirrorCodesSupported()
+    var showImportDialog by remember { mutableStateOf(false) }
+    var showQuickCodeDialog by remember { mutableStateOf(false) }
+    var importText by remember { mutableStateOf("") }
+    var importWorking by remember { mutableStateOf(false) }
+    var pendingOverwrite by remember { mutableStateOf<MirrorImportPreview?>(null) }
+    var shownCode by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // A scan started from this screen comes back here instead of pairing a sensor.
+    DisposableEffect(showImportDialog) {
+        if (showImportDialog) {
+            MainActivity.setQrCodeListener { code -> importText = code }
+        }
+        onDispose { MainActivity.setQrCodeListener(null) }
+    }
+
+    fun importCode(preview: MirrorImportPreview) {
+        importWorking = true
+        scope.launch {
+            val result = repository.importMirrorCode(preview)
+            importWorking = false
+            showImportDialog = false
+            pendingOverwrite = null
+            if (result.ok) {
+                if (result.needsBluetoothPermission) {
+                    (context as? Activity)?.let { Applic.requestBluetoothPermissions(it) }
+                }
+                val warning = result.blocker?.takeIf { it.isNotBlank() }
+                    ?: context.getString(R.string.loc_mirror_data_not_all)
+                        .takeIf { result.partialData }
+                warning?.let {
+                    Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                }
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.loc_connection_saved),
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                Toast.makeText(
+                    context,
+                    context.getString(result.error.messageRes),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
 
     // Dev guide expanded state
     var showGuideExpanded by remember { mutableStateOf(false) }
@@ -254,25 +318,64 @@ fun MirrorSettingsScreen(
                 onClick = { onOpenConnectionEdit(-1) }
             )
 
+            if (codesSupported) {
+                SettingsActionRow(
+                    title = stringResource(R.string.loc_mirror_import),
+                    subtitle = stringResource(R.string.loc_mirror_import_desc),
+                    icon = Icons.Default.QrCodeScanner,
+                    onClick = {
+                        importText = ""
+                        showImportDialog = true
+                    }
+                )
+                SettingsActionRow(
+                    title = stringResource(R.string.loc_mirror_code_title),
+                    subtitle = stringResource(R.string.loc_mirror_code_desc),
+                    icon = Icons.Default.QrCode2,
+                    onClick = { showQuickCodeDialog = true }
+                )
+            }
+
             if (connections.isEmpty()) {
                 Text(
                     text = stringResource(R.string.dialog_mirror_no_conns),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                    modifier = Modifier.padding(horizontal = ScreenLayout.CardPadding, vertical = 14.dp)
                 )
             } else {
                 connections.forEach { conn ->
-                    val ipText = if (conn.ips.isNotEmpty()) conn.ips.joinToString(", ") else "127.0.0.1"
-                    val roleLabel = stringResource(if (conn.isReceiver) R.string.settings_role_receiver else R.string.settings_role_sender)
+                    val transportText = mirrorTransportName(conn)
+                    val addressText = if (conn.isIce) {
+                        context.getString(R.string.loc_mirror_ice)
+                    } else if (conn.ips.isNotEmpty()) {
+                        conn.ips.joinToString(", ")
+                    } else {
+                        context.getString(R.string.detect)
+                    }
+                    val roleLabel = stringResource(
+                        if (conn.isReceiver) R.string.loc_mirror_receive_from else R.string.loc_mirror_send_data
+                    )
                     val statusSummary = getMirrorConnectionStatusSummary(conn)
                     val statusSuffix = if (statusSummary.isNotBlank()) " • $statusSummary" else ""
 
                     SettingsNavRow(
-                        title = conn.label.ifBlank { stringResource(R.string.loc_connection_default_name, conn.index + 1) },
-                        subtitle = stringResource(R.string.loc_connection_list, ipText, conn.port, roleLabel, statusSuffix),
-                        icon = Icons.Default.Devices,
-                        onClick = { onOpenConnectionEdit(conn.index) }
+                        title = conn.label.ifBlank {
+                            stringResource(R.string.loc_connection_default_name, conn.index + 1)
+                        },
+                        subtitle = stringResource(
+                            R.string.loc_mirror_connection_summary,
+                            transportText,
+                            if (conn.isReceiver) addressText else "$addressText:${conn.port}",
+                            roleLabel,
+                            statusSuffix
+                        ),
+                        icon = mirrorTransportIcon(conn),
+                        onClick = { onOpenConnectionEdit(conn.index) },
+                        checked = !conn.isDeactivated,
+                        onCheckedChange = { enabled ->
+                            repository.setMirrorConnectionDeactivated(conn.index, !enabled)
+                        }
                     )
                 }
             }
@@ -466,4 +569,210 @@ fun MirrorSettingsScreen(
             }
         }
     }
+
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false },
+            title = { Text(stringResource(R.string.loc_mirror_import)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = stringResource(R.string.loc_mirror_import_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = importText,
+                        onValueChange = { importText = it },
+                        label = { Text(stringResource(R.string.loc_mirror_import)) },
+                        minLines = 3,
+                        maxLines = 6,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                importText = readClipboardText(context).orEmpty()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentPaste,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.loc_mirror_import_paste), fontSize = 12.sp)
+                        }
+                        OutlinedButton(
+                            onClick = { (context as? MainActivity)?.let { MainActivity.scanQrCode(it) } }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QrCodeScanner,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.loc_mirror_import_scan), fontSize = 12.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = importText.isNotBlank() && !importWorking,
+                    onClick = {
+                        val payload = importText
+                        importWorking = true
+                        scope.launch {
+                            val preview = repository.previewMirrorImport(payload)
+                            importWorking = false
+                            when {
+                                preview == null -> Toast.makeText(
+                                    context,
+                                    context.getString(R.string.loc_mirror_import_empty),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                // Only a receiving connection replaces the data the other
+                                // device already holds, so that is the only case to confirm.
+                                preview.overwritesData && preview.draft.receiveFrom ->
+                                    pendingOverwrite = preview
+                                else -> importCode(preview)
+                            }
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.loc_mirror_import_add))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    pendingOverwrite?.let { preview ->
+        AlertDialog(
+            onDismissRequest = { pendingOverwrite = null },
+            title = { Text(stringResource(R.string.overwrite)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(
+                            R.string.loc_mirror_import_overwrite,
+                            presentMirrorDataTypes(context, preview)
+                        ),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = stringResource(R.string.loc_mirror_import_overwrite_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = { importCode(preview) }) {
+                    Text(stringResource(R.string.overwrite))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingOverwrite = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showQuickCodeDialog) {
+        AlertDialog(
+            onDismissRequest = { showQuickCodeDialog = false },
+            title = { Text(stringResource(R.string.loc_mirror_code_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = stringResource(R.string.loc_mirror_code_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    MirrorQuickCode.entries.forEach { kind ->
+                        SettingsActionRow(
+                            title = stringResource(kind.titleRes),
+                            subtitle = stringResource(kind.subtitleRes),
+                            icon = Icons.Default.QrCode2,
+                            onClick = {
+                                showQuickCodeDialog = false
+                                scope.launch {
+                                    val result = repository.createMirrorQuickCode(kind)
+                                    val code = result.code
+                                    if (result.ok && !code.isNullOrBlank()) {
+                                        shownCode = code
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(
+                                                if (result.ok) R.string.loc_mirror_no_code
+                                                else R.string.loc_mirror_code_failed
+                                            ),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showQuickCodeDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    shownCode?.let { code ->
+        MirrorCodeDialog(code = code, onDismiss = { shownCode = null })
+    }
+}
+
+/** The connection method a stored connection uses, in the wording of the editor. */
+@Composable
+private fun mirrorTransportName(conn: MirrorConnection): String = when {
+    conn.isIce -> stringResource(R.string.loc_mirror_ice)
+    conn.transport == BleMirror.TRANSPORT_BLUETOOTH -> stringResource(R.string.transport_bluetooth)
+    conn.transport == BleMirror.TRANSPORT_MESSAGES -> stringResource(R.string.loc_transport_wear_os)
+    conn.transport == BleMirror.TRANSPORT_TCP -> stringResource(R.string.transport_tcp)
+    else -> stringResource(R.string.transport_automatic)
+}
+
+private fun mirrorTransportIcon(conn: MirrorConnection): ImageVector = when {
+    conn.isIce -> Icons.Default.Cloud
+    conn.transport == BleMirror.TRANSPORT_BLUETOOTH -> Icons.Default.Bluetooth
+    conn.transport == BleMirror.TRANSPORT_MESSAGES -> Icons.Default.Watch
+    conn.transport == BleMirror.TRANSPORT_TCP -> Icons.Default.Lan
+    else -> Icons.Default.Wifi
+}
+
+/** Names the data this device already holds that a received connection would replace. */
+private fun presentMirrorDataTypes(
+    context: Context,
+    preview: MirrorImportPreview
+): String {
+    val context = context
+    val types = buildList {
+        if (preview.presentAmounts) add(context.getString(R.string.amountsname))
+        if (preview.presentScans) add(context.getString(R.string.scansname))
+        if (preview.presentStream) add(context.getString(R.string.streamname))
+    }
+    return types.joinToString(", ")
+}
+
+private fun readClipboardText(context: Context): String? {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    val clip = clipboard?.primaryClip ?: return null
+    if (clip.itemCount == 0) return null
+    return clip.getItemAt(0).coerceToText(context)?.toString()
 }
