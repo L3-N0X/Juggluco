@@ -72,15 +72,18 @@ fun WebServerSettingsScreen(
             if (iv in 1..Natives.WEBSERVER_MAX_INTERVAL) iv.toString() else "60"
         } catch (_: Throwable) { "60" }
     }
-    val mirrorListenPort = remember {
-        try { Natives.getreceiveport()?.trim().orEmpty() } catch (_: Throwable) { "" }
-    }
+    //Read when saving, the mirror can connect and change its port while this screen is open.
+    fun mirrorListenPort(): Int =
+        try { Natives.getreceiveport()?.trim()?.toIntOrNull() ?: 0 } catch (_: Throwable) { 0 }
 
     var apiSecret by remember { mutableStateOf(oldSecret) }
     var httpPort by remember { mutableStateOf(oldHttpPort) }
     var sslPort by remember { mutableStateOf(oldSslPort) }
     var pollInterval by remember { mutableStateOf(oldInterval) }
     var showSecret by remember { mutableStateOf(false) }
+
+    val secretTooLong = apiSecret.length > Natives.WEBSERVER_MAX_APISECRET
+    val secretCharset = apiSecret.any { it.code !in 0x20..0x7E }
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_title_web_server),
@@ -134,6 +137,14 @@ fun WebServerSettingsScreen(
                     onValueChange = { apiSecret = it },
                     label = { Text(stringResource(R.string.loc_api_secret)) },
                     singleLine = true,
+                    isError = secretTooLong || secretCharset,
+                    supportingText = if (secretTooLong) {
+                        { Text(stringResource(R.string.loc_secret_too_long, Natives.WEBSERVER_MAX_APISECRET)) }
+                    } else if (secretCharset) {
+                        { Text(stringResource(R.string.loc_secret_charset)) }
+                    } else {
+                        null
+                    },
                     visualTransformation = if (showSecret) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showSecret = !showSecret }) {
@@ -179,16 +190,17 @@ fun WebServerSettingsScreen(
                             Toast.makeText(context, context.getString(R.string.loc_interval_range, Natives.WEBSERVER_MAX_INTERVAL), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
-                        if (apiSecret.length > Natives.WEBSERVER_MAX_APISECRET) {
+                        if (secretTooLong) {
                             Toast.makeText(context, context.getString(R.string.loc_secret_too_long, Natives.WEBSERVER_MAX_APISECRET), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
-                        if (apiSecret.any { it.code !in 0x20..0x7E }) {
+                        if (secretCharset) {
                             Toast.makeText(context, context.getString(R.string.loc_secret_charset), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
-                        if (mirrorListenPort.isNotBlank() && (hp.toString() == mirrorListenPort || sp.toString() == mirrorListenPort)) {
-                            Toast.makeText(context, context.getString(R.string.loc_ports_mirror_collision, mirrorListenPort), Toast.LENGTH_SHORT).show()
+                        val mirrorPort = mirrorListenPort()
+                        if (mirrorPort != 0 && (hp == mirrorPort || sp == mirrorPort)) {
+                            Toast.makeText(context, context.getString(R.string.loc_ports_mirror_collision, mirrorPort.toString()), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
 
@@ -202,8 +214,8 @@ fun WebServerSettingsScreen(
                                     Natives.WEBSERVERCONFIG_SECRETLONG -> context.getString(R.string.loc_secret_too_long, Natives.WEBSERVER_MAX_APISECRET)
                                     Natives.WEBSERVERCONFIG_SECRETTYPE -> context.getString(R.string.loc_secret_charset)
                                     Natives.WEBSERVERCONFIG_MIRRORPORT -> {
-                                        val live = try { Natives.getreceiveport()?.trim().orEmpty() } catch (_: Throwable) { mirrorListenPort }
-                                        context.getString(R.string.loc_ports_mirror_collision, live.ifBlank { mirrorListenPort })
+                                        val live = mirrorListenPort()
+                                        context.getString(R.string.loc_ports_mirror_collision, if (live != 0) live.toString() else "")
                                     }
                                     else -> context.getString(R.string.loc_error_saving, status.toString())
                                 }

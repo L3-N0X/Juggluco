@@ -1348,7 +1348,7 @@ static     constexpr const char isnull[]="null";
 
 extern void makesha1secret();
 
-constexpr const int maxwebserverapissecret=79;
+constexpr const int maxwebserverapissecret=maxapisecretlength;
 constexpr const int maxwebserverinterval=86400;
 
 enum {
@@ -1380,9 +1380,13 @@ static int mirrordataport() {
     return portnum;
     }
 
-static int checksecret(JNIEnv *env,jstring japisecret,char *secretbuf) {
+static int checksecret(JNIEnv *env,jstring japisecret,char *secretbuf,int bufsize,int *secretlen) {
+    *secretlen=0;
+    if(bufsize<1)
+        return webserverconfig_secretlong;
+    secretbuf[0]='\0';
     const jint len=japisecret?env->GetStringUTFLength(japisecret):0;
-    if(len<0||len>maxwebserverapissecret)
+    if(len<0||len>maxwebserverapissecret||len>=bufsize)
         return webserverconfig_secretlong;
     if(len&&env->GetStringLength(japisecret)!=len)
         return webserverconfig_secrettype;
@@ -1393,6 +1397,7 @@ static int checksecret(JNIEnv *env,jstring japisecret,char *secretbuf) {
             return webserverconfig_secrettype;
         }
     secretbuf[len]='\0';
+    *secretlen=len;
     return webserverconfig_ok;
     }
 
@@ -1405,8 +1410,9 @@ extern "C" JNIEXPORT jint  JNICALL   fromjava(setWebServerConfig)(JNIEnv *env, j
         return webserverconfig_identical;
     if(jinterval<1||jinterval>maxwebserverinterval)
         return webserverconfig_interval;
-    char secret[maxwebserverapissecret+1];
-    const int secretresult=checksecret(env,japisecret,secret);
+    char secret[sizeof(settings->data()->apisecret)];
+    int secretlen=0;
+    const int secretresult=checksecret(env,japisecret,secret,sizeof(secret),&secretlen);
     if(secretresult!=webserverconfig_ok)
         return secretresult;
     const int mirrorport=mirrordataport();
@@ -1416,8 +1422,8 @@ extern "C" JNIEXPORT jint  JNICALL   fromjava(setWebServerConfig)(JNIEnv *env, j
     settings->data()->sslport=jsslport;
     settings->data()->nightinterval=jinterval;
 #ifndef WEAROS
-    memcpy(settings->data()->apisecret,secret,strlen(secret)+1);
-    settings->data()->apisecretlength=strlen(secret);
+    memcpy(settings->data()->apisecret,secret,secretlen+1);
+    settings->data()->apisecretlength=secretlen;
     makesha1secret();
 #endif
     return webserverconfig_ok;
@@ -1427,27 +1433,29 @@ extern "C" JNIEXPORT void  JNICALL   fromjava(setApiSecret)(JNIEnv *env, jclass 
 #ifndef WEAROS
     if(!japisecret) return;
     const jint maxlen=sizeof(settings->data()->apisecret)-1;
-    const jint len=env->GetStringUTFLength( japisecret);
-    if(len<0||len>maxlen) {
-        LOGGER("setApiSecret too long %d>%d\n",len,maxlen);
+    char secret[maxlen+1];
+    int secretlen=0;
+    const int result=checksecret(env,japisecret,secret,sizeof(secret),&secretlen);
+    if(result!=webserverconfig_ok) {
+        LOGGER("setApiSecret rejected, code %d\n",result);
         return;
         }
-    const jint jlen=env->GetStringLength( japisecret);
-    if(jlen!=len) {
-        LOGGER("setApiSecret unexpected character count %d/%d\n",len,jlen);
-        return;
-        }
-    char secret[sizeof(settings->data()->apisecret)];
-    if(len)
-        env->GetStringUTFRegion(japisecret, 0,jlen, secret);
-    secret[len]='\0';
-    memcpy(settings->data()->apisecret,secret,len+1);
-    settings->data()->apisecretlength=len;
+    memcpy(settings->data()->apisecret,secret,secretlen+1);
+    settings->data()->apisecretlength=secretlen;
     makesha1secret();
 #endif
      }
 extern "C" JNIEXPORT jstring  JNICALL   fromjava(getApiSecret)(JNIEnv *env, jclass cl) {
-     return myNewStringUTF(env,settings->data()->apisecret);
+    const char *secret=settings->data()->apisecret;
+    const size_t bufsize=sizeof(settings->data()->apisecret);
+    const char *end=static_cast<const char *>(memchr(secret,'\0',bufsize));
+    size_t len=end?static_cast<size_t>(end-secret):bufsize;
+    const size_t storedlength=settings->data()->apisecretlength;
+    if(storedlength&&storedlength<len)
+        len=storedlength;
+    if(len>=bufsize)
+        len=bufsize-1;
+    return myNewStringUTF(env,std::string_view(secret,len));
     }
 extern void stopsslwatchthread() ;
 extern std::string startsslwatchthread() ;
