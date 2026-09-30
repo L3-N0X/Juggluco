@@ -66,7 +66,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import tk.glucodata.Applic
 import tk.glucodata.BleMirror
 import tk.glucodata.MainActivity
@@ -77,6 +79,7 @@ import tk.glucodata.SensorBridge
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.MirrorConnection
 import tk.glucodata.ui.model.MirrorImportPreview
+import tk.glucodata.ui.model.MirrorPresentData
 import tk.glucodata.ui.model.MirrorQuickCode
 import tk.glucodata.ui.screens.ScreenLayout
 
@@ -118,6 +121,15 @@ fun getMirrorConnectionStatusSummary(conn: MirrorConnection): String {
     return if (conn.isActive) context.getString(R.string.loc_state_active) else ""
 }
 
+/**
+ * A one-tap connection code that still has to be confirmed, because handing out a
+ * receiving code makes this device receive again from the beginning.
+ */
+private data class PendingQuickCode(
+    val kind: MirrorQuickCode,
+    val present: MirrorPresentData
+)
+
 @Composable
 fun MirrorSettingsScreen(
     repository: GlucoseRepository,
@@ -157,8 +169,21 @@ fun MirrorSettingsScreen(
     var importText by remember { mutableStateOf("") }
     var importWorking by remember { mutableStateOf(false) }
     var pendingOverwrite by remember { mutableStateOf<MirrorImportPreview?>(null) }
+    var pendingQuickCode by remember { mutableStateOf<PendingQuickCode?>(null) }
     var shownCode by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    // The relay side of the native mirror screen reports its own errors here.
+    var relayError by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        relayError = withContext(Dispatchers.IO) {
+            try {
+                Natives.serverError().orEmpty()
+            } catch (_: Throwable) {
+                ""
+            }
+        }
+    }
 
     // A scan started from this screen comes back here instead of pairing a sensor.
     DisposableEffect(showImportDialog) {
@@ -203,6 +228,62 @@ fun MirrorSettingsScreen(
     // Dev guide expanded state
     var showGuideExpanded by remember { mutableStateOf(false) }
 
+    /** Creates one of the four ready made connections and shows the code it produced. */
+    fun createQuickCode(kind: MirrorQuickCode) {
+        showQuickCodeDialog = false
+        scope.launch {
+            val result = repository.createMirrorQuickCode(kind)
+            if (!result.ok) {
+                Toast.makeText(
+                    context,
+                    context.getString(result.error.messageRes),
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+            if (result.needsBluetoothPermission) {
+                (context as? Activity)?.let { Applic.requestBluetoothPermissions(it) }
+            }
+            // The same reason the native side speaks up: a nearby link cannot start
+            // until whatever holds it back is out of the way.
+            result.blocker?.takeIf { it.isNotBlank() }?.let {
+                Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            }
+            val code = result.code
+            if (code.isNullOrBlank()) {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.loc_mirror_no_code),
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                shownCode = code
+            }
+        }
+    }
+
+    /**
+     * A receiving connection code makes this device receive from the beginning
+     * again, which replaces the data it already holds, so the native side asks
+     * before it hands one out and so does this.
+     */
+    fun requestQuickCode(kind: MirrorQuickCode) {
+        // The confirmation is its own dialog, so the choice list steps aside for it.
+        showQuickCodeDialog = false
+        if (!kind.isReceiver) {
+            createQuickCode(kind)
+            return
+        }
+        scope.launch {
+            val present = repository.mirrorPresentData()
+            if (present.any) {
+                pendingQuickCode = PendingQuickCode(kind, present)
+            } else {
+                createQuickCode(kind)
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         repository.refreshMirrorConnections()
     }
@@ -233,6 +314,16 @@ fun MirrorSettingsScreen(
                 icon = Icons.Default.Router,
                 onClick = onOpenTurnServerConfig
             )
+            if (relayError.isNotBlank()) {
+                Text(
+                    text = relayError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = ScreenLayout.CardPadding, vertical = 4.dp)
+                )
+            }
         }
 
         // DEVICE ROLE & NETWORK STATUS
@@ -653,35 +744,21 @@ fun MirrorSettingsScreen(
     }
 
     pendingOverwrite?.let { preview ->
-        AlertDialog(
-            onDismissRequest = { pendingOverwrite = null },
-            title = { Text(stringResource(R.string.overwrite)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = stringResource(
-                            R.string.loc_mirror_import_overwrite,
-                            presentMirrorDataTypes(context, preview)
-                        ),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = stringResource(R.string.loc_mirror_import_overwrite_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+        MirrorOverwriteDialog(
+            present = preview.present,
+            onConfirm = { importCode(preview) },
+            onDismiss = { pendingOverwrite = null }
+        )
+    }
+
+    pendingQuickCode?.let { request ->
+        MirrorOverwriteDialog(
+            present = request.present,
+            onConfirm = {
+                pendingQuickCode = null
+                createQuickCode(request.kind)
             },
-            confirmButton = {
-                Button(onClick = { importCode(preview) }) {
-                    Text(stringResource(R.string.overwrite))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingOverwrite = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
+            onDismiss = { pendingQuickCode = null }
         )
     }
 
@@ -702,25 +779,7 @@ fun MirrorSettingsScreen(
                             title = stringResource(kind.titleRes),
                             subtitle = stringResource(kind.subtitleRes),
                             icon = Icons.Default.QrCode2,
-                            onClick = {
-                                showQuickCodeDialog = false
-                                scope.launch {
-                                    val result = repository.createMirrorQuickCode(kind)
-                                    val code = result.code
-                                    if (result.ok && !code.isNullOrBlank()) {
-                                        shownCode = code
-                                    } else {
-                                        Toast.makeText(
-                                            context,
-                                            context.getString(
-                                                if (result.ok) R.string.loc_mirror_no_code
-                                                else R.string.loc_mirror_code_failed
-                                            ),
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
-                            }
+                            onClick = { requestQuickCode(kind) }
                         )
                     }
                 }
@@ -756,16 +815,59 @@ private fun mirrorTransportIcon(conn: MirrorConnection): ImageVector = when {
     else -> Icons.Default.Wifi
 }
 
+/**
+ * Asks before a receiving connection starts again from the beginning and replaces
+ * the data this device already holds. The native side asks the same question when a
+ * connection code is imported and when one is handed out.
+ */
+@Composable
+private fun MirrorOverwriteDialog(
+    present: MirrorPresentData,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.overwrite)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(
+                        R.string.loc_mirror_import_overwrite,
+                        presentMirrorDataTypes(context, present)
+                    ),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = stringResource(R.string.loc_mirror_import_overwrite_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(R.string.overwrite))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
 /** Names the data this device already holds that a received connection would replace. */
 private fun presentMirrorDataTypes(
     context: Context,
-    preview: MirrorImportPreview
+    present: MirrorPresentData
 ): String {
-    val context = context
     val types = buildList {
-        if (preview.presentAmounts) add(context.getString(R.string.amountsname))
-        if (preview.presentScans) add(context.getString(R.string.scansname))
-        if (preview.presentStream) add(context.getString(R.string.streamname))
+        if (present.amounts) add(context.getString(R.string.amountsname))
+        if (present.scans) add(context.getString(R.string.scansname))
+        if (present.stream) add(context.getString(R.string.streamname))
     }
     return types.joinToString(", ")
 }

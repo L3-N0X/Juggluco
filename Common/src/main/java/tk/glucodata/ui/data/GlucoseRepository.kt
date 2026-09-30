@@ -19,7 +19,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import tk.glucodata.Applic
-import tk.glucodata.Backup
 import tk.glucodata.BleMirror
 import tk.glucodata.BuildConfig
 import tk.glucodata.Log
@@ -63,6 +62,7 @@ import tk.glucodata.ui.model.MirrorConnectionDraft
 import tk.glucodata.ui.model.MirrorDataStart
 import tk.glucodata.ui.model.MirrorHostEditState
 import tk.glucodata.ui.model.MirrorImportPreview
+import tk.glucodata.ui.model.MirrorPresentData
 import tk.glucodata.ui.model.MirrorQuickCode
 import tk.glucodata.ui.model.MirrorSaveError
 import tk.glucodata.ui.model.MirrorSaveResult
@@ -2622,6 +2622,20 @@ class GlucoseRepository(
         }
     }
 
+    /**
+     * What the nearby Bluetooth link of a connection is doing. The native side shows
+     * this next to the native status, and it is the only place a Bluetooth-only
+     * connection says anything at all about itself.
+     */
+    suspend fun mirrorBluetoothStatus(index: Int): String? = withContext(Dispatchers.IO) {
+        if (index < 0 || !Applic.Nativesloaded) return@withContext null
+        try {
+            BleMirror.statusForConnection(index)?.takeIf { it.isNotBlank() }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     /** Creates one of the four ready made connections and returns its connection code. */
     suspend fun createMirrorQuickCode(kind: MirrorQuickCode): MirrorSaveResult = withContext(Dispatchers.IO) {
         if (!Applic.Nativesloaded || !mirrorCodesAvailable) {
@@ -2724,11 +2738,27 @@ class GlucoseRepository(
                 bleReverse = bleReverse,
                 bleClient = bleClient
             ),
-            presentAmounts = !nums && numio.hasNumdata(),
-            presentScans = !scans && nativeHasScans(),
-            presentStream = !stream && nativeHasStream()
+            present = presentMirrorData(nums = nums, scans = scans, stream = stream)
         )
     }
+
+    /**
+     * The data this device already holds, named the way the native side names it:
+     * a type is listed when the connection at hand will not send it again, so the
+     * data that is present stays as it is. Receiving starts at the beginning, so
+     * the user has to agree before that replaces what is there.
+     */
+    suspend fun mirrorPresentData(): MirrorPresentData = withContext(Dispatchers.IO) {
+        if (!Applic.Nativesloaded) return@withContext MirrorPresentData.NONE
+        presentMirrorData(nums = false, scans = false, stream = false)
+    }
+
+    private fun presentMirrorData(nums: Boolean, scans: Boolean, stream: Boolean) =
+        MirrorPresentData(
+            amounts = !nums && nativeHasAmounts(),
+            scans = !scans && nativeHasScans(),
+            stream = !stream && nativeHasStream()
+        )
 
     /** Adds the connection described by a code the user confirmed to import. */
     suspend fun importMirrorCode(preview: MirrorImportPreview): MirrorSaveResult {
@@ -2830,6 +2860,12 @@ class GlucoseRepository(
         false
     }
 
+    private fun nativeHasAmounts(): Boolean = try {
+        numio.hasNumdata()
+    } catch (_: Throwable) {
+        false
+    }
+
     private fun nativeHasStream(): Boolean = try {
         Natives.hasstreamed()
     } catch (_: Throwable) {
@@ -2876,14 +2912,6 @@ class GlucoseRepository(
             }
         } catch (_: Throwable) {
             false
-        }
-    }
-
-    fun openAdvancedMirrorView(activity: Activity) {
-        if (activity is MainActivity) {
-            try {
-                Backup().realmkbackupview(activity, false)
-            } catch (_: Throwable) {}
         }
     }
 

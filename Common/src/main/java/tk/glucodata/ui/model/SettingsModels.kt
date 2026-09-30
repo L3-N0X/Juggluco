@@ -278,13 +278,28 @@ enum class MirrorSaveError(@StringRes val messageRes: Int) {
     }
 }
 
+/**
+ * The data this device already holds that a receiving connection would send again
+ * from the beginning. The native side asks before that happens, both when a
+ * connection code is imported and when a receiving connection code is handed out.
+ */
+data class MirrorPresentData(
+    val amounts: Boolean = false,
+    val scans: Boolean = false,
+    val stream: Boolean = false
+) {
+    val any: Boolean get() = amounts || scans || stream
+
+    companion object {
+        val NONE = MirrorPresentData()
+    }
+}
+
 /** A payload read from a connection code, ready to become a real connection. */data class MirrorImportPreview(
     val draft: MirrorConnectionDraft,
-    val presentAmounts: Boolean = false,
-    val presentScans: Boolean = false,
-    val presentStream: Boolean = false
+    val present: MirrorPresentData = MirrorPresentData.NONE
 ) {
-    val overwritesData: Boolean get() = presentAmounts || presentScans || presentStream
+    val overwritesData: Boolean get() = present.any
 }
 
 /** The four one-tap connections a device can hand out as a connection code. */
@@ -292,7 +307,10 @@ enum class MirrorQuickCode(@StringRes val titleRes: Int, @StringRes val subtitle
     LOCAL_SENDER(R.string.loc_mirror_code_local_sender, R.string.loc_mirror_code_local_sender_desc),
     LOCAL_RECEIVER(R.string.loc_mirror_code_local_receiver, R.string.loc_mirror_code_local_receiver_desc),
     INTERNET_SENDER(R.string.loc_mirror_code_internet_sender, R.string.loc_mirror_code_internet_sender_desc),
-    INTERNET_RECEIVER(R.string.loc_mirror_code_internet_receiver, R.string.loc_mirror_code_internet_receiver_desc)
+    INTERNET_RECEIVER(R.string.loc_mirror_code_internet_receiver, R.string.loc_mirror_code_internet_receiver_desc);
+
+    /** A receiving connection replaces the data this device already holds. */
+    val isReceiver: Boolean get() = this == LOCAL_RECEIVER || this == INTERNET_RECEIVER
 }
 
 /**
