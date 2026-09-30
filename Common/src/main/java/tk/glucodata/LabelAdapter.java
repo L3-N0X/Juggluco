@@ -78,7 +78,7 @@ public View getDropDownView(int position, View convertView, ViewGroup parent) {
         text.setText(str.toString());
         }
     else
-        text.setText("Error!!");
+        text.setText(text.getContext().getString(R.string.error_label));
 
     if(isWearable) {
         text.setGravity(Gravity.CENTER);
@@ -140,7 +140,7 @@ public View getView(int position, View convertView, ViewGroup parent) {
         text.setText(str.toString());
         }
     else {
-        text.setText("Error!!");
+        text.setText(text.getContext().getString(R.string.error_label));
         }
 //    text.setBackgroundColor(RED);
         return convertView;

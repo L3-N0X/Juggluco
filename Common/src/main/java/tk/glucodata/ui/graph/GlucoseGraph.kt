@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
@@ -72,6 +73,7 @@ fun GlucoseGraph(
     val alertMarkerColor = MaterialTheme.colorScheme.errorContainer
     val alertMarkerContentColor = MaterialTheme.colorScheme.onErrorContainer
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
 
     val renderData by rememberGraphRenderData(readings, logs, alertEvents)
 
@@ -281,7 +283,7 @@ fun GlucoseGraph(
                     )
                 }
                 if (displayConfig.showAmounts) {
-                    drawEventStrip(chart, data.events, unit, surfaceColor, paints, logbookColors)
+                    drawEventStrip(context, chart, data.events, unit, surfaceColor, paints, logbookColors)
                 }
 
                 inspected?.let { drawScrubber(chart, it, clinicalColors, textPrimary, surfaceColor) }

@@ -128,9 +128,14 @@ fun WearQuickLogScreen(
     }
 
     val (displayText, labelText) = when (selectedType) {
-        LogType.CARBS -> "${value.roundToInt()} g" to stringResource(R.string.log_short_carbs)
-        LogType.RAPID_INSULIN -> String.format(java.util.Locale.getDefault(), "%.1f U", value) to stringResource(R.string.log_short_bolus)
-        LogType.BASAL_INSULIN -> String.format(java.util.Locale.getDefault(), "%.1f U", value) to stringResource(R.string.log_short_basal)
+        LogType.CARBS -> stringResource(R.string.log_value_carbs, "${value.roundToInt()}") to
+            stringResource(R.string.log_short_carbs)
+        LogType.RAPID_INSULIN ->
+            stringResource(R.string.log_value_insulin, String.format(java.util.Locale.getDefault(), "%.1f", value)) to
+                stringResource(R.string.log_short_bolus)
+        LogType.BASAL_INSULIN ->
+            stringResource(R.string.log_value_insulin, String.format(java.util.Locale.getDefault(), "%.1f", value)) to
+                stringResource(R.string.log_short_basal)
         LogType.BLOOD_GLUCOSE -> if (unit == GlucoseUnit.MMOL_L) {
             String.format(java.util.Locale.getDefault(), "%.1f", value) to stringResource(unit.labelRes)
         } else {

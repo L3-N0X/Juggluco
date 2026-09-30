@@ -1,5 +1,6 @@
 package tk.glucodata.ui.graph
 
+import android.content.Context
 import android.graphics.Paint
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -8,6 +9,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogRecord
@@ -186,10 +188,13 @@ internal fun statusColor(ordinal: Int, colors: ClinicalColors): Color = when (or
     else -> colors.veryHigh
 }
 
-internal fun eventLabel(record: LogRecord, unit: GlucoseUnit): String = when (record.type) {
-    LogType.RAPID_INSULIN -> "${record.value.roundToInt()}U"
-    LogType.BASAL_INSULIN -> "${record.value.roundToInt()}B"
-    LogType.CARBS, LogType.MEAL -> "${record.value.roundToInt()}g"
+internal fun eventLabel(context: Context, record: LogRecord, unit: GlucoseUnit): String = when (record.type) {
+    LogType.RAPID_INSULIN ->
+        context.getString(R.string.value_with_unit, "${record.value.roundToInt()}", context.getString(R.string.unit_insulin_short))
+    LogType.BASAL_INSULIN ->
+        context.getString(R.string.value_with_unit, "${record.value.roundToInt()}", context.getString(R.string.unit_basal_short))
+    LogType.CARBS, LogType.MEAL ->
+        context.getString(R.string.value_with_unit, "${record.value.roundToInt()}", context.getString(R.string.unit_carbs_short))
     LogType.BLOOD_GLUCOSE -> unit.format(record.value)
     LogType.NOTE -> "•"
 }

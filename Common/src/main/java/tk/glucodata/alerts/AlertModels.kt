@@ -30,11 +30,11 @@ enum class AlertKind {
  * Audio stream an alert plays on. The stream decides which volume slider and which
  * silent/Do Not Disturb rules apply; [NONE] plays no sound at all (vibrate only or silent).
  */
-enum class AlertOutput {
-    ALARM,
-    NOTIFICATION,
-    MEDIA,
-    NONE
+enum class AlertOutput(@StringRes val labelRes: Int) {
+    ALARM(R.string.alarm),
+    NOTIFICATION(R.string.notification),
+    MEDIA(R.string.media),
+    NONE(R.string.off)
 }
 
 /** Built-in vibration patterns; timings alternate off/on in milliseconds and loop. */

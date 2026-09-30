@@ -695,7 +695,7 @@ static private void doSearchIngr(MainActivity act,View view,IngredientViewAdapte
                     doonback();
                     }
                  else {
-                    Applic.argToaster(act, "Regex error, try again", Toast.LENGTH_LONG);
+                    Applic.argToaster(act, act.getString(R.string.regex_error_try_again), Toast.LENGTH_LONG);
                     }
                     };
     searchstr.setOnEditorActionListener(new TextView.OnEditorActionListener() {

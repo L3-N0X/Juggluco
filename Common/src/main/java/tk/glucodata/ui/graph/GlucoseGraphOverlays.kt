@@ -1,5 +1,6 @@
 package tk.glucodata.ui.graph
 
+import android.content.Context
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -76,6 +77,7 @@ internal fun DrawScope.drawAlertIndicators(
 }
 
 internal fun DrawScope.drawEventStrip(
+    context: Context,
     chart: ChartTransform,
     events: GraphEvents,
     unit: GlucoseUnit,
@@ -101,7 +103,7 @@ internal fun DrawScope.drawEventStrip(
             lastLabelX = x
             paints.event.color = color.toArgb()
             drawContext.canvas.nativeCanvas.drawText(
-                eventLabel(record, unit),
+                eventLabel(context, record, unit),
                 x,
                 y - chart.px(7f),
                 paints.event

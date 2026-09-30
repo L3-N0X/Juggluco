@@ -188,7 +188,7 @@ public static void show(MainActivity context,View parent) {
                         }
                 catch(Throwable e) {
                         Log.stack(LOG_ID,"parseInt", e);
-			Applic.argToaster(context,intervalstr+" invalid", Toast.LENGTH_LONG);
+			Applic.argToaster(context,context.getString(R.string.invalid_value, intervalstr), Toast.LENGTH_LONG);
 			return;
                         };
 		Natives.setinterval(intervalnum);

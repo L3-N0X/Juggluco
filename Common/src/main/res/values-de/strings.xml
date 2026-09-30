@@ -793,11 +793,76 @@
     <string name="settings_cat_data">DATENVERWALTUNG &amp; WERKZEUGE</string>
     <string name="settings_export_sensor_data">Sensordaten exportieren</string>
     <string name="settings_export_sensor_data_desc">CSV- oder HTML-Dateien für Insulindosen, Scans, Datenstrom &amp; Verlauf exportieren</string>
-    <string name="settings_classic_view_desc">OpenGL-Kurve</string>
+    <string name="settings_classic_view_desc">Öffne die alte Querformat Graph-Oberfläche</string>
 
     <string name="settings_cat_about">ÜBER</string>
 
+    <!-- Settings group headers (new Compose settings screen) -->
+    <string name="settings_group_glucose_title">Zielbereich &amp; Einheiten</string>
+    <string name="settings_group_glucose_desc">mmol/L oder mg/dL und die Schwellen des Zielbereichs festlegen</string>
+    <string name="settings_group_alarms_title">Alarme &amp; Audio</string>
+    <string name="settings_group_alarms_desc">Untere und obere Glukosealarme, Schlummern und Audiostream</string>
+    <string name="settings_group_display_title">Anzeige &amp; Erscheinungsbild</string>
+    <string name="settings_group_display_desc">App-Design, schwebendes Glukose-Widget, Statusleiste und Vollbild</string>
+    <string name="settings_group_voice_title">Stimme &amp; Sprachausgabe</string>
+    <string name="settings_group_voice_desc">Gesprochene Glukosewerte, Sprechtempo und Tonhöhe</string>
+    <string name="settings_group_broadcasts_title">Broadcasts &amp; Integrationen</string>
+    <string name="settings_group_broadcasts_desc">Glucodata, xDrip, Health Connect, LibreView und lokaler Webserver</string>
+    <string name="settings_group_mirror_title">Mirror &amp; Netzwerkweitergabe</string>
+    <string name="settings_group_mirror_desc">Synchronisation mehrerer Geräte, lokales Relay und Verbindungstests</string>
+    <string name="settings_group_hardware_title">NFC &amp; Hardware</string>
+    <string name="settings_group_hardware_desc">Töne beim NFC-Scan und Optionen zum automatischen Starten</string>
+    <string name="settings_group_data_title">Datenverwaltung</string>
     <string name="settings_group_data_desc">Glukosedaten exportieren, Speicher &amp; Protokolle</string>
+    <string name="settings_group_about_title">Über Juggluco</string>
+    <string name="settings_group_about_desc">App-Version, Lizenz, Sensorunterstützung und Entwicklerleitfaden</string>
+    <string name="settings_group_watch_title">Smartwatch &amp; Wear OS</string>
+    <string name="settings_group_watch_desc">Wear OS, Garmin und Watchdrip verbinden sowie Sensorstreaming der Uhr verwalten</string>
+
+    <!-- Settings sub-screens: servers, integrations, watches -->
+    <string name="settings_title_web_server">Lokaler REST-Webserver</string>
+    <string name="settings_desc_web_server">Lokale HTTP-/SSL-Ports und API-Geheimnis festlegen</string>
+    <string name="settings_title_turn_server">TURN-Relay-Server</string>
+    <string name="settings_desc_turn_server">TURN-Server für Mobilfunk und NAT-Überbrückung festlegen</string>
+    <string name="settings_title_mirror_edit">Mirror-Peer-Verbindung</string>
+    <string name="settings_desc_mirror_edit">Host-Adresse, Port und Synchronisationsrichtung festlegen</string>
+    <string name="settings_title_libre_view">Abbott-LibreView-Upload</string>
+    <string name="settings_desc_libre_view">LibreView-Cloud-Upload und Zugangsdaten einrichten</string>
+    <string name="settings_garmin_title">Garmin (Kerfstok)</string>
+    <string name="settings_garmin_desc">Glukosewerte an eine Garmin-Uhr mit Kerfstok senden</string>
+    <string name="settings_gadgetbridge_title">Gadgetbridge</string>
+    <string name="settings_gadgetbridge_desc">Glukosewerte als Wetter-Updates an Gadgetbridge senden</string>
+    <string name="settings_watchdrip_title">Watchdrip+</string>
+    <string name="settings_watchdrip_desc">Zifferblätter mit Glukosewerten an MiBand und Amazfit senden</string>
+    <string name="settings_direct_sensor_title">Direkte Sensorverbindung</string>
+    <string name="settings_direct_sensor_desc">Sensor verbindet sich direkt per Bluetooth mit der Uhr statt über das Telefon</string>
+    <string name="settings_enter_nums_title">Insulin &amp; Kohlenhydrate eingeben</string>
+    <string name="settings_enter_nums_desc">Insulindosen und Kohlenhydrate auf der Uhr eingeben</string>
+    <string name="settings_wearos_service">Wear-OS-Dienst</string>
+    <string name="settings_wearos_service_desc">Hintergrundnachrichten und automatische Erkennung mit Wear-OS-Uhren aktivieren</string>
+    <string name="settings_watch_forward_alarm">Alarme an die Uhr weiterleiten</string>
+    <string name="settings_watch_forward_alarm_desc">Uhr vibrieren lassen oder alarmieren, wenn Glukosealarme auslösen</string>
+    <string name="settings_watch_separate_alarm">Eigener Alarmton</string>
+    <string name="settings_watch_separate_alarm_desc">Eigenen Alarmton auf der Uhr verwenden</string>
+    <string name="settings_search_watches">Uhren suchen</string>
+    <string name="settings_connected_watches">Verbundene Uhren</string>
+    <string name="settings_other_watches">Andere Smartwatches</string>
+    <string name="settings_no_watches_found">Keine Wear-OS-Uhren gefunden</string>
+    <string name="settings_init_watch">Uhr-App initialisieren</string>
+    <string name="settings_sync_reinit">Synchronisieren &amp; neu verbinden</string>
+    <string name="settings_reset_defaults">Auf Standard zurücksetzen</string>
+    <string name="settings_summary_target_range_four">%1$s / %2$s – %3$s / %4$s</string>
+
+    <!-- Custom colour picker -->
+    <string name="settings_color_picker_title">Farbe wählen</string>
+    <string name="settings_color_picker_hue">Farbton</string>
+    <string name="settings_color_picker_saturation">Sättigung</string>
+    <string name="settings_color_picker_brightness">Helligkeit</string>
+    <string name="settings_color_picker_system">Systemfarben verwenden</string>
+    <string name="settings_custom_color">Eigene Farbe</string>
+    <string name="settings_custom_color_system">Mit den Material-You-Systemfarben</string>
+    <string name="settings_custom_color_custom">Mit deiner eigenen Farbe</string>
+
     <string name="settings_card_about">Über Juggluco</string>
     <string name="settings_version_title">Juggluco v11.0.2</string>
     <string name="settings_about_details">Moderne Jetpack Compose Material 3 Edition\nOpen-Source-Software lizenziert unter GPLv3\nEntwickelt von Jaap Korthals Altes</string>
@@ -958,6 +1023,12 @@
     <string name="log_pick_basal">Basal</string>
     <string name="log_pick_bg">BZ</string>
     <string name="log_all">Alle</string>
+    <string name="unit_insulin_short">U</string>
+    <string name="unit_carbs_short">g</string>
+    <string name="unit_basal_short">B</string>
+    <string name="unit_per_min">%1$s/Min.</string>
+    <string name="value_with_unit">%1$s %2$s</string>
+    <string name="log_entry_tile_description">%1$s %2$s %3$s</string>
     <string name="log_value_insulin">%1$s U</string>
     <string name="log_value_carbs">%1$s g</string>
     <string name="log_glucose_value">%1$s %2$s</string>
@@ -1382,6 +1453,54 @@
     <string name="loc_libreview_upload_started">LibreView-Upload im Hintergrund gestartet</string>
     <string name="loc_upload_failed">Upload fehlgeschlagen: %1$s</string>
     <string name="loc_libreview_info">LibreView ist Abbouds offizielle Diabetes-Cloud-Plattform. Beim Sync werden Libre-2- und Libre-3-Glukosedaten übertragen, damit dein Behandlungsteam dein Ambulantes Glukoseprofil (AGP) einsehen kann.</string>
+    <string name="about_hardware_abbott">Abbott FreeStyle Libre</string>
+    <string name="about_hardware_dexcom">Dexcom CGM</string>
+    <string name="about_hardware_sibionics">SiBionics CGM</string>
+    <!-- Legacy Java UI: toasts, dialogs and buttons -->
+    <string name="too_many_schedules">Zu viele Zeitpläne</string>
+    <string name="threshold_should_be">Ein Schwellenwert muss zwischen 0.0 und 0.8 liegen</string>
+    <string name="hostname_is_slow">Hostname ist langsam</string>
+    <string name="resetted_suffix">"Zurückgesetzt "</string>
+    <string name="no_permission_sensor_via_bt_off">Keine Berechtigung. Sensor über Bluetooth ausgeschaltet</string>
+    <string name="location_off_cant_scan">Standort ist ausgeschaltet, Geräte können nicht gesucht werden</string>
+    <string name="cant_save_null_fd">Speichern nicht möglich: parcelFileDescriptor ist null</string>
+    <string name="turn_on_location_in_system_settings">Standort in den Systemeinstellungen einschalten</string>
+    <string name="no_location_unknown_fix">Kein Standort, keine Möglichkeit zu beheben</string>
+    <string name="juggluco_has_to_exit">Juggluco muss beendet werden</string>
+    <string name="location">Standort</string>
+    <string name="system_location_needed_for_bt">Der Systemstandort muss eingeschaltet sein, um Bluetooth-Geräte zu finden</string>
+    <string name="adding_meter_failed">Hinzufügen des Geräts %1$s fehlgeschlagen</string>
+    <string name="regex_error_try_again">Fehler im regulären Ausdruck, bitte erneut versuchen</string>
+    <string name="glucose_meter_not_used">Das Blutzuckermessgerät wird nicht verwendet</string>
+    <string name="app_is_already_running">APP_IS_ALREADY_RUNNING</string>
+    <string name="open_app">App öffnen</string>
+    <string name="index_too_large">Index %1$d ist zu groß</string>
+    <string name="label_too_long">%1$s ist zu lang</string>
+    <string name="invalid_value">%1$s ist ungültig</string>
+    <string name="nothing_suffix">" nichts"</string>
+    <string name="to_get_older_values_scan_again">Für ältere Werte musst du erneut scannen</string>
+    <string name="move_to_zxing">Zu zXing wechseln</string>
+    <string name="cancelled">Abgebrochen</string>
+    <string name="iob">IOB</string>
+    <string name="intro">Einführung</string>
+    <string name="qr">QR</string>
+    <string name="nfc_emulator">NFC-Emu</string>
+    <string name="xdrip_broadcast_label">xDrip-Broadcast</string>
+    <string name="glucodata_broadcast_label">Glucodata</string>
+    <string name="glucodata_broadcast_full_label">Glucodata-Broadcast</string>
+    <string name="restore">Wiederherstellen</string>
+    <string name="dont_understand">Ich verstehe \'%1$s\' nicht</string>
+    <string name="error_label">Fehler!!</string>
+    <string name="rssi_equals">RSSI = %1$d</string>
+    <string name="address_unknown">Adresse unbekannt</string>
+    <string name="garmin_already_sending">Ein Libre-3-Sensor wird bereits an Garmin gesendet</string>
+    <string name="garmin_auth_unavailable">Autorisierungsdaten für Libre 3 sind nicht verfügbar</string>
+    <string name="garmin_identity_unavailable">Sensoridentität für Libre 3 ist nicht verfügbar</string>
+    <string name="garmin_comm_unavailable">Garmin-Kommunikation ist nicht verfügbar</string>
+    <string name="garmin_select_direct_first">Wähle zuerst Libre 3 direkt für eine Garmin-Uhr</string>
+    <string name="garmin_provisioning_failed">Bereitstellungsdaten für Garmin mit Libre 3 konnten nicht erstellt werden</string>
+    <string name="garmin_transferred">Libre 3 auf die ausgewählte Garmin-Uhr übertragen</string>
+
     <string name="loc_about_application">Anwendung</string>
     <string name="loc_supported_sensor_hardware">Unterstützte Sensorhardware</string>
     <string name="loc_libre_hardware_desc">Libre 1, Libre 2 (Europa und USA) und Libre 3 mit direktem BLE-Streaming und NFC-Scans</string>
@@ -1410,6 +1529,9 @@
     <string name="loc_developer_testing">Anweisungen für Entwicklungstests</string>
     <string name="loc_how_to_relay">Live-Daten parallel weiterleiten</string>
     <string name="loc_local_production_app">Lokale Produktions-App</string>
+    <string name="loc_local_dev_build">Lokaler Dev-Build</string>
+    <string name="loc_mirror_sender">Sender</string>
+    <string name="loc_mirror_receiver">Empfänger</string>
     <string name="loc_mirror_status">Status: %1$s</string>
     <string name="loc_mirror_connection_default">Mirror-Verbindung #%1$d</string>
     <string name="loc_host_default">Host #%1$d</string>
@@ -1623,5 +1745,238 @@
 <string name="garmin_alarm_save_failed">Alarmeinstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut.</string>
 <string name="garmin_alarm_invalid">Überprüfen Sie die Werte: „Niedrig“ muss unter „Hoch“ liegen; Verzögerung bei fehlenden Werten 1–4095 Minuten, Wiederholung 0–4095 Minuten, Dauer 0–65535 Sekunden.</string>
 <string name="garmin_alarm_newer">Auf der Uhr befinden sich neuere Alarmeinstellungen. Durch das Speichern hier werden diese überschrieben.</string>
+
+    <!-- Sensor pairing / activation flow -->
+    <string name="sensor_current_state">Aktueller Sensorzustand</string>
+    <string name="sensor_handshake_authenticated">Authentifiziert</string>
+    <string name="sensor_handshake_connected">Verbunden</string>
+    <string name="sensor_handshake_disconnected">Getrennt</string>
+    <string name="sensor_name_generic">Sensor</string>
+    <string name="sensor_name_active">Aktiver Sensor</string>
+    <string name="sensor_id_unknown">Unbekannt</string>
+    <string name="content_desc_nfc">NFC</string>
+    <string name="sensor_diagnostic_details">Details zur Sensordiagnose</string>
+    <string name="sensor_expected_end">Voraussichtliches Ende</string>
+    <string name="sensor_expiry_calendar_failed">Kalender kann nicht geöffnet werden: %1$s</string>
+    <string name="sensor_pairing_start">Kopplung starten</string>
+    <string name="sensor_pairing_compose_nfc_only">Diese Kopplungsmethode ist in der Sensorgeräteliste verfügbar. Wähle zum Scannen einen NFC-Sensor.</string>
+    <string name="sensor_start_new">Neuen Sensor starten</string>
+    <string name="sensor_started">Sensor gestartet</string>
+    <string name="sensor_activation_waiting_title">Warten auf Sensor</string>
+    <string name="sensor_activation_waiting_desc">Halte die Rückseite deines Telefons über den ausgewählten Sensor.</string>
+    <string name="sensor_activation_activating_title">Sensor wird aktiviert</string>
+    <string name="sensor_activation_activating_desc">Der Sensor hat die Aktivierungsanfrage angenommen. Lass ihn liegen, bis die Einrichtung abgeschlossen ist…</string>
+    <string name="sensor_activation_reading_title">Sensor wird ausgelesen</string>
+    <string name="sensor_activation_reading_desc">Sensor wird ausgelesen und sein Aktivierungsstatus geprüft…</string>
+    <string name="sensor_activation_verifying_title">Sensor wird bestätigt</string>
+    <string name="sensor_activation_verifying_desc">Es wird geprüft, ob der Sensor registriert und für die Aufwärmphase bereit ist…</string>
+    <string name="sensor_activation_cancelled_title">Sensor-Scan abgebrochen</string>
+    <string name="sensor_activation_cancelled_desc">Der Scan wurde abgebrochen, bevor der Sensor aktiviert wurde.</string>
+    <string name="sensor_activation_cancelled_retry_desc">Du kannst mit demselben Sensor-Modell einen neuen Scan starten.</string>
+    <string name="sensor_activation_failed_title">Sensor nicht aktiviert</string>
+    <string name="sensor_activation_failed_desc">Der Sensor konnte nicht aktiviert werden.</string>
+    <string name="sensor_activation_failed_retry_desc">Prüfe, ob der richtige Sensor ausgewählt und in Reichweite ist, und versuche es dann erneut.</string>
+    <string name="sensor_activation_second_scan_title">Sensor erneut scannen</string>
+    <string name="sensor_activation_second_scan_desc">Der Sensor wurde aktiviert. Scanne ihn ein zweites Mal, um die Kopplung abzuschließen und seine Schlüssel zu übertragen.</string>
+    <string name="sensor_activation_retry">Erneut versuchen</string>
+
+    <!-- Mirror: identity, transport, addressing -->
+    <string name="loc_mirror_identity">Identifikation</string>
+    <string name="loc_mirror_label_required">Für Bluetooth und Nachrichten erforderlich: Dort finden die beiden Geräte einander über das Label.</string>
+    <string name="loc_mirror_label_too_long">Label zu lang, höchstens 15 Zeichen</string>
+    <string name="loc_mirror_label_in_use">Eine andere Verbindung verwendet dieses Label bereits</string>
+    <string name="loc_mirror_password">Verbindungskennwort</string>
+    <string name="loc_mirror_password_desc">Gemeinsames Geheimnis für eine direkte Bluetooth-Verbindung. Beide Geräte brauchen dasselbe Passwort.</string>
+    <string name="loc_mirror_show_password">Passwort anzeigen</string>
+    <string name="loc_mirror_password_too_long">Passwort zu lang, höchstens 16 Zeichen</string>
+    <string name="loc_mirror_method">Verbindungsmethode</string>
+    <string name="loc_mirror_invalid_transport">Verbindungsmethode und Optionen passen nicht zusammen</string>
+    <string name="loc_mirror_addresses">Adressen</string>
+    <string name="loc_mirror_address_hint">Wird der Reihe nach verwendet, bis eines antwortet.</string>
+    <string name="loc_mirror_add_address">Weitere Adresse hinzufügen</string>
+    <string name="loc_mirror_remove_address">Adresse %1$s entfernen</string>
+    <string name="loc_mirror_use_hostname">Hostname verwenden</string>
+    <string name="loc_mirror_use_hostname_desc">Das Auflösen eines Namens dauert lange, also verwende ihn nur bei Verbindungen, die sich selten ändern.</string>
+    <string name="loc_mirror_detect_ip">Adresse erkennen</string>
+    <string name="loc_mirror_detect_ip_desc">Das andere Gerät im lokalen Netzwerk suchen, statt die Adresse oben zu verwenden.</string>
+    <string name="loc_mirror_test_ip">Adresse testen</string>
+    <string name="loc_mirror_test_ip_desc">Von uns aus verbinden. Aus bedeutet, dass dieses Gerät nur auf das andere wartet.</string>
+    <string name="loc_mirror_hostname_too_long">Hostname zu lang</string>
+    <string name="hostname">Hostname</string>
+
+    <!-- Mirror: direction, data selection, resend -->
+    <string name="loc_mirror_direction">Verbindungsrichtung</string>
+    <string name="loc_mirror_direction_active">Nur aktiv</string>
+    <string name="loc_mirror_direction_active_desc">Immer die Adresse oben anwählen.</string>
+    <string name="loc_mirror_direction_passive">Nur passiv</string>
+    <string name="loc_mirror_direction_passive_desc">Nur darauf warten, dass sich das andere Gerät verbindet.</string>
+    <string name="loc_mirror_direction_both">Beides</string>
+    <string name="loc_mirror_direction_both_desc">Ausgehende Verbindungen aufbauen und eingehende annehmen.</string>
+    <string name="loc_mirror_send_data">Daten senden</string>
+    <string name="loc_mirror_send_stream">Den kontinuierlichen Datenstrom senden</string>
+    <string name="loc_mirror_send_scans">Scans und Fingerstiche senden</string>
+    <string name="loc_mirror_send_amounts">Insulin- und Kohlenhydratmengen senden</string>
+    <string name="loc_mirror_receive_from">Daten empfangen</string>
+    <string name="loc_mirror_receive_from_desc">Glukosewerte vom anderen Gerät übernehmen. Sensoren und Bluetooth funktionieren wie gewohnt.</string>
+    <string name="loc_mirror_shared_data">Geteilte Daten</string>
+    <string name="loc_mirror_data_start">Vorhandene Daten auf dem anderen Gerät</string>
+    <string name="loc_mirror_data_start_now">Erst ab jetzt</string>
+    <string name="loc_mirror_data_start_from">Ab %1$s</string>
+    <string name="loc_mirror_data_start_all">Alles, auch ältere Daten</string>
+    <string name="loc_mirror_data_start_screen">Ab der Position, die dieses Gerät anzeigt</string>
+    <string name="loc_mirror_data_not_all">Das andere Gerät empfängt nicht alle Datentypen.</string>
+    <string name="loc_mirror_restore">Fehlende Daten wiederherstellen</string>
+    <string name="loc_mirror_restore_desc">Auch Daten senden, die das andere Gerät noch nicht gesehen hat.</string>
+    <string name="loc_mirror_resend">Alle Daten erneut senden</string>
+    <string name="loc_mirror_resend_desc">Den gesamten Verlauf erneut senden. Das dauert eine Weile und kann in anderen Apps Duplikate erzeugen.</string>
+    <string name="loc_mirror_resend_confirm">Alle Daten erneut senden? Das dauert eine Weile und kann in anderen Apps Duplikate erzeugen.</string>
+    <string name="loc_mirror_resend_done">Alle Daten werden erneut gesendet</string>
+    <string name="loc_mirror_database_busy">Datenbank belegt, bitte erneut versuchen</string>
+    <string name="loc_mirror_connection_summary">%1$s · %2$s · %3$s%4$s</string>
+
+    <!-- Mirror: connection codes and relay (ICE) -->
+    <string name="loc_mirror_show_code">Verbindungscode anzeigen</string>
+    <string name="loc_mirror_show_code_desc">Ein QR-Code, den das andere Gerät scannen kann, um diese Verbindung hinzuzufügen.</string>
+    <string name="loc_mirror_no_code">Für diese Verbindung ist kein Code verfügbar</string>
+    <string name="loc_mirror_code_title">Verbindungscode erstellen</string>
+    <string name="loc_mirror_code_desc">Erstellt die Verbindung hier und zeigt einen Code, den das andere Gerät scannen kann.</string>
+    <string name="loc_mirror_code_section">Verbindungscode</string>
+    <string name="loc_mirror_code_failed">Verbindung konnte nicht erstellt werden</string>
+    <string name="loc_mirror_code_local_sender">Lokales Netzwerk · Sender</string>
+    <string name="loc_mirror_code_local_sender_desc">Sendet Daten an ein Gerät in diesem Netzwerk.</string>
+    <string name="loc_mirror_code_local_receiver">Lokales Netzwerk · Empfänger</string>
+    <string name="loc_mirror_code_local_receiver_desc">Empfängt Daten von einem Gerät in diesem Netzwerk.</string>
+    <string name="loc_mirror_code_internet_sender">Überall · Sender</string>
+    <string name="loc_mirror_code_internet_sender_desc">Sendet Daten über ein Relay, auch über Netzwerkgrenzen hinweg.</string>
+    <string name="loc_mirror_code_internet_receiver">Überall · Empfänger</string>
+    <string name="loc_mirror_code_internet_receiver_desc">Empfängt Daten über ein Relay, auch über Netzwerkgrenzen hinweg.</string>
+    <string name="loc_mirror_import">Aus Verbindungscode hinzufügen</string>
+    <string name="loc_mirror_import_desc">Scanne den Code des anderen Geräts oder füge den Text eines Codes ein.</string>
+    <string name="loc_mirror_import_scan">Code scannen</string>
+    <string name="loc_mirror_import_paste">Aus Zwischenablage einfügen</string>
+    <string name="loc_mirror_import_add">Verbindung hinzufügen</string>
+    <string name="loc_mirror_import_empty">Das ist kein Juggluco-Verbindungscode.</string>
+    <string name="loc_mirror_import_overwrite">Vorhandene Daten: %1$s</string>
+    <string name="loc_mirror_import_overwrite_desc">Beim Empfangen wird wieder von vorn begonnen, wodurch die Daten ersetzt werden, die das andere Gerät bereits hat.</string>
+    <string name="loc_mirror_ice">Relay verwenden (ICE)</string>
+    <string name="loc_mirror_ice_title">Relay</string>
+    <string name="loc_mirror_ice_desc">Das andere Gerät über ein TURN-Relay erreichen, wenn es keine direkte Route gibt. Beide Geräte brauchen dasselbe Label und gegenläufige Seitennummern.</string>
+    <string name="loc_mirror_ice_label">ICE-Label</string>
+    <string name="loc_mirror_ice_label_hint">Mindestens 16 Zeichen, mit dem anderen Gerät geteilt.</string>
+    <string name="loc_mirror_ice_label_too_long">ICE-Label zu lang, höchstens 32 Zeichen</string>
+    <string name="loc_mirror_ice_side">ICE-Seite</string>
+    <string name="loc_mirror_ice_side_desc">Zwei Gegenstellen mit demselben Label brauchen unterschiedliche Seitennummern.</string>
+
+    <!-- LibreView cloud upload -->
+    <string name="loc_libreview_upload">Hochladen</string>
+    <string name="loc_libreview_account_none">Noch keine Konto-ID</string>
+    <string name="loc_libreview_account_fetch">Konto-ID von LibreView holen</string>
+    <string name="loc_libreview_account_fetch_desc">Fragt beim LibreView-Server, zu welchem Konto diese Zugangsdaten gehören</string>
+    <string name="loc_libreview_account_manual">Konto-ID notieren</string>
+    <string name="loc_libreview_account_manual_desc">Gib die ID aus deinem LibreView-Konto ein, statt LibreView danach zu fragen</string>
+    <string name="loc_libreview_account_requested">Konto-ID wird bei LibreView angefragt</string>
+    <string name="loc_libreview_account_written">Von Hand notiert</string>
+    <string name="loc_libreview_account_from_server">Von LibreView abgerufen</string>
+    <string name="loc_libreview_viewed">Angesehene Scans hochladen</string>
+    <string name="loc_libreview_viewed_desc">Auch Scans senden, die Abbottes App bereits angezeigt hat</string>
+    <string name="loc_libreview_immediate">Scans sofort hochladen</string>
+    <string name="loc_libreview_immediate_desc">Einen Scan sofort an LibreView senden, sobald er entsteht</string>
+    <string name="loc_libreview_kind_unset">Nicht senden</string>
+    <string name="loc_libreview_carb_weight">Gramm Kohlenhydrate pro Einheit</string>
+    <string name="loc_libreview_carb_weight_shown">%1$s · %2$s g pro Einheit</string>
+    <string name="loc_libreview_status">Letzter Upload</string>
+    <string name="loc_libreview_status_none">Noch nichts hochgeladen</string>
+    <string name="loc_libreview_resend">Start ändern</string>
+    <string name="loc_libreview_resend_desc">Vergessen, was vor einem Zeitpunkt hochgeladen wurde, und erneut senden</string>
+    <string name="loc_libreview_resend_from">Erneut senden ab %1$s</string>
+    <string name="loc_libreview_resend_done">Alles ab %1$s wird erneut gesendet</string>
+    <string name="loc_libreview_treatments">Behandlungszuordnung</string>
+    <string name="loc_libreview_treatments_desc">LibreView mitteilen, was die Zahlen unter jedem deiner Logbook-Labels bedeuten</string>
+    <string name="loc_libreview_treatments_info">LibreView akzeptiert für jeden Wert entweder eine Insulindosis, eine Kohlenhydratmenge oder eine Notiz, daher wird jedes deiner Logbook-Labels auf eine davon abgebildet. Ein nicht zugeordnetes Label wird nie gesendet.</string>
+    <string name="loc_libreview_treatments_none">Keine Logbook-Labels zum Zuordnen</string>
+    <string name="loc_libreview_treatments_progress">%1$d von %2$d Labels zugeordnet · %3$s</string>
+    <string name="loc_libreview_treatments_unmapped">Nicht zugeordnete Labels werden nie an LibreView gesendet</string>
+    <string name="loc_libreview_region">Region</string>
+    <string name="loc_libreview_region_desc">Abbott veröffentlicht eine eigene LibreLink-Konfiguration pro Region</string>
+    <string name="loc_libreview_region_fr">Frankreich</string>
+    <string name="loc_libreview_region_nl">Niederlande</string>
+    <string name="loc_libreview_region_pl">Polen</string>
+    <string name="loc_libreview_region_ru">Russland</string>
+    <string name="loc_libreview_region_uk">Vereinigtes Königreich</string>
+
+    <!-- Broadcast receiver pickers -->
+    <string name="loc_glucodata_receiver_dialog_title">Glucodata-Empfänger-Apps</string>
+    <string name="loc_xdrip_receiver_dialog_title">xDrip-Empfänger-Apps</string>
+    <string name="loc_no_glucodata_receivers">Keine installierte App empfängt Glucodata-Broadcasts.</string>
+    <string name="loc_no_xdrip_receivers">Keine installierte App empfängt xDrip-Broadcasts.</string>
+    <string name="loc_receiver_not_installed">%1$s · Nicht installiert</string>
+    <string name="loc_receiver_limit">Wähle bis zu 10 Empfänger-Apps aus.</string>
+    <string name="loc_range_desc">%1$s</string>
+    <string name="loc_reset">Zurücksetzen</string>
+
+    <!-- Graph layers -->
+    <string name="layer_alerts">Alarmlinien</string>
+    <string name="layer_alerts_desc">Momente, an denen ein Alarm ausgelöst hat, auf dem Graphen markieren</string>
+
+    <!-- Common units and states -->
+    <string name="mgdL">mg/dL</string>
+    <string name="mmolL">mmol/L</string>
+    <string name="off">Aus</string>
+    <string name="shortoff">Aus</string>
+    <string name="nothing">Nichts</string>
+    <string name="media">Medien</string>
+    <string name="notification">Benachrichtigung</string>
+    <string name="alarm">Alarm</string>
+    <string name="alarmis">Alarm ist</string>
+    <string name="alarmclock">⏰</string>
+    <string name="android13">Android</string>
+    <string name="resettitle">Zurücksetzen</string>
+    <string name="interval">Intervall</string>
+    <string name="upload">Hochladen</string>
+    <string name="uploader">Uploader</string>
+    <string name="autoqr">Auto-QR</string>
+    <string name="googlescan">Google-Scan</string>
+    <string name="garmin_connect">Garmin Connect</string>
+    <string name="via_garmin">Garmin Connect</string>
+    <string name="everSensebroadcast">EverSense-Broadcast</string>
+    <string name="patchedlibrebroadcast">Gepatchte Libre</string>
+    <string name="deletemeter">Geräteinformationen entfernen. Messungen bleiben erhalten.</string>
+    <string name="resetmessage">Löscht den Speicher des Senders. Sollte gedrückt werden, bevor ein neuer Sensor in einem bereits benutzten Sender verwendet wird.</string>
+    <string name="overlaypermissionmessage">adb shell pm grant tk.glucodata android.permission.SYSTEM_ALERT_WINDOW</string>
+    <string name="httpportxdripwarning">Der Webserver funktioniert nur mit xDrip-Zifferblatt-Apps, wenn der HTTP-Port 17580 ist.</string>
+    <string name="amountshort">@string/amountsname</string>
+    <string name="fontsizeshort">@string/fontsize</string>
+    <string name="streamhistory">Bluetooth-Verlauf</string>
+    <string name="streamingenabled">" Streaming aktiviert"</string>
+    <string name="streamingnotenabled">" Streaming nicht aktiviert"</string>
+    <string name="talk_touch">Talk Touch</string>
+    <string name="libreisviewed">Angesehene Scans</string>
+
+    <!-- Insulins -->
+    <string name="aspart">Insulin Aspart/NovoRapid/NovoLog</string>
+    <string name="fiasp">Fiasp</string>
+    <string name="glulisine">Insulin Glulisin/Apidra</string>
+    <string name="lispro">Insulin Lispro/Humalog</string>
+    <string name="humaninsulin">Humaninsulin/Humulin R/Novolin R</string>
+    <string name="urli">URLi/Lyumjev/Insulin lispro-aabc</string>
+    <string name="afrezza">Afrezza</string>
+
+    <!-- Sibionics sensor variants -->
+    <string name="sibionics">Sibionics</string>
+    <string name="sibionics2">Sibionics 2/Split - com.sisensing.eco</string>
+    <string name="eusibionics">Sibionics EU - com.sisensing.sijoy</string>
+    <string name="chsibionics">Sibionics China - com.sisensing.sisensingcgm</string>
+    <string name="hematonix">Hematonix - com.sisensing.rusibionics</string>
+    <string name="dexfuture">Vorhersage (Dexcom)</string>
+
+    <!-- Watch face complication labels -->
+    <string name="glucose_mono_arrow_beside">Glukose (Mono · Pfeil daneben)</string>
+    <string name="glucose_mono_arrow_bottom">Glukose (Mono · Pfeil darunter)</string>
+    <string name="glucose_mono_arrow_top">Glukose (Mono · Pfeil darüber)</string>
+    <string name="glucose_signal_arrow_bottom">Glukose (Signal · Pfeil darunter)</string>
+    <string name="glucose_signal_arrow_top">Glukose (Signal · Pfeil darüber)</string>
+    <string name="glucosearrowiconcomplicationlabel">Glukose (Mono · Trendpfeil)</string>
+    <string name="glucoseshortcomplicationlabel">Glukose (Kurztext)</string>
+    <string name="glucosevalueiconcomplicationlabel">Glukose (Mono · Wert)</string>
 </resources>
 

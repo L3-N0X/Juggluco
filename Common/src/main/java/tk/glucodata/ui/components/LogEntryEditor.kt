@@ -263,7 +263,14 @@ private fun EditorContent(
 
     val separator = remember { DecimalFormatSymbols.getInstance(Locale.getDefault()).decimalSeparator }
     val glucoseUnitLabel = stringResource(unit.labelRes)
-    fun unitLabel(type: LogType) = if (type == LogType.BLOOD_GLUCOSE) glucoseUnitLabel else type.unitLabel
+    val insulinUnitLabel = stringResource(R.string.unit_insulin_short)
+    val carbsUnitLabel = stringResource(R.string.unit_carbs_short)
+    fun unitLabel(type: LogType): String = when {
+        type == LogType.BLOOD_GLUCOSE -> glucoseUnitLabel
+        type.unitLabelRes == R.string.unit_carbs_short -> carbsUnitLabel
+        type.unitLabelRes == R.string.unit_insulin_short -> insulinUnitLabel
+        else -> ""
+    }
     fun shown(text: String) = text.replace('.', separator)
 
     val keypadVisible = !(noteFocused && WindowInsets.isImeVisible)
@@ -798,12 +805,14 @@ private fun AmountTile(
     )
     val content = if (active) typeColors.onContainer else scheme.onSurface
     val label = stringResource(type.shortLabelRes)
+    val tileDescription =
+        stringResource(R.string.log_entry_tile_description, label, valueText.ifEmpty { "0" }, unitText)
 
     Surface(
         onClick = onClick,
         modifier = modifier
             .heightIn(min = 112.dp)
-            .semantics { contentDescription = "$label ${valueText.ifEmpty { "0" }} $unitText" },
+            .semantics { contentDescription = tileDescription },
         shape = RoundedCornerShape(24.dp),
         color = container,
         border = BorderStroke(2.dp, border)

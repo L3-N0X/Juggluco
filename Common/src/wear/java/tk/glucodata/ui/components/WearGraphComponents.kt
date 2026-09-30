@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,6 +24,7 @@ import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import tk.glucodata.R
 import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
@@ -73,7 +75,7 @@ internal fun WearGraphHeader(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "${unit.symbol} • ${subtitle.orEmpty()}",
+                    text = stringResource(R.string.wear_ui_unit_and_subtitle, unit.symbol, subtitle.orEmpty()),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -84,14 +86,18 @@ internal fun WearGraphHeader(
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = if (isLive) "History (${selectedHours}h)" else subtitle.orEmpty(),
+                    text = if (isLive) {
+                        stringResource(R.string.wear_ui_history_hours, selectedHours)
+                    } else {
+                        subtitle.orEmpty()
+                    },
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (!isLive) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "NOW",
+                        text = stringResource(R.string.wear_ui_now),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -161,7 +167,7 @@ private fun WearTimeRangePill(
         }
     ) {
         Text(
-            text = "${hours}h",
+            text = stringResource(R.string.wear_ui_hours_short, hours),
             fontSize = 13.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
         )

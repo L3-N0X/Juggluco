@@ -31,19 +31,19 @@ fun AboutSettingsScreen(
         // SENSOR HARDWARE ECOSYSTEM
         SettingsSection(title = stringResource(R.string.loc_supported_sensor_hardware)) {
             SettingsActionRow(
-                title = "Abbott FreeStyle Libre",
+                title = stringResource(R.string.about_hardware_abbott),
                 subtitle = stringResource(R.string.loc_libre_hardware_desc),
                 icon = Icons.Default.Sensors
             )
 
             SettingsActionRow(
-                title = "Dexcom CGM",
+                title = stringResource(R.string.about_hardware_dexcom),
                 subtitle = stringResource(R.string.loc_dexcom_hardware_desc),
                 icon = Icons.Default.Sensors
             )
 
             SettingsActionRow(
-                title = "Sibionics CGM",
+                title = stringResource(R.string.about_hardware_sibionics),
                 subtitle = stringResource(R.string.loc_sibionics_hardware_desc),
                 icon = Icons.Default.Sensors
             )

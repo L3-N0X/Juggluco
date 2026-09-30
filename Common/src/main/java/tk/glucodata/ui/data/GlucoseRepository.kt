@@ -28,6 +28,8 @@ import tk.glucodata.JugglucoSend
 import tk.glucodata.MessageSender
 import tk.glucodata.Natives
 import tk.glucodata.Nightscout
+import androidx.annotation.StringRes
+import tk.glucodata.R
 import tk.glucodata.Notify
 import tk.glucodata.SensorBridge
 import tk.glucodata.SendLikexDrip
@@ -100,6 +102,9 @@ sealed interface SensorActivationState {
 class GlucoseRepository(
     private val scope: CoroutineScope
 ) {
+
+    /** Resolves a string resource outside of Compose (the repository has no context of its own). */
+    private fun res(@StringRes id: Int): String = Applic.getContext().getString(id)
     private data class NativeEntryIdentity(
         val store: NumberStore,
         val timeSeconds: Long,
@@ -950,7 +955,7 @@ class GlucoseRepository(
                             0x10 -> "SiBionics (GS1 / GS3)"
                             0x30, 0x40 -> "Dexcom G7 / ONE+"
                             0x50 -> "Accu-Chek SmartGuide"
-                            else -> "CGM Sensor"
+                            else -> res(R.string.cgm_sensor)
                         }
 
                         val status = when {
@@ -981,7 +986,7 @@ class GlucoseRepository(
 
                         detailsList.add(
                             SensorDetail(
-                                id = info.serial ?: "Unknown",
+                                id = info.serial ?: res(R.string.sensor_id_unknown),
                                 name = info.serial ?: typeName,
                                 sensorPtr = info.sensorptr,
                                 status = status,
@@ -999,14 +1004,17 @@ class GlucoseRepository(
                                 isHidden = info.isHidden,
                                 hasCalibration = info.hasCalibration,
                                 batteryPercent = null,
-                                connectionStatusStr = info.statusStr ?: if (info.isConnected) "Connected" else "Disconnected",
+                                connectionStatusStr = info.statusStr ?: res(
+                                    if (info.isConnected) R.string.sensor_handshake_connected
+                                    else R.string.sensor_handshake_disconnected
+                                ),
                                 handshakeStatusStr = info.handshakeStr ?: "",
                                 rawDiagnosticText = info.infoHtml ?: ""
                             )
                         )
                         legacyList.add(
                             SensorInfo(
-                                id = info.serial ?: "Unknown",
+                                id = info.serial ?: res(R.string.sensor_id_unknown),
                                 name = info.serial ?: typeName,
                                 state = if (info.isConnected) SensorState.ACTIVE else SensorState.DISCONNECTED,
                                 startTime = start,
@@ -1026,7 +1034,7 @@ class GlucoseRepository(
                     if (ptrs != null && ptrs.isNotEmpty()) {
                         for (ptr in ptrs) {
                             if (ptr == 0L) continue
-                            val name = Natives.namefromSensorptr(ptr) ?: "Sensor"
+                            val name = Natives.namefromSensorptr(ptr) ?: res(R.string.sensor_name_generic)
                             val infoText = Natives.sensortextfromSensorptr(ptr) ?: ""
                             val warmup = SensorBridge.warmupMinutes(ptr)
                             val isHidden = try { Natives.getHidefromSensorptr(ptr) } catch (_: Throwable) { false }
@@ -1071,8 +1079,9 @@ class GlucoseRepository(
                                     isHidden = isHidden,
                                     hasCalibration = hasCali,
                                     batteryPercent = null,
-                                    connectionStatusStr = "Connected",
-                                    handshakeStatusStr = "Authenticated",
+                                    connectionStatusStr = res(R.string.sensor_handshake_connected),
+                                    handshakeStatusStr = res(R.string.sensor_handshake_authenticated),
+                                    handshakeStatusRes = R.string.sensor_handshake_authenticated,
                                     rawDiagnosticText = infoText
                                 )
                             )
@@ -1084,7 +1093,7 @@ class GlucoseRepository(
                                     startTime = start,
                                     endTime = end,
                                     lastReadingTime = lastKnownReading,
-                                    sensorType = if (infoText.isNotEmpty()) infoText else "Active Sensor",
+                                    sensorType = if (infoText.isNotEmpty()) infoText else res(R.string.sensor_name_active),
                                     isConnected = true,
                                     isStreaming = true
                                 )
@@ -2170,7 +2179,7 @@ class GlucoseRepository(
         }
     }
 
-    fun addLocalReceiverConnection(targetPort: String = "17580", label: String = "Local Prod Sync"): Boolean {
+    fun addLocalReceiverConnection(targetPort: String = "17580", label: String = res(R.string.loc_local_production_app)): Boolean {
         return try {
             if (!Applic.Nativesloaded) return false
             val portStr = targetPort.trim().ifEmpty { "17580" }
@@ -2189,7 +2198,7 @@ class GlucoseRepository(
                 false,
                 null,
                 0L,
-                label.trim().ifEmpty { "Local Prod Sync" },
+                label.trim().ifEmpty { res(R.string.loc_local_production_app) },
                 false,
                 false,
                 null,
@@ -2211,7 +2220,7 @@ class GlucoseRepository(
         }
     }
 
-    fun addLocalSenderConnection(targetPort: String = "17581", label: String = "Local Dev Build"): Boolean {
+    fun addLocalSenderConnection(targetPort: String = "17581", label: String = res(R.string.loc_local_dev_build)): Boolean {
         return try {
             if (!Applic.Nativesloaded) return false
             val portStr = targetPort.trim().ifEmpty { "17581" }
@@ -2230,7 +2239,7 @@ class GlucoseRepository(
                 false,
                 null,
                 0L,
-                label.trim().ifEmpty { "Local Dev Build" },
+                label.trim().ifEmpty { res(R.string.loc_local_dev_build) },
                 false,
                 false,
                 null,
@@ -2280,7 +2289,7 @@ class GlucoseRepository(
                 false,
                 null,
                 0L,
-                label.trim().ifEmpty { if (isReceiver) "Receiver" else "Sender" },
+                label.trim().ifEmpty { res(if (isReceiver) R.string.loc_mirror_receiver else R.string.loc_mirror_sender) },
                 false,
                 false,
                 null,

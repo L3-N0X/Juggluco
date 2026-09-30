@@ -55,7 +55,7 @@ class ZXing {
                    if(intentResult != null) {
                       final var scan=intentResult.getContents();
                       if (scan== null) 
-                        Toaster( "Cancelled");
+                        Toaster( act.getString(R.string.cancelled));
                        else {
                             Log.i(LOG_ID,"Scan: "+scan);
                             Toaster(scan);
