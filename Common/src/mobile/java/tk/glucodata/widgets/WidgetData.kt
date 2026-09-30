@@ -44,6 +44,12 @@ class WidgetSnapshot(
 ) {
     val hasReading: Boolean get() = currentTime > 0L && currentMgDl > 0f
     val isStale: Boolean get() = !hasReading || now - currentTime > Notify.glucosetimeout
+
+    /** A reading worth showing: current, or stale (shown struck through) but not older than [Notify.lastreadingshown]. */
+    val hasRecentReading: Boolean get() = hasReading && now - currentTime <= Notify.lastreadingshown
+
+    /** How much longer the reading may be shown. */
+    val lastReadingShownFor: Long get() = (currentTime + Notify.lastreadingshown - now).coerceAtLeast(60_000L)
     val status: GlucoseStatus? get() = if (hasReading) statusOf(currentMgDl) else null
 
     fun statusOf(mgDl: Float): GlucoseStatus = range.statusOf(mgDl)

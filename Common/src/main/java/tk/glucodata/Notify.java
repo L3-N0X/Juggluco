@@ -81,6 +81,8 @@ static {
         };
 static public final int glucosetimeoutSEC=30*11;
 static public final long glucosetimeout=1000L*glucosetimeoutSEC;
+/** How long the last reading stays on show, struck through, once no new ones arrive (a sensor warning, a lost connection). */
+static public final long lastreadingshown=1000L*60*60*12;
 
     static final private String LOG_ID="Notify";
 static Notify onenot=null;
@@ -376,7 +378,8 @@ public static void refreshGlucoseNotification() {
     final var strgl=SuperGattCallback.previousglucose;
     final var gl=SuperGattCallback.previousglucosevalue;
     if(strgl==null||gl<2.0f||System.currentTimeMillis()-strgl.time>glucosetimeout) {
-        GlucoseNotifications.statusIcons(null,0.0f,null);
+        if(!(showalways&&!getisalarm()&&noti.stalenotification()))
+            GlucoseNotifications.stale(null);
         return;
         }
     if(showalways&&!getisalarm())
@@ -1015,9 +1018,46 @@ void oldnotification(long time) {
     }
 */
 void oldnotification(long time) {
+    if(isWearable) {
+        oldnotificationtext(time);
+        return;
+        }
+    // Reads the recent history for the graph, so not on the main thread the loss alarm arrives on.
+    Applic.scheduler.execute(()-> {
+        try {
+            // A reading that came in meanwhile has its own notification.
+            if(System.currentTimeMillis()-Natives.lastglucosetime()<glucosetimeout/2)
+                return;
+            if(showalways&&!getisalarm()) {
+                if(stalenotification())
+                    return;
+                }
+            else
+                GlucoseNotifications.stale(null);
+            oldnotificationtext(time);
+            }
+        catch(Throwable th) {
+            Log.stack(LOG_ID,"oldnotification",th);
+            }
+        });
+    }
+private void oldnotificationtext(long time) {
     final String tformat= timef.format(time);
     String message = Applic.getContext().getString(R.string.nonewvalue) + tformat;
      placelargenotification(R.drawable.novalue, message,GLUCOSENOTIFICATION,true);
+    }
+/** The glucose notification once readings stopped: the last one, greyed and struck through. False when there is none recent enough. */
+private boolean stalenotification() {
+    var builder=mkbuilder(GLUCOSENOTIFICATION);
+    builder.setOnlyAlertOnce(true).setShowWhen(true).setPriority(Notification.PRIORITY_DEFAULT);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        builder.setVisibility(VISIBILITY_PUBLIC);
+        }
+    if(!GlucoseNotifications.stale(builder))
+        return false;
+    hasvalue=true;
+    fornotify(builder.build());
+    return true;
     }
     @SuppressWarnings("deprecation")
 private Notification  makenotification(int draw,String message,String type,boolean once) {

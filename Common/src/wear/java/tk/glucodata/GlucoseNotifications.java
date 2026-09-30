@@ -17,4 +17,8 @@ final class GlucoseNotifications {
 
     static void statusIcons(notGlucose glucose, float displayValue, String valueText) {
     }
+
+    static boolean stale(Notification.Builder builder) {
+        return false;
+    }
 }
