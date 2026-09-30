@@ -16,6 +16,9 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StrikethroughSpan
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
 import androidx.wear.watchface.complications.data.LongTextComplicationData
@@ -29,6 +32,7 @@ import androidx.wear.watchface.complications.data.SmallImageComplicationData
 import androidx.wear.watchface.complications.data.SmallImageType
 import tk.glucodata.Applic
 import tk.glucodata.R
+import tk.glucodata.StaleReading
 import tk.glucodata.Natives
 import tk.glucodata.Notify
 import tk.glucodata.ui.model.GlucoseRange
@@ -64,12 +68,16 @@ enum class ComplicationColorStyle {
  */
 data class ComplicationGlucose(
     val value: String,
+    /** No current reading: [value] is then either [ComplicationRenderer.NO_VALUE] or the last reading, shown struck through. */
     val isOld: Boolean,
     val rate: Float,
     val status: GlucoseStatus,
     val time: Long,
     val isMmol: Boolean
-)
+) {
+    /** The last reading, shown struck through because no new one arrived. */
+    val isStruck: Boolean get() = isOld && value != ComplicationRenderer.NO_VALUE
+}
 
 object ComplicationRenderer {
     /**
@@ -87,8 +95,8 @@ object ComplicationRenderer {
     const val ICON_SIZE = 96
 
     /**
-     * Placeholder shown whenever no current reading is available (no sensor data
-     * yet, or the reading is older than the glucose timeout). Never substitute a
+     * Placeholder shown whenever no reading is available (no sensor data yet, or
+     * the last one is too old to show even struck through). Never substitute a
      * plausible number here: a fabricated value is indistinguishable from a real
      * measurement on a watch face.
      */
@@ -160,8 +168,9 @@ object ComplicationRenderer {
         ).normalized()
         val status = range.statusOf(valMgDl)
 
+        // An old reading stays on show, greyed and struck through, until it is too old to mean anything.
         return ComplicationGlucose(
-            value = if (isOld) NO_VALUE else strGl.value,
+            value = if (isOld && !StaleReading.shown(now - timeMs)) NO_VALUE else strGl.value,
             isOld = isOld,
             rate = strGl.rate,
             status = status,
@@ -226,6 +235,14 @@ object ComplicationRenderer {
         canvas.drawText(text, CX, baseline, paint)
     }
 
+    /** The value, centred; an old reading struck through. */
+    private fun drawValue(canvas: Canvas, glucose: ComplicationGlucose, paint: Paint, centerY: Float) {
+        drawCenteredText(canvas, glucose.value, paint, centerY)
+        if (!glucose.isStruck) return
+        val width = paint.measureText(glucose.value)
+        StaleReading.strike(canvas, CX - width / 2f, CX + width / 2f, centerY, StaleReading.digitHeight(paint), paint)
+    }
+
     /**
      * Renders a complication into a [CANVAS_SIZE]x[CANVAS_SIZE] ARGB_8888 bitmap.
      */
@@ -277,7 +294,8 @@ object ComplicationRenderer {
             textSize = 22f * S
         }
 
-        val timeStr = if (showTime && !glucose.isOld && glucose.time > 0) {
+        // An old reading always carries its time, so it is clear how old it is.
+        val timeStr = if ((showTime && !glucose.isOld && glucose.time > 0) || glucose.isStruck) {
             tk.glucodata.NumberView.minhourstr(glucose.time)
         } else null
 
@@ -290,7 +308,7 @@ object ComplicationRenderer {
                 val cyArrow = 70f * S
                 val baseSize = (if (glucose.isMmol) 68f else 72f) * S * userScale
                 fitTextSize(textPaint, glucose.value, baseSize, safeWidth)
-                drawCenteredText(canvas, glucose.value, textPaint, cyVal)
+                drawValue(canvas, glucose, textPaint, cyVal)
 
                 drawTrendArrow(
                     canvas = canvas,
@@ -314,7 +332,7 @@ object ComplicationRenderer {
                 val cyArrow = 186f * S
                 val baseSize = (if (glucose.isMmol) 68f else 72f) * S * userScale
                 fitTextSize(textPaint, glucose.value, baseSize, safeWidth)
-                drawCenteredText(canvas, glucose.value, textPaint, cyVal)
+                drawValue(canvas, glucose, textPaint, cyVal)
 
                 drawTrendArrow(
                     canvas = canvas,
@@ -361,7 +379,8 @@ object ComplicationRenderer {
                 val baseline = cyVal - (fm.descent + fm.ascent) / 2f
 
                 textPaint.textAlign = Paint.Align.LEFT
-                canvas.drawText(glucose.value, startX, baseline, textPaint)
+                if (glucose.isStruck) StaleReading.drawStruck(canvas, glucose.value, startX, baseline, textPaint)
+                else canvas.drawText(glucose.value, startX, baseline, textPaint)
 
                 val arrowCenterX = startX + textWidth + spacing + hw
                 drawTrendArrow(
@@ -386,7 +405,7 @@ object ComplicationRenderer {
                 val cyVal = if (timeStr != null) 120f * S else CY
                 val baseSize = (if (glucose.isMmol) 84f else 92f) * S * userScale
                 fitTextSize(textPaint, glucose.value, baseSize, safeWidth)
-                drawCenteredText(canvas, glucose.value, textPaint, cyVal)
+                drawValue(canvas, glucose, textPaint, cyVal)
 
                 if (timeStr != null) {
                     drawCenteredText(canvas, timeStr, timePaint, 215f * S)
@@ -540,17 +559,26 @@ object ComplicationRenderer {
         pendingIntent: PendingIntent?
     ): ComplicationData? {
         val glucose = if (isPreview) getPreviewGlucose() else getLatestGlucose()
+        val context = Applic.getContext()
         val hasValue = !glucose.isOld && glucose.value != NO_VALUE
         val trend = if (glucose.isOld) TrendArrow.UNKNOWN else TrendArrow.fromRate(glucose.rate)
-        val descText = if (hasValue) {
-            PlainComplicationText.Builder(
-                "${Applic.getContext().getString(R.string.glucose)} ${glucose.value}, ${Applic.getContext().getString(trend.labelRes)}"
+        val timeOfReading = if (glucose.time > 0) tk.glucodata.NumberView.minhourstr(glucose.time) else null
+        val descText = when {
+            hasValue -> PlainComplicationText.Builder(
+                "${context.getString(R.string.glucose)} ${glucose.value}, ${context.getString(trend.labelRes)}"
             ).build()
-        } else {
+            glucose.isStruck -> PlainComplicationText.Builder(
+                "${context.getString(R.string.glucose)} ${glucose.value}, ${context.getString(R.string.nonewvalue).trim()} $timeOfReading"
+            ).build()
             // No reading: announce it as unknown instead of reading out the placeholder.
-            PlainComplicationText.Builder(Applic.getContext().getString(R.string.unknown)).build()
+            else -> PlainComplicationText.Builder(context.getString(R.string.unknown)).build()
         }
-        val valueText = PlainComplicationText.Builder(glucose.value).build()
+        // Watch faces that keep text spans strike an old reading through; the others still show it muted by its time title.
+        val valueText = PlainComplicationText.Builder(
+            if (glucose.isStruck) SpannableString(glucose.value).apply {
+                setSpan(StrikethroughSpan(), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            } else glucose.value
+        ).build()
 
         // Monochrome arrow asset any watch face can tint; signal arrow asset
         // for full-color watch faces. Both share identical geometry.
@@ -561,12 +589,10 @@ object ComplicationRenderer {
             renderArrowIcon(ComplicationColorStyle.SIGNAL, glucose)
         )
 
-        // Optional time title for text slots ("13:42"); null when stale/hidden.
+        // Time title for text slots ("13:42"): optional for a current reading, always for an old one.
         val showTime = Natives.gettimeOnComplication()
-        val titleText = if (showTime && !glucose.isOld && glucose.time > 0) {
-            PlainComplicationText.Builder(
-                tk.glucodata.NumberView.minhourstr(glucose.time)
-            ).build()
+        val titleText = if ((showTime && !glucose.isOld && timeOfReading != null) || glucose.isStruck) {
+            PlainComplicationText.Builder(timeOfReading ?: "").build()
         } else null
 
         return when (type) {

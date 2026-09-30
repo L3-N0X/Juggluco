@@ -2,11 +2,13 @@ package tk.glucodata
 
 import android.app.Notification
 import android.graphics.drawable.Icon
+import android.os.Build
 import tk.glucodata.notifications.GlucoseNotificationStyler
 import tk.glucodata.notifications.NotificationConfigStore
 import tk.glucodata.notifications.StatusIconInput
 import tk.glucodata.notifications.StatusIconKind
 import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.widgets.WidgetDataSource
 
 /**
  * Entry points for [Notify] into the phone's glucose notification (tk.glucodata.notifications).
@@ -61,5 +63,34 @@ object GlucoseNotifications {
         } catch (th: Throwable) {
             Log.stack(LOG_ID, "statusIcons", th)
         }
+    }
+
+    /**
+     * Once readings stopped: gives [builder] the last reading, greyed and struck through, and shows
+     * it on the extra status bar icons too. With a null [builder] only the icons are updated.
+     * Returns false when there is no reading recent enough to show.
+     */
+    @JvmStatic
+    fun stale(builder: Notification.Builder?): Boolean = try {
+        val context = Applic.app
+        val config = NotificationConfigStore.load(context)
+        val snapshot = WidgetDataSource.load(context, config.historyMillis(System.currentTimeMillis()))
+        if (!snapshot.hasRecentReading) {
+            GlucoseNotificationStyler.postStatusIcons(context, config, null, null)
+            false
+        } else {
+            val valueText = GlucoseNotificationStyler.iconValueText(snapshot)
+            GlucoseNotificationStyler.postStatusIcons(context, config, snapshot, valueText)
+            if (builder != null) {
+                GlucoseNotificationStyler.style(context, builder, config, snapshot, valueText)
+                builder.setWhen(snapshot.currentTime)
+                // Goes once the reading is too old to show; by then the plain message has replaced it.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) builder.setTimeoutAfter(snapshot.lastReadingShownFor)
+            }
+            builder != null
+        }
+    } catch (th: Throwable) {
+        Log.stack(LOG_ID, "stale", th)
+        false
     }
 }
