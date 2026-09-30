@@ -2172,7 +2172,9 @@ public void backglucose() {
    sendtowatch=wasglucose;
 //   setSending(false);
    }
-private final static Application getApplication() {
+/** The application this transport runs in. The Compose Garmin screen has no
+ * legacy Activity to hand over, so it reaches the transport through this. */
+public final static Application getApplication() {
    return Applic.app;
     }
 

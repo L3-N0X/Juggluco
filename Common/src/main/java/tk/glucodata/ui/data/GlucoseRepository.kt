@@ -23,6 +23,7 @@ import tk.glucodata.BleMirror
 import tk.glucodata.BuildConfig
 import tk.glucodata.Log
 import tk.glucodata.MainActivity
+import tk.glucodata.GarminBridge
 import tk.glucodata.JugglucoSend
 import tk.glucodata.MessageSender
 import tk.glucodata.Natives
@@ -45,6 +46,10 @@ import tk.glucodata.ui.model.BroadcastReceiverApp
 import tk.glucodata.ui.model.DeltaCalculation
 import tk.glucodata.ui.model.DisplayConfig
 import tk.glucodata.ui.model.ExchangesConfig
+import tk.glucodata.ui.model.GarminLibre3Result
+import tk.glucodata.ui.model.GarminShortcut
+import tk.glucodata.ui.model.GarminShortcutError
+import tk.glucodata.ui.model.GarminStatus
 import tk.glucodata.ui.model.GlucosePoint
 import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStats
@@ -262,6 +267,12 @@ class GlucoseRepository(
 
     private val _wearDiagnosticInfo = MutableStateFlow(WearDiagnosticInfo())
     val wearDiagnosticInfo: StateFlow<WearDiagnosticInfo> = _wearDiagnosticInfo.asStateFlow()
+
+    private val _garminStatus = MutableStateFlow(GarminStatus())
+    val garminStatus: StateFlow<GarminStatus> = _garminStatus.asStateFlow()
+
+    private val _garminShortcuts = MutableStateFlow<List<GarminShortcut>>(emptyList())
+    val garminShortcuts: StateFlow<List<GarminShortcut>> = _garminShortcuts.asStateFlow()
 
     private val _libreView = MutableStateFlow(LibreViewConfig())
     val libreView: StateFlow<LibreViewConfig> = _libreView.asStateFlow()
@@ -3102,7 +3113,7 @@ class GlucoseRepository(
     fun setGarminEnabled(enabled: Boolean) {
         _watchConfig.value = _watchConfig.value.copy(garminEnabled = enabled)
         scope.launch(Dispatchers.IO) {
-            WatchBridge.setGarmin(enabled)
+            GarminBridge.setEnabled(enabled)
         }
     }
 
@@ -3118,6 +3129,138 @@ class GlucoseRepository(
         scope.launch(Dispatchers.IO) {
             WatchBridge.setNotifyWatch(enabled)
         }
+    }
+
+    // --- GARMIN ACTIONS ---
+
+    /**
+     * Reads the Garmin transport. The status screen calls this about once a second
+     * while it is open, because a watch answers, retries and reports state on its
+     * own schedule and there is no callback to wait for.
+     */
+    fun refreshGarminStatus() {
+        scope.launch(Dispatchers.IO) {
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    /**
+     * Looks for Garmin Connect devices paired since start-up. This asks the SDK
+     * about every known device, so it belongs on entering the screen, not on every
+     * refresh tick.
+     */
+    fun discoverGarminDevices() {
+        scope.launch(Dispatchers.IO) {
+            GarminBridge.refreshDevices()
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    fun setGarminActive(peerId: Long, active: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            GarminBridge.setActive(peerId, active)
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    fun setGarminGlucose(peerId: Long, enabled: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            GarminBridge.setGlucose(peerId, enabled)
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    /**
+     * Hands the active Libre 3 sensor to the watch. The phone only lets go once
+     * the watch really has the sensor, so the result decides what the screen says.
+     */
+    suspend fun requestGarminLibre3Direct(peerId: Long, enabled: Boolean): GarminLibre3Result =
+        withContext(Dispatchers.IO) {
+            val result = GarminBridge.setLibre3Direct(peerId, enabled)
+            _garminStatus.value = GarminBridge.read()
+            result
+        }
+
+    fun setGarminNumbersDevice(peerId: Long, enabled: Boolean) {
+        scope.launch(Dispatchers.IO) {
+            GarminBridge.setNumbersDevice(peerId, enabled)
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    fun setGarminTransportMode(mode: Int) {
+        _garminStatus.value = _garminStatus.value.copy(transportMode = mode)
+        scope.launch(Dispatchers.IO) {
+            GarminBridge.setTransportMode(mode)
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    fun syncGarmin(peerId: Long) {
+        scope.launch(Dispatchers.IO) {
+            GarminBridge.sync(peerId)
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    fun sendNextGarminMessage(peerId: Long) {
+        scope.launch(Dispatchers.IO) {
+            GarminBridge.sendNextMessage(peerId)
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    fun reinitGarmin(peerId: Long) {
+        scope.launch(Dispatchers.IO) {
+            GarminBridge.reinit(peerId)
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    fun setGarminDarkMode(peerId: Long, black: Boolean) {
+        _garminStatus.value = _garminStatus.value.copy(
+            watches = _garminStatus.value.watches.map {
+                if (it.id == peerId) it.copy(darkMode = black) else it
+            }
+        )
+        scope.launch(Dispatchers.IO) {
+            GarminBridge.setDarkMode(peerId, black)
+            _garminStatus.value = GarminBridge.read()
+        }
+    }
+
+    /**
+     * Stores the ConnectIQ application id and restarts the transport, so a watch
+     * that was left talking to another application starts over cleanly. A null id
+     * means the default one.
+     */
+    suspend fun saveGarminAppId(id: String?): Boolean = withContext(Dispatchers.IO) {
+        val saved = GarminBridge.saveAppId(id)
+        if (saved) {
+            GarminBridge.restartTransport()
+            _garminStatus.value = GarminBridge.read()
+        }
+        saved
+    }
+
+    fun refreshGarminShortcuts() {
+        scope.launch(Dispatchers.IO) {
+            _garminShortcuts.value = GarminBridge.shortcuts()
+        }
+    }
+
+    suspend fun saveGarminShortcuts(shortcuts: List<GarminShortcut>): GarminShortcutError? =
+        withContext(Dispatchers.IO) {
+            val error = GarminBridge.saveShortcuts(shortcuts)
+            _garminShortcuts.value = GarminBridge.shortcuts()
+            error
+        }
+
+    /** The native help pages only exist in the phone build; elsewhere this is null. */
+    fun garminHelpHtml(name: String): String? = try {
+        GarminBridge.helpHtml(name)
+    } catch (_: Throwable) {
+        null
     }
 
     // --- DISPLAY & UI ACTIONS ---

@@ -193,12 +193,6 @@ object WatchBridge {
         } catch (_: Throwable) {}
     }
 
-    fun setGarmin(enabled: Boolean) {
-        try {
-            Natives.setusegarmin(enabled)
-        } catch (_: Throwable) {}
-    }
-
     fun setSeparateAlerts(enabled: Boolean) {
         try {
             Notify.alertseparate = enabled

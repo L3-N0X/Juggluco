@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.DisplaySettings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.WatchLater
@@ -60,6 +61,7 @@ fun WatchSettingsScreen(
     repository: GlucoseRepository,
     onNavigateBack: () -> Unit,
     onOpenMirrorConfig: () -> Unit = {},
+    onOpenGarminStatus: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -252,6 +254,17 @@ fun WatchSettingsScreen(
                     repository.setGarminEnabled(enabled)
                 }
             )
+
+            // Device selection, sync and diagnostics need the transport, which
+            // only exists once Garmin is switched on.
+            if (watchConfig.garminEnabled) {
+                SettingsNavRow(
+                    title = stringResource(R.string.status),
+                    subtitle = stringResource(R.string.loc_garmin_status_desc),
+                    icon = Icons.Default.DisplaySettings,
+                    onClick = onOpenGarminStatus
+                )
+            }
 
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_watchdrip_title),

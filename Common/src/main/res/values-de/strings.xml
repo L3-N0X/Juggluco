@@ -1745,6 +1745,39 @@
 <string name="garmin_alarm_invalid">Überprüfen Sie die Werte: „Niedrig“ muss unter „Hoch“ liegen; Verzögerung bei fehlenden Werten 1–4095 Minuten, Wiederholung 0–4095 Minuten, Dauer 0–65535 Sekunden.</string>
 <string name="garmin_alarm_newer">Auf der Uhr befinden sich neuere Alarmeinstellungen. Durch das Speichern hier werden diese überschrieben.</string>
 
+    <!-- Garmin-Status, Konfiguration und Kurzbefehle (Compose) -->
+    <string name="loc_garmin_status_title">Garmin (Kerfstok)</string>
+    <string name="loc_garmin_config_title">Garmin-Konfiguration</string>
+    <string name="loc_garmin_status_desc">Geräte, Verbindung und Abgleich</string>
+    <string name="loc_garmin_config_desc">Uhr-App, Kurzbefehle und Anzeige</string>
+    <string name="loc_garmin_shortcuts_title">Kurzbefehle</string>
+    <string name="loc_garmin_shortcuts_desc">Mengen, die die Uhr selbst anbietet</string>
+    <string name="loc_garmin_shortcuts_hint">Diese Mengen erscheinen auf der Uhr neben dem Glukosewert, sodass eine Insulindosis oder eine Mahlzeit ohne das Telefon erfasst werden kann.</string>
+    <string name="loc_garmin_shortcuts_saved">Kurzbefehle gespeichert</string>
+    <string name="loc_garmin_unnamed_shortcut">Kurzbefehl ohne Namen</string>
+    <string name="loc_garmin_watch_section">Uhr</string>
+    <string name="loc_garmin_actions_section">Aktionen</string>
+    <string name="loc_garmin_details_section">Details</string>
+    <string name="loc_garmin_libre3_connection">Sensorverbindung (Libre 3)</string>
+    <string name="loc_garmin_transport_title">Verbindungsmethode</string>
+    <string name="loc_garmin_transport_desc">Wie das Telefon die Uhr erreicht. Eine Änderung startet die Verbindung neu.</string>
+    <string name="loc_garmin_libre3_phone_desc">Das Telefon liest den Sensor weiter und sendet die Werte an die Uhr.</string>
+    <string name="loc_garmin_libre3_watch_desc">Die Uhr liest den Sensor selbst über direktes Bluetooth.</string>
+    <string name="loc_garmin_not_available">Garmin ist auf diesem Gerät nicht verfügbar</string>
+    <string name="loc_garmin_no_watches">Keine Garmin-Uhr gefunden</string>
+    <string name="loc_garmin_pair_instructions">Koppeln Sie die Uhr in den Bluetooth-Einstellungen von Android mit diesem Telefon und suchen Sie anschließend erneut nach Uhren.</string>
+    <string name="loc_garmin_search_watches">Erneut nach Uhren suchen</string>
+    <string name="loc_garmin_search_watches_desc">Liest die mit diesem Telefon gekoppelten Garmin-Connect-Geräte erneut ein</string>
+    <string name="loc_garmin_glucose_desc">Glukosewerte an diese Uhr senden</string>
+    <string name="loc_garmin_numbers_desc">Die Uhr, die gespeicherte Zahlen und den Verlauf erhält</string>
+    <string name="loc_garmin_numbers_device">Zahlengerät: %1$s</string>
+    <string name="loc_garmin_app_id_dialog_title">Uhr-App-ID</string>
+    <string name="loc_garmin_app_id_saved">Uhr-App-ID geändert</string>
+    <string name="loc_garmin_app_id_dialog_desc">Die ID der Kerfstok-Anwendung, die auf der Uhr laufen muss.</string>
+    <string name="loc_garmin_help_title">Hilfe</string>
+    <string name="loc_garmin_connected_via">Verbindung: %1$s</string>
+    <string name="loc_garmin_default_app_id">Standard-App-ID</string>
+
     <!-- Sensor pairing / activation flow -->
     <string name="sensor_current_state">Aktueller Sensorzustand</string>
     <string name="sensor_handshake_authenticated">Authentifiziert</string>

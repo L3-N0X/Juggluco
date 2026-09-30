@@ -167,6 +167,97 @@ data class WearDiagnosticInfo(
     val reachableWearNodesCount: Int = 0
 )
 
+/**
+ * How the phone reaches a Garmin watch. The values are the native
+ * `AllData.GARMIN_TRANSPORT_*` codes, copied here because the Garmin transport
+ * itself only exists in the phone build.
+ */
+object GarminTransport {
+    const val AUTOMATIC = 0
+    const val CONNECT = 1
+    const val DIRECT = 2
+}
+
+/**
+ * One Garmin watch, as the native transport reports it.
+ *
+ * [communicationStatus] and [lastError] are the native English state keys, not
+ * display text: the status screen maps them onto localized strings, exactly the
+ * way the native Garmin status screen does.
+ * [transportResult] is the name of the native ConnectIQ result, or null when the
+ * watch has not answered since the last message was sent.
+ */
+data class GarminWatchState(
+    val id: Long,
+    val name: String,
+    val connected: Boolean = false,
+    val direct: Boolean = false,
+    val active: Boolean = false,
+    val glucose: Boolean = false,
+    val libre3Direct: Boolean = false,
+    val libre3Installed: Boolean = false,
+    val numbers: Boolean = false,
+    val darkMode: Boolean = false,
+    val communicationStatus: String = "",
+    val lastError: String? = null,
+    val transportResult: String? = null,
+    val lastAcknowledged: Long = 0L,
+    val lastGlucoseAcknowledged: Long = 0L,
+    val acknowledgedGlucoseTime: Long = 0L,
+    val timestampedGlucoseAck: Boolean = false,
+    val lastSend: Long = 0L,
+    val lastReceived: Long = 0L,
+    /** When the last transport result was reported; older than that it is history. */
+    val lastStatusTime: Long = 0L,
+    /** True while this watch has stored messages the user has to push by hand. */
+    val waiting: Boolean = false
+)
+
+/** One read of everything the Garmin status screen shows. */
+data class GarminStatus(
+    /** The watch builds have no Garmin transport, so the screen says so instead. */
+    val supported: Boolean = false,
+    val watches: List<GarminWatchState> = emptyList(),
+    val transportMode: Int = GarminTransport.AUTOMATIC,
+    val numbersDeviceName: String = "",
+    val sending: Boolean = false,
+    /** Sending glucose only makes sense once a watch can be reached at all. */
+    val sendGlucoseAvailable: Boolean = false,
+    val appInstalled: Boolean = false,
+    val appId: String = "",
+    val defaultAppId: String = ""
+) {
+    val appIdIsDefault: Boolean get() = appId == defaultAppId
+}
+
+/** A named amount the user can push to a watch without going through the watch. */
+data class GarminShortcut(val label: String, val value: String)
+
+/**
+ * What came of handing the active Libre 3 sensor to a watch. The phone keeps
+ * the sensor unless the watch accepted it, so a refusal has to be undone.
+ */
+enum class GarminLibre3Result {
+    APPLIED,
+    /** The native side does not know this watch, so there was nothing to hand over. */
+    NO_DEVICE,
+    /** There is no Libre 3 sensor on the phone to hand over. */
+    NO_SENSOR
+}
+
+/** Which half of a shortcut the native store refused to store. */
+enum class GarminShortcutField { LABEL, VALUE }
+
+/**
+ * Why the native shortcut store refused a save. The native call reports the
+ * offending entry, so the screen can name the half of it that did not fit. A null
+ * [field] means the entry itself was refused rather than one of its halves.
+ */
+data class GarminShortcutError(
+    val index: Int,
+    val field: GarminShortcutField? = null
+)
+
 data class MirrorConnection(
     val index: Int,
     val label: String,
