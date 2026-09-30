@@ -84,6 +84,26 @@ data class ExchangesConfig(
     val webServerSecret: String = ""
 )
 
+data class UploaderConfig(
+    val url: String = "",
+    val active: Boolean = false,
+    val v3: Boolean = false,
+    val postTreatments: Boolean = false,
+    val canSendTreatments: Boolean = false
+)
+
+data class UploaderStatus(
+    val text: String = "",
+    val timeMillis: Long = 0L
+)
+
+data class TreatmentMapping(
+    val index: Int,
+    val label: String,
+    val kind: Int,
+    val weight: Float
+)
+
 data class DisplayConfig(
     val floatingGlucose: Boolean = false,
     val statusBarNotification: Boolean = true,

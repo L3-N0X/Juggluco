@@ -115,6 +115,40 @@ private static  String getstart(HttpURLConnection con,int max)  throws IOExcepti
         }
     }
 
+static private String readstring(HttpURLConnection con,int code)  throws IOException{
+    var stream=(code>=200&&code<400)?con.getInputStream():con.getErrorStream();
+    if(stream==null)
+        return "";
+    try(var in = new BufferedReader(new InputStreamReader(stream))) {
+        StringBuffer response = new StringBuffer();
+        String inputLine;
+        while ((inputLine = in.readLine()) != null) {
+            response.append(inputLine);
+            }
+        return response.toString();
+        }
+    finally {
+        con.disconnect();
+        }
+    }
+
+static private String limitstring(String str) {
+    final int max=400;
+    if(str.length()<=max)
+        return str;
+    return str.substring(0,max)+"...";
+    }
+
+@Keep
+static public String getstatus() {
+    return uploadstatus;
+    }
+
+@Keep
+static public long getuploadtime() {
+    return uploadtime;
+    }
+
 final  static String nothing=Applic.getContext().getString(R.string.triednothing).intern();
 final static String success=Applic.getContext().getString(R.string.success).intern();
 static private String uploadstatus=nothing;
@@ -269,6 +303,46 @@ static public int upload(String httpurl,byte[] postdata,String secret,boolean pu
         return -1;
         }
      }
+@Keep
+static public String testconnection(String httpurl,String secret) {
+    patch();
+    uploadtime=System.currentTimeMillis();
+    String base=httpurl.trim();
+    while(base.endsWith("/"))
+        base=base.substring(0,base.length()-1);
+    final String testurl=base+"/api/v1/version";
+    {if(doLog) {Log.i(LOG_ID,"testconnection "+testurl);};};
+    try {
+        uploadstatus="start test "+testurl;
+        URL url = new URL(testurl);
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setConnectTimeout(10000);
+        urlConnection.setReadTimeout(60000);
+        urlConnection.setRequestMethod("GET");
+        if(secret!=null&&!secret.isEmpty())
+            urlConnection.setRequestProperty("api-secret", secret);
+        urlConnection.setRequestProperty("Content-Type", "application/json");
+        final int code=urlConnection.getResponseCode();
+        String res=limitstring(readstring(urlConnection,code));
+        if(code==HTTP_OK) {
+            final String ok="test ResponseCode="+code+"\n"+res;
+            uploadstatus=ok;
+            {if(doLog) {Log.i(LOG_ID,ok);};};
+            return ok;
+            }
+        final String failure="test failure code="+code+"\n"+res;
+        uploadstatus=failure;
+        Log.e(LOG_ID,failure);
+        return failure;
+        }
+    catch(Throwable th) {
+        final String failure="test failure:\n"+(th==null?"Network error":th.toString());
+        uploadstatus=failure;
+        Log.e(LOG_ID,failure);
+        return failure;
+        }
+    }
+
 private static    void askclearupload(Context context) {
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(" ").setMessage(R.string.resendquestion).

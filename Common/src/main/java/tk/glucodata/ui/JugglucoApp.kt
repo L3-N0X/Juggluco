@@ -58,6 +58,7 @@ import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
 import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
 import tk.glucodata.ui.screens.settings.SettingsDestination
 import tk.glucodata.ui.screens.settings.TurnServerSettingsScreen
+import tk.glucodata.ui.screens.settings.UploaderSettingsScreen
 import tk.glucodata.ui.screens.settings.VoiceSettingsScreen
 import tk.glucodata.ui.screens.settings.WatchSettingsScreen
 import tk.glucodata.ui.screens.settings.WebServerSettingsScreen
@@ -141,6 +142,7 @@ fun JugglucoApp(
                     repository = repository,
                     onOpenWebServerConfig = { activeSettingsDestination = SettingsDestination.WEB_SERVER },
                     onOpenLibreViewConfig = { activeSettingsDestination = SettingsDestination.LIBRE_VIEW },
+                    onOpenUploaderConfig = { activeSettingsDestination = SettingsDestination.UPLOADER },
                     onNavigateBack = { activeSettingsDestination = null }
                 )
                 SettingsDestination.MIRROR -> MirrorSettingsScreen(
@@ -170,6 +172,10 @@ fun JugglucoApp(
                     onNavigateBack = { activeSettingsDestination = SettingsDestination.BROADCASTS }
                 )
                 SettingsDestination.LIBRE_VIEW -> LibreViewSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.BROADCASTS }
+                )
+                SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                     repository = repository,
                     onNavigateBack = { activeSettingsDestination = SettingsDestination.BROADCASTS }
                 )

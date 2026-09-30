@@ -27,6 +27,7 @@ import tk.glucodata.MainActivity
 import tk.glucodata.JugglucoSend
 import tk.glucodata.MessageSender
 import tk.glucodata.Natives
+import tk.glucodata.NightPost
 import tk.glucodata.Nightscout
 import tk.glucodata.Notify
 import tk.glucodata.SensorBridge
@@ -62,6 +63,9 @@ import tk.glucodata.ui.model.SensorStatus
 import tk.glucodata.ui.model.SignalQuality
 import tk.glucodata.ui.model.StatsPeriod
 import tk.glucodata.ui.model.TimeRange
+import tk.glucodata.ui.model.TreatmentMapping
+import tk.glucodata.ui.model.UploaderConfig
+import tk.glucodata.ui.model.UploaderStatus
 import tk.glucodata.ui.model.WatchConfig
 import tk.glucodata.ui.model.WearDiagnosticInfo
 import tk.glucodata.ui.model.WearWatchDevice
@@ -202,6 +206,12 @@ class GlucoseRepository(
 
     private val _exchanges = MutableStateFlow(ExchangesConfig())
     val exchanges: StateFlow<ExchangesConfig> = _exchanges.asStateFlow()
+
+    private val _uploader = MutableStateFlow(UploaderConfig())
+    val uploader: StateFlow<UploaderConfig> = _uploader.asStateFlow()
+
+    private val _uploaderStatus = MutableStateFlow(UploaderStatus())
+    val uploaderStatus: StateFlow<UploaderStatus> = _uploaderStatus.asStateFlow()
 
     private val _xdripReceiverApps = MutableStateFlow<List<BroadcastReceiverApp>>(emptyList())
     val xdripReceiverApps: StateFlow<List<BroadcastReceiverApp>> = _xdripReceiverApps.asStateFlow()
@@ -455,6 +465,16 @@ class GlucoseRepository(
                     libreViewEnabled = Natives.getuselibreview(),
                     xdripWebServer = Natives.getusexdripwebserver()
                 )
+
+                // Read Nightscout uploader
+                _uploader.value = UploaderConfig(
+                    url = try { Natives.getnightuploadurl().orEmpty() } catch (_: Throwable) { "" },
+                    active = try { Natives.getuseuploader() } catch (_: Throwable) { false },
+                    v3 = try { Natives.getnightscoutV3() } catch (_: Throwable) { false },
+                    postTreatments = try { Natives.getpostTreatments() } catch (_: Throwable) { false },
+                    canSendTreatments = try { Natives.canSendNumbers(1) } catch (_: Throwable) { false }
+                )
+                refreshUploaderStatus()
 
                 val savedMinimalistUnits = try {
                     Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
@@ -1877,6 +1897,98 @@ class GlucoseRepository(
                     Natives.setusexdripwebserver(true)
                 }
             } catch (_: Throwable) {}
+        }
+    }
+
+    fun uploaderSecret(): String {
+        return try { Natives.getnightuploadsecret().orEmpty() } catch (_: Throwable) { "" }
+    }
+
+    fun saveUploaderConfig(url: String, secret: String, active: Boolean, v3: Boolean) {
+        _uploader.value = _uploader.value.copy(url = url, active = active, v3 = v3)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setNightUploader(url, secret, active, v3)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setUploaderActive(enabled: Boolean) {
+        val current = _uploader.value
+        saveUploaderConfig(current.url, uploaderSecret(), enabled, current.v3)
+    }
+
+    fun setUploaderPostTreatments(enabled: Boolean) {
+        _uploader.value = _uploader.value.copy(postTreatments = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setpostTreatments(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun sendUploaderNow() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.wakeuploader()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun resendUploaderData() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.resetuploader()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    suspend fun testUploader(url: String, secret: String): String = withContext(Dispatchers.IO) {
+        val result = try {
+            if (Applic.Nativesloaded) NightPost.testconnection(url, secret) else "test failure: not initialized"
+        } catch (e: Throwable) {
+            e.message.orEmpty()
+        }
+        _uploaderStatus.value = UploaderStatus(text = result, timeMillis = System.currentTimeMillis())
+        result
+    }
+
+    fun refreshUploaderStatus() {
+        val text = try { NightPost.getstatus() } catch (_: Throwable) { "" }
+        val time = try { NightPost.getuploadtime() } catch (_: Throwable) { 0L }
+        _uploaderStatus.value = UploaderStatus(text = text.orEmpty(), timeMillis = time)
+    }
+
+    fun uploaderTreatmentMappings(): List<TreatmentMapping> {
+        val labels = try { Natives.getLabels() } catch (_: Throwable) { null } ?: return emptyList()
+        if (labels.size < 2) return emptyList()
+        return (0 until labels.size - 1).map { index ->
+            TreatmentMapping(
+                index = index,
+                label = labels[index].orEmpty(),
+                kind = try { Natives.getlibrenumkind(1, index) } catch (_: Throwable) { 0 },
+                weight = try { Natives.getlibrefoodweight(1, index) } catch (_: Throwable) { 1f }
+            )
+        }
+    }
+
+    fun setUploaderTreatmentMapping(index: Int, kind: Int, weight: Float) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setlibrenum(1, index, kind, weight)
+                }
+            } catch (_: Throwable) {}
+            val canSend = try { Natives.canSendNumbers(1) } catch (_: Throwable) { false }
+            _uploader.value = _uploader.value.copy(canSendTreatments = canSend)
         }
     }
 
