@@ -50,9 +50,11 @@ fun BroadcastsSettingsScreen(
     repository: GlucoseRepository,
     onOpenWebServerConfig: () -> Unit = {},
     onOpenLibreViewConfig: () -> Unit = {},
+    onOpenUploaderConfig: () -> Unit = {},
     onNavigateBack: () -> Unit
 ) {
     val exchanges by repository.exchanges.collectAsState()
+    val uploader by repository.uploader.collectAsState()
     val xdripReceiverApps by repository.xdripReceiverApps.collectAsState()
     val xdripReceiverAppsLoading by repository.xdripReceiverAppsLoading.collectAsState()
     val glucodataReceiverApps by repository.glucodataReceiverApps.collectAsState()
@@ -128,6 +130,18 @@ fun BroadcastsSettingsScreen(
                 checked = exchanges.libreViewEnabled,
                 onCheckedChange = { repository.setLibreViewEnabled(it) },
                 onClick = onOpenLibreViewConfig
+            )
+
+            SettingsNavRow(
+                title = stringResource(R.string.settings_title_uploader),
+                subtitle = stringResource(
+                    if (uploader.url.isBlank()) R.string.settings_desc_uploader
+                    else R.string.loc_uploader_configured_url, uploader.url
+                ),
+                icon = Icons.Default.CloudUpload,
+                checked = uploader.active,
+                onCheckedChange = { repository.setUploaderActive(it) },
+                onClick = onOpenUploaderConfig
             )
 
             SettingsNavRow(

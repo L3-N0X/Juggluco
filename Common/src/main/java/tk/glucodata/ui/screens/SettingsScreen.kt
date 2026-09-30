@@ -58,6 +58,7 @@ import tk.glucodata.ui.screens.settings.SettingsDestination
 import tk.glucodata.ui.screens.settings.SettingsNavRow
 import tk.glucodata.ui.screens.settings.SettingsSection
 import tk.glucodata.ui.screens.settings.TurnServerSettingsScreen
+import tk.glucodata.ui.screens.settings.UploaderSettingsScreen
 import tk.glucodata.ui.screens.settings.VoiceSettingsScreen
 import tk.glucodata.ui.screens.settings.WatchSettingsScreen
 import tk.glucodata.ui.screens.settings.WebServerSettingsScreen
@@ -139,6 +140,7 @@ fun SettingsScreen(
                 repository = repository,
                 onOpenWebServerConfig = { handleNavigate(SettingsDestination.WEB_SERVER) },
                 onOpenLibreViewConfig = { handleNavigate(SettingsDestination.LIBRE_VIEW) },
+                onOpenUploaderConfig = { handleNavigate(SettingsDestination.UPLOADER) },
                 onNavigateBack = { handleNavigate(null) }
             )
             SettingsDestination.MIRROR -> MirrorSettingsScreen(
@@ -170,6 +172,10 @@ fun SettingsScreen(
             SettingsDestination.LIBRE_VIEW -> LibreViewSettingsScreen(
                 repository = repository,
                 onOpenTreatments = { handleNavigate(SettingsDestination.LIBRE_VIEW_TREATMENTS) },
+                onNavigateBack = { handleNavigate(SettingsDestination.BROADCASTS) }
+            )
+SettingsDestination.UPLOADER -> UploaderSettingsScreen(
+                repository = repository,
                 onNavigateBack = { handleNavigate(SettingsDestination.BROADCASTS) }
             )
             SettingsDestination.LIBRE_VIEW_TREATMENTS -> LibreViewTreatmentsScreen(
