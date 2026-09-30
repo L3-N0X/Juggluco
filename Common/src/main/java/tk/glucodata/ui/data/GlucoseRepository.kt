@@ -48,6 +48,11 @@ import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HardwareConfig
+import tk.glucodata.ui.model.LibreLabelMapping
+import tk.glucodata.ui.model.LibreRegion
+import tk.glucodata.ui.model.LibreSaveError
+import tk.glucodata.ui.model.LibreTreatmentKind
+import tk.glucodata.ui.model.LibreViewConfig
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
 import tk.glucodata.ui.model.MirrorConnection
@@ -242,6 +247,19 @@ class GlucoseRepository(
 
     private val _wearDiagnosticInfo = MutableStateFlow(WearDiagnosticInfo())
     val wearDiagnosticInfo: StateFlow<WearDiagnosticInfo> = _wearDiagnosticInfo.asStateFlow()
+
+    private val _libreView = MutableStateFlow(LibreViewConfig())
+    val libreView: StateFlow<LibreViewConfig> = _libreView.asStateFlow()
+
+    private val _libreTreatments = MutableStateFlow<List<LibreLabelMapping>>(emptyList())
+    val libreTreatments: StateFlow<List<LibreLabelMapping>> = _libreTreatments.asStateFlow()
+
+    /**
+     * Whether "send amounts" may be switched on: either it already is, or every label has been
+     * given a treatment kind. Read from native so it keeps agreeing with the uploader.
+     */
+    private val _libreAmountsAllowed = MutableStateFlow(false)
+    val libreAmountsAllowed: StateFlow<Boolean> = _libreAmountsAllowed.asStateFlow()
 
     init {
         DisplaySync.install(this)
@@ -535,8 +553,58 @@ class GlucoseRepository(
                 _alarmBehavior.value = readAlarmBehavior()
                 _voiceAnnounce.value = try { Natives.getVoiceActive() } catch (_: Throwable) { false }
                 _speakAlarms.value = try { Natives.speakalarms() } catch (_: Throwable) { true }
+
+                // Read LibreView
+                readLibreViewState()
             }
         } catch (_: Throwable) {}
+    }
+
+    /**
+     * Reloads the LibreView account, upload and treatment-mapping state from native. The mapping
+     * is one kind lookup and one weight lookup per label, and the weight is only needed for labels
+     * that map to carbs, so this stays cheap enough to run in the settings pass.
+     */
+    private fun readLibreViewState() {
+        val manualAccountId = try { Natives.manualLibreAccountIDnumber() != -1L } catch (_: Throwable) { false }
+        _libreView.value = LibreViewConfig(
+            region = LibreRegion.fromNative(
+                try { Natives.getLibreCountry() } catch (_: Throwable) { LibreRegion.UNITED_KINGDOM.nativeIndex }
+            ),
+            accountId = try { Natives.getlibreAccountIDnumber() } catch (_: Throwable) { -1L },
+            hasAccountId = manualAccountId ||
+                (try { !Natives.getlibreAccountID().isNullOrBlank() } catch (_: Throwable) { false }),
+            manualAccountId = manualAccountId,
+            uploadCurrent = try { Natives.getLibreCurrent() } catch (_: Throwable) { false },
+            uploadViewed = try { Natives.getLibreIsViewed() } catch (_: Throwable) { false },
+            sendAmounts = try { Natives.getSendNumbers() } catch (_: Throwable) { false }
+        )
+        _libreTreatments.value = readLibreTreatments()
+        _libreAmountsAllowed.value = try { Natives.canSendNumbers(LIBRE_NIGHT) } catch (_: Throwable) { false }
+    }
+
+    private fun readLibreTreatments(): List<LibreLabelMapping> {
+        val labels = try { Natives.getLabels().toList() } catch (_: Throwable) { return emptyList() }
+        // The last label is the reserved blood label, which is never mapped to a treatment.
+        return labels.dropLast(1).mapIndexed { index, label ->
+            val kind = LibreTreatmentKind.fromNative(
+                try { Natives.getlibrenumkind(LIBRE_NIGHT, index) } catch (_: Throwable) { 0 }
+            )
+            LibreLabelMapping(
+                index = index,
+                label = label,
+                kind = kind,
+                weight = if (kind == LibreTreatmentKind.CARBS) {
+                    try { Natives.getlibrefoodweight(LIBRE_NIGHT, index) } catch (_: Throwable) { 1f }
+                } else {
+                    1f
+                }
+            )
+        }
+    }
+
+    fun refreshLibreView() {
+        scope.launch(Dispatchers.IO) { readLibreViewState() }
     }
 
     fun refreshAll() {
@@ -1859,6 +1927,150 @@ class GlucoseRepository(
             try {
                 if (Applic.Nativesloaded) {
                     Natives.setuselibreview(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    /**
+     * Writes the LibreView account. Credentials are length checked here, before anything reaches
+     * JNI: `libreemail` and `librepass` are fixed size fields in the settings struct that native
+     * fills without a bounds check. The email is required to look like an account and the
+     * password to be non-trivial as soon as [validateCredentials] is set, which is what the
+     * user turning LibreView uploads on means.
+     */
+    fun saveLibreViewAccount(
+        email: String,
+        password: String,
+        region: LibreRegion,
+        accountId: Long,
+        manualAccountId: Boolean,
+        sendAmounts: Boolean,
+        validateCredentials: Boolean
+    ): LibreSaveError {
+        val address = email.trim()
+        // The upper bounds always apply: a longer credential would be copied past a fixed size
+        // field in the settings struct. The lower bounds only matter once the user has switched
+        // LibreView uploads on, which is what [validateCredentials] says.
+        if (address.length > LIBRE_EMAIL_MAX_LENGTH) return LibreSaveError.EMAIL_TOO_LONG
+        if (password.length > LIBRE_PASSWORD_MAX_LENGTH) return LibreSaveError.PASSWORD_TOO_LONG
+        if (validateCredentials) {
+            if (address.length < LIBRE_EMAIL_MIN_LENGTH) return LibreSaveError.EMAIL_TOO_SHORT
+            if (password.length < LIBRE_PASSWORD_MIN_LENGTH) return LibreSaveError.PASSWORD_TOO_SHORT
+        }
+        if (manualAccountId && accountId <= 0L) return LibreSaveError.ACCOUNT_ID_MISSING
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (!Applic.Nativesloaded) return@launch
+                Natives.setlibreemail(address)
+                Natives.setlibrepass(password)
+                Natives.setLibreCountry(region.nativeIndex)
+                Natives.setlibreAccountIDnumber(if (manualAccountId) accountId else -1L)
+                Natives.setSendNumbers(sendAmounts)
+                // Both fields empty means the account was removed: forget what was uploaded
+                // for it, exactly like the legacy dialog did.
+                if (address.isEmpty() && password.isEmpty()) {
+                    Natives.clearlibreFromMSec(0L)
+                }
+                readLibreViewState()
+            } catch (_: Throwable) {}
+        }
+        return LibreSaveError.NONE
+    }
+
+    /** Asks LibreView for the account id belonging to the saved credentials. */
+    fun requestLibreViewAccountId() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setlibreAccountIDnumber(-1L)
+                    Natives.askServerforAccountID()
+                }
+            } catch (_: Throwable) {}
+            readLibreViewState()
+        }
+    }
+
+    fun setLibreViewRegion(region: LibreRegion) {
+        _libreView.value = _libreView.value.copy(region = region)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setLibreCountry(region.nativeIndex)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setLibreViewUploadCurrent(enabled: Boolean) {
+        _libreView.value = _libreView.value.copy(uploadCurrent = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setLibreCurrent(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setLibreViewUploadViewed(enabled: Boolean) {
+        _libreView.value = _libreView.value.copy(uploadViewed = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setLibreIsViewed(enabled)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun setLibreViewSendAmounts(enabled: Boolean) {
+        _libreView.value = _libreView.value.copy(sendAmounts = enabled)
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setSendNumbers(enabled)
+                }
+            } catch (_: Throwable) {}
+            readLibreViewState()
+        }
+    }
+
+    /** Maps one logbook label onto a LibreView record kind, with the carbs weight it is stored with. */
+    fun setLibreLabelMapping(index: Int, kind: LibreTreatmentKind, weight: Float) {
+        _libreTreatments.value = _libreTreatments.value.map { mapping ->
+            if (mapping.index == index) mapping.copy(kind = kind, weight = weight) else mapping
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.setlibrenum(LIBRE_NIGHT, index, kind.nativeValue, weight)
+                }
+            } catch (_: Throwable) {}
+            readLibreViewState()
+        }
+    }
+
+    /** Starts a LibreView upload in the background, like the uploader does after a scan. */
+    fun startLibreViewUpload() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.wakelibreview(0)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    /**
+     * Resends everything from [fromMsec] onwards: everything older than that is forgotten, so the
+     * next upload starts over from the chosen moment.
+     */
+    fun resendLibreViewFrom(fromMsec: Long) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    Natives.clearlibreFromMSec(fromMsec.coerceAtLeast(0L))
                 }
             } catch (_: Throwable) {}
         }
@@ -3274,6 +3486,22 @@ class GlucoseRepository(
         const val MIRROR_HOSTNAME_MAX_LENGTH = 81
         const val MIRROR_NOW_SECONDS = 300L
         const val MIRROR_CODE_SUFFIX = "MirrorJuggluco"
+
+        /**
+         * The `night` index of the native treatment mappings: 0 is the LibreView export, 1 the
+         * Nightscout one. Only the LibreView half belongs to this screen.
+         */
+        const val LIBRE_NIGHT = 0
+
+        /**
+         * Limits of the fixed size credential fields in the settings struct (`char libreemail[256]`,
+         * `char librepass[36]`). Native copies straight into them without a bounds check, so
+         * anything longer has to be refused before it gets there.
+         */
+        const val LIBRE_EMAIL_MIN_LENGTH = 3
+        const val LIBRE_EMAIL_MAX_LENGTH = 255
+        const val LIBRE_PASSWORD_MIN_LENGTH = 3
+        const val LIBRE_PASSWORD_MAX_LENGTH = 36
 
         /**
          * Connection codes are a phone feature: the native side does not export

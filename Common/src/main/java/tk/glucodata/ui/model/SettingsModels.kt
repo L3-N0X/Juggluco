@@ -322,3 +322,80 @@ data class MirrorHostEditState(
     val isReceiver: Boolean get() = (receiveFrom and 2) != 0
     val isIce: Boolean get() = iceLabel.isNotEmpty()
 }
+
+/**
+ * The LibreLink configuration region a LibreView account lives in. Abbott ships one
+ * configuration file per region, so the region decides which upload endpoints are used.
+ * The order is the native `librecountry` order, which the native side also uses to
+ * derive the glucose unit (even index mmol/L, odd index mg/dL).
+ */
+enum class LibreRegion(val nativeIndex: Int, @StringRes val labelRes: Int) {
+    UNITED_KINGDOM(0, R.string.loc_libreview_region_uk),
+    FRANCE(1, R.string.loc_libreview_region_fr),
+    NETHERLANDS(2, R.string.loc_libreview_region_nl),
+    POLAND(3, R.string.loc_libreview_region_pl),
+    RUSSIA(4, R.string.loc_libreview_region_ru);
+
+    companion object {
+        fun fromNative(index: Int): LibreRegion = entries.find { it.nativeIndex == index } ?: UNITED_KINGDOM
+    }
+}
+
+/**
+ * What LibreView should do with the numbers of one logbook label. The values are the
+ * native `librenums[].kind` codes, where 0 means "not mapped yet" and every other value
+ * makes the native export write the entry as that kind of record.
+ */
+enum class LibreTreatmentKind(val nativeValue: Int, @StringRes val labelRes: Int) {
+    UNSET(0, R.string.loc_libreview_kind_unset),
+    RAPID_INSULIN(1, R.string.rapidinsulin),
+    LONG_INSULIN(2, R.string.longinsulin),
+    CARBS(3, R.string.carbo),
+    NOTE(4, R.string.comments);
+
+    val isMapped: Boolean get() = this != UNSET
+
+    companion object {
+        fun fromNative(value: Int): LibreTreatmentKind = entries.find { it.nativeValue == value } ?: UNSET
+    }
+}
+
+/** The LibreView treatment mapping of a single logbook label. */
+data class LibreLabelMapping(
+    val index: Int,
+    val label: String,
+    val kind: LibreTreatmentKind,
+    /** Grams of carbs a unit of this label stands for, only used for [LibreTreatmentKind.CARBS]. */
+    val weight: Float
+)
+
+/**
+ * The LibreView account and upload settings. The password is deliberately not part of
+ * this: it is typed on the screen and handed to the repository on save only, so it does
+ * not outlive the editor in a process wide state holder.
+ */
+data class LibreViewConfig(
+    val region: LibreRegion = LibreRegion.UNITED_KINGDOM,
+    /**
+     * The account id as native reports it: the hand written number when there is one, otherwise
+     * the value derived from the id LibreView sent after signing in. That derived value is a hash,
+     * so it can be negative and only [hasAccountId] says whether there is an id at all.
+     */
+    val accountId: Long = -1L,
+    val hasAccountId: Boolean = false,
+    val manualAccountId: Boolean = false,
+    val uploadCurrent: Boolean = false,
+    val uploadViewed: Boolean = false,
+    val sendAmounts: Boolean = false
+)
+
+/** Why saving the LibreView settings did not work. */
+enum class LibreSaveError(@StringRes val messageRes: Int) {
+    NONE(R.string.loc_libreview_saved),
+    EMAIL_TOO_SHORT(R.string.emailaddresstooshort),
+    EMAIL_TOO_LONG(R.string.emailaddresstoolong),
+    PASSWORD_TOO_SHORT(R.string.password8),
+    PASSWORD_TOO_LONG(R.string.password36),
+    ACCOUNT_ID_INVALID(R.string.wrongformat),
+    ACCOUNT_ID_MISSING(R.string.noaccountidspecified)
+}
