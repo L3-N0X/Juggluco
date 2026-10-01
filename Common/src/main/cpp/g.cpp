@@ -414,22 +414,16 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(getsensorptr)(JNIEnv *env, jclass 
 extern "C" JNIEXPORT jlong JNICALL   fromjava(streamfromSensorptr)(JNIEnv *env, jclass cl,jlong sensorptr,int pos) {
     if(!sensorptr)
         return 0LL;
-    const auto *sens=reinterpret_cast<const SensorGlucoseData*>(sensorptr); 
+    const auto *sens=reinterpret_cast<const SensorGlucoseData*>(sensorptr);
     const ScanData *start= sens->beginpolls();
     const int len=sens->pollcount();
-    auto cali=make_calibrator<ScanData>(sens);
     for(int i=pos;i<len;i++) {
         const ScanData *item=start+i;
         if(item->valid()) {
             for(++i;i<len&&!start[i].valid();i++)  {
                 ;
                 }
-            long mgdL;
-            if(double calibrated=cali.calibrateONEtest(*item);!isnan(calibrated)) {
-                mgdL=(long)round(calibrated);
-                }
-             else
-                mgdL=item->getmgdL();
+            long mgdL=item->getmgdL();
             return ((jlong)item->gettime())|(((jlong)mgdL)<<32|((jlong)i)<<48);
             }
         }
@@ -441,19 +435,13 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(scanfromSensorptr)(JNIEnv *env, jc
     const auto *sens=reinterpret_cast<const SensorGlucoseData*>(sensorptr);
     const ScanData *start= sens->beginscans();
     const int len=sens->scancount();
-    auto cali=make_calibrator<ScanData>(sens);
     for(int i=pos;i<len;i++) {
         const ScanData *item=start+i;
         if(item->valid()) {
             for(++i;i<len&&!start[i].valid();i++)  {
                 ;
                 }
-            long mgdL;
-            if(double calibrated=cali.calibrateONEtest(*item);!isnan(calibrated)) {
-                mgdL=(long)round(calibrated);
-                }
-             else
-                mgdL=item->getmgdL();
+            long mgdL=item->getmgdL();
             return ((jlong)item->gettime())|(((jlong)mgdL)<<32|((jlong)i)<<48);
             }
         }
@@ -465,6 +453,27 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(calibratedStreamfromSensorptr)(JNI
     const auto *sens=reinterpret_cast<const SensorGlucoseData*>(sensorptr);
     const ScanData *start= sens->beginpolls();
     const int len=sens->pollcount();
+    auto cali=make_calibrator<ScanData>(sens);
+    for(int i=pos;i<len;i++) {
+        const ScanData *item=start+i;
+        if(item->valid()) {
+            for(++i;i<len&&!start[i].valid();i++)  {
+                ;
+                }
+            if(double calibrated=cali.calibrateONEtest(*item);!isnan(calibrated)) {
+                long mgdL=(long)round(calibrated);
+                return ((jlong)item->gettime())|(((jlong)mgdL)<<32|((jlong)i)<<48);
+                }
+            }
+        }
+    return ((jlong)len)<<48;
+    }
+extern "C" JNIEXPORT jlong JNICALL   fromjava(calibratedScanfromSensorptr)(JNIEnv *env, jclass cl,jlong sensorptr,int pos) {
+    if(!sensorptr)
+        return 0LL;
+    const auto *sens=reinterpret_cast<const SensorGlucoseData*>(sensorptr);
+    const ScanData *start= sens->beginscans();
+    const int len=sens->scancount();
     auto cali=make_calibrator<ScanData>(sens);
     for(int i=pos;i<len;i++) {
         const ScanData *item=start+i;

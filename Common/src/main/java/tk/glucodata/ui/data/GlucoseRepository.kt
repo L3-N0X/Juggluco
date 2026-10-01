@@ -946,6 +946,29 @@ class GlucoseRepository(
                             }
                             pos = nextPos
                         }
+
+                        pos = 0
+                        safetyLimit = 10000
+                        while (safetyLimit-- > 0) {
+                            val res = try { Natives.calibratedScanfromSensorptr(ptr, pos) } catch (_: Throwable) { 0L }
+                            val time = res and 0xFFFFFFFFL
+                            val nextPos = (res ushr 48).toInt() and 0xFFFF
+                            if (time == 0L || nextPos <= pos) break
+                            val mgdL = (res ushr 32).toInt() and 0xFFFF
+                            if (mgdL in 20..600) {
+                                loadedList.add(
+                                    GlucosePoint(
+                                        timestamp = time * 1000L,
+                                        valueMgDl = mgdL.toFloat(),
+                                        isScan = true,
+                                        isHistory = false,
+                                        isCalibrated = true,
+                                        status = range.statusOf(mgdL.toFloat())
+                                    )
+                                )
+                            }
+                            pos = nextPos
+                        }
                     }
                 }
             }
