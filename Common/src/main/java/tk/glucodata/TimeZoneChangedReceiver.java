@@ -54,6 +54,9 @@ static final private String LOG_ID="TimeZoneChangedReceiver";
             }
        Notify.mkDateformat();
        bluediag.mktimeformat();
+       // Reminder times are local clock times.
+       if(app!=null)
+           tk.glucodata.alerts.Reminders.refresh();
       }
 
     }

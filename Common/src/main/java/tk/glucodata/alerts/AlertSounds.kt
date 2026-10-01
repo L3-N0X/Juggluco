@@ -41,6 +41,7 @@ object AlertSounds {
             AlertKind.FALLING -> "lowsoon"
             AlertKind.RISING -> "highsoon"
             AlertKind.SIGNAL_LOSS -> "elves"
+            AlertKind.REMINDER -> "nudge"
         }
         return builtIns.first { it.key == key }
     }

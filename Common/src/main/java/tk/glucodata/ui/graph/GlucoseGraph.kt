@@ -287,6 +287,9 @@ fun GlucoseGraph(
                 if (displayConfig.showAmounts) {
                     drawEventStrip(context, chart, data.events, unit, surfaceColor, paints, logbookColors)
                 }
+                if (displayConfig.showMeals) {
+                    drawMealLayer(chart, data.meals, surfaceColor, paints, logbookColors, !displayConfig.showAmounts)
+                }
 
                 inspected?.let { drawScrubber(chart, it, clinicalColors, textPrimary, surfaceColor) }
             }

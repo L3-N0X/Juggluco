@@ -24,7 +24,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,6 +76,16 @@ class AlertActivity : ComponentActivity() {
                     if (alert == null) finish()
                 }
                 alert?.let {
+                    if (it.isReminder) {
+                        ReminderScreen(
+                            alert = it,
+                            snoozeOptions = settings.snoozeOptions,
+                            onTaken = { Reminders.taken(it.rule.id, it.reminderDue, isTest = it.isTest, fallback = it.rule); finish() },
+                            onSnooze = { minutes -> AlertPlayer.snooze(minutes); finish() },
+                            onSkip = { Reminders.skip(it.rule.id, it.reminderDue, isTest = it.isTest); finish() }
+                        )
+                        return@let
+                    }
                     AlertScreen(
                         alert = it,
                         snoozeOptions = settings.snoozeOptions,
@@ -105,6 +119,7 @@ private fun AlertScreen(
         AlertKind.LOW, AlertKind.FALLING -> if (critical) clinical.veryLow else clinical.low
         AlertKind.HIGH, AlertKind.RISING -> if (critical) clinical.veryHigh else clinical.high
         AlertKind.SIGNAL_LOSS -> scheme.onSurface
+        AlertKind.REMINDER -> scheme.tertiary
     }
 
     Surface(color = scheme.background, contentColor = scheme.onBackground, modifier = Modifier.fillMaxSize()) {
@@ -248,6 +263,123 @@ private fun AlertScreen(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+            }
+        }
+    }
+}
+
+/** Full-screen medication reminder: what to take, then "Taken", the snooze choices and "Skip". */
+@Composable
+private fun ReminderScreen(
+    alert: AlertPlayer.ActiveAlert,
+    snoozeOptions: List<Int>,
+    onTaken: () -> Unit,
+    onSnooze: (Int) -> Unit,
+    onSkip: () -> Unit
+) {
+    val context = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
+    val spec = alert.rule.reminder
+    Surface(color = scheme.background, contentColor = scheme.onBackground, modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+                .padding(horizontal = ScreenLayout.Gutter, vertical = ScreenLayout.TopPadding),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = ScreenLayout.SectionSpacing),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = scheme.tertiaryContainer,
+                    contentColor = scheme.onTertiaryContainer,
+                    modifier = Modifier.size(96.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Medication, contentDescription = null, modifier = Modifier.size(48.dp))
+                    }
+                }
+                Spacer(Modifier.height(ScreenLayout.SectionSpacing * 2))
+                Text(
+                    text = AlertPlayer.reminderTitle(alert.rule),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (spec.dose.isNotBlank()) {
+                    Spacer(Modifier.height(ScreenLayout.SectionSpacing))
+                    Text(
+                        text = spec.dose,
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = scheme.tertiary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Spacer(Modifier.height(ScreenLayout.SectionSpacing))
+                Text(
+                    text = listOf(spec.note.trim(), AlertPlayer.reminderDetail(alert.rule.copy(reminder = spec.copy(dose = "", note = "")), alert.reminderDue))
+                        .filter { it.isNotEmpty() }
+                        .joinToString(" · "),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = scheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(ScreenLayout.SectionSpacing)
+            ) {
+                Button(
+                    onClick = onTaken,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 64.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary)
+                ) {
+                    Text(
+                        text = stringResource(R.string.loc_reminder_taken_long),
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(ScreenLayout.SectionSpacing),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    snoozeOptions.take(3).forEach { minutes ->
+                        val label = formatMinutes(context, minutes)
+                        val contentLabel = stringResource(R.string.loc_snooze_duration, label)
+                        FilledTonalButton(
+                            onClick = { onSnooze(minutes) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 56.dp)
+                                .semantics { contentDescription = contentLabel },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = scheme.surfaceContainerHigh,
+                                contentColor = scheme.onSurface
+                            )
+                        ) {
+                            Text(text = label, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, maxLines = 2)
+                        }
+                    }
+                }
+                TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.loc_reminder_skip_dose))
                 }
             }
         }

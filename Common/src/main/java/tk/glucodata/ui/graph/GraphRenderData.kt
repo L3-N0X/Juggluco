@@ -99,6 +99,26 @@ class GraphEvents(val times: LongArray, val records: List<LogRecord>) {
     }
 }
 
+/** Carbs entries that carry a composed meal, kept sorted with a parallel time array for binary search. */
+@Immutable
+class GraphMeals(val times: LongArray, val records: List<LogRecord>) {
+    val size: Int get() = times.size
+
+    fun firstIndexAtOrAfter(time: Long): Int {
+        var low = 0
+        var high = times.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (times[mid] < time) low = mid + 1 else high = mid
+        }
+        return low
+    }
+
+    companion object {
+        val Empty = GraphMeals(LongArray(0), emptyList())
+    }
+}
+
 @Immutable
 class GraphAlertEvents(val times: LongArray, val events: List<AlertEvent>) {
     val size: Int get() = times.size
@@ -128,6 +148,7 @@ class GraphRenderData(
     val scans: GraphSeries,
     val calibratedScans: GraphSeries,
     val events: GraphEvents,
+    val meals: GraphMeals,
     val alertEvents: GraphAlertEvents,
     val oldestTime: Long,
     val newestTime: Long,
@@ -156,7 +177,7 @@ class GraphRenderData(
         val Empty = GraphRenderData(
             GraphSeries.Empty, GraphSeries.Empty, GraphSeries.Empty,
             GraphSeries.Empty, GraphSeries.Empty, GraphSeries.Empty,
-            GraphEvents.Empty, GraphAlertEvents.Empty, 0L, 0L, 0, 0L
+            GraphEvents.Empty, GraphMeals.Empty, GraphAlertEvents.Empty, 0L, 0L, 0, 0L
         )
 
         fun build(
@@ -187,6 +208,8 @@ class GraphRenderData(
 
             val sortedLogs = logs.sortedBy { it.timestamp }
             val eventTimes = LongArray(sortedLogs.size) { sortedLogs[it].timestamp }
+            val mealRecords = sortedLogs.filter { it.hasMeal }
+            val mealTimes = LongArray(mealRecords.size) { mealRecords[it].timestamp }
             val sortedAlerts = alertEvents.sortedBy { it.timestamp }
             val alertTimes = LongArray(sortedAlerts.size) { sortedAlerts[it].timestamp }
 
@@ -228,6 +251,7 @@ class GraphRenderData(
                 scans = toSeries(scans),
                 calibratedScans = toSeries(calibratedScans),
                 events = GraphEvents(eventTimes, sortedLogs),
+                meals = GraphMeals(mealTimes, mealRecords),
                 alertEvents = GraphAlertEvents(alertTimes, sortedAlerts),
                 oldestTime = oldest,
                 newestTime = newest,

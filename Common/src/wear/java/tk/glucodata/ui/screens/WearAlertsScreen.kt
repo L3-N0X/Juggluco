@@ -337,6 +337,7 @@ fun WearAlertEditScreen(
                         valueText = { tenths -> stringResource(R.string.wear_ui_per_min, unit.formatRate(tenths / 10f)) }
                     )
                 }
+                AlertKind.REMINDER -> Unit
                 AlertKind.SIGNAL_LOSS -> item {
                     PresetStepperContent(
                         label = stringResource(R.string.wear_ui_no_reading_for),

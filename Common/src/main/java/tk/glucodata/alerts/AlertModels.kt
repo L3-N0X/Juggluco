@@ -4,7 +4,11 @@ import androidx.annotation.StringRes
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import java.util.UUID
 import tk.glucodata.Applic
 import tk.glucodata.R
@@ -20,10 +24,13 @@ enum class AlertKind {
     /** Rate of change at or above [AlertRule.rateMgdlPerMin]. */
     RISING,
     /** No new reading for [AlertRule.lossMinutes]. */
-    SIGNAL_LOSS;
+    SIGNAL_LOSS,
+    /** Time-based medication reminder, see [AlertRule.reminder]; never driven by readings. */
+    REMINDER;
 
     val isGlucoseLevel: Boolean get() = this == LOW || this == HIGH
     val isRate: Boolean get() = this == FALLING || this == RISING
+    val isReminder: Boolean get() = this == REMINDER
 }
 
 /**
@@ -115,6 +122,134 @@ data class AlertSchedule(
     }
 }
 
+/** How a medication reminder recurs. */
+enum class ReminderRepeat {
+    /** On the days ticked in [AlertRule.schedule]. */
+    DAYS_OF_WEEK,
+    /** Every [ReminderSpec.intervalDays] days, counted from [ReminderSpec.startDay]. */
+    EVERY_N_DAYS,
+    /** Only on [ReminderSpec.startDay]. */
+    ONCE
+}
+
+/**
+ * What a medication reminder is about and when it is due. The logbook link carries over the
+ * old numeric alarms: a reminder whose dose was already logged stays quiet, and confirming
+ * one can log the dose.
+ */
+data class ReminderSpec(
+    /** Free text such as "500 mg" or "2 tablets". */
+    val dose: String = "",
+    /** Free text such as "with food". */
+    val note: String = "",
+    /** Minutes after midnight, sorted and distinct. */
+    val times: List<Int> = listOf(8 * 60),
+    val repeat: ReminderRepeat = ReminderRepeat.DAYS_OF_WEEK,
+    val intervalDays: Int = 2,
+    /** Epoch day: the first day of [ReminderRepeat.EVERY_N_DAYS], the day of [ReminderRepeat.ONCE]. */
+    val startDay: Long = LocalDate.now().toEpochDay(),
+    /** Extra reminders while unconfirmed, [AlertRule.repeatMinutes] apart; [UNTIL_TAKEN] keeps going. */
+    val maxRepeats: Int = 3,
+    /** Native logbook label this medication is logged as; -1 when not linked. */
+    val logLabel: Int = -1,
+    /** Logged amount that counts as taken (0 = any amount), and the amount logged on "Taken". */
+    val logAmount: Float = 0f,
+    /** A matching logbook entry this long before the due time already counts as taken; 0 never skips. */
+    val lookBackMinutes: Int = 120,
+    /** Add [logAmount] of [logLabel] to the logbook when the reminder is confirmed. */
+    val logWhenTaken: Boolean = false
+) {
+    val isLinked: Boolean get() = logLabel >= 0
+
+    fun occursOn(date: LocalDate, days: Int): Boolean = when (repeat) {
+        ReminderRepeat.DAYS_OF_WEEK -> days and (1 shl (date.dayOfWeek.value - 1)) != 0
+        ReminderRepeat.EVERY_N_DAYS -> {
+            val diff = date.toEpochDay() - startDay
+            diff >= 0 && diff % intervalDays.coerceAtLeast(1) == 0L
+        }
+        ReminderRepeat.ONCE -> date.toEpochDay() == startDay
+    }
+
+    private fun millisOf(date: LocalDate, minute: Int, zone: ZoneId): Long =
+        LocalDateTime.of(date, LocalTime.of(minute / 60, minute % 60)).atZone(zone).toInstant().toEpochMilli()
+
+    /** First due time strictly after [after], or null when the reminder never comes again. */
+    fun nextAfter(after: Long, days: Int, zone: ZoneId = ZoneId.systemDefault()): Long? {
+        if (times.isEmpty()) return null
+        val first = Instant.ofEpochMilli(after).atZone(zone).toLocalDate()
+        val horizon = 8 + intervalDays.coerceAtLeast(1)
+        for (offset in 0..horizon) {
+            val date = first.plusDays(offset.toLong())
+            if (!occursOn(date, days)) continue
+            times.sorted().forEach { minute ->
+                val at = millisOf(date, minute, zone)
+                if (at > after) return at
+            }
+        }
+        return null
+    }
+
+    /** Latest due time in (`after`, `atOrBefore`], or null when there is none. */
+    fun latestBetween(after: Long, atOrBefore: Long, days: Int, zone: ZoneId = ZoneId.systemDefault()): Long? {
+        if (times.isEmpty() || atOrBefore <= after) return null
+        val last = Instant.ofEpochMilli(atOrBefore).atZone(zone).toLocalDate()
+        // Due times further back than a year are of no interest to anyone.
+        val first = maxOf(Instant.ofEpochMilli(after).atZone(zone).toLocalDate(), last.minusDays(400))
+        var date = last
+        while (!date.isBefore(first)) {
+            if (occursOn(date, days)) {
+                times.sortedDescending().forEach { minute ->
+                    val at = millisOf(date, minute, zone)
+                    if (at <= atOrBefore) return at.takeIf { it > after }
+                }
+            }
+            date = date.minusDays(1)
+        }
+        return null
+    }
+
+    /** True when a change to this spec moves the due times. */
+    fun timingDiffers(other: ReminderSpec): Boolean =
+        times != other.times || repeat != other.repeat || intervalDays != other.intervalDays || startDay != other.startDay
+
+    fun toJson(): JSONObject = JSONObject()
+        .put("dose", dose)
+        .put("note", note)
+        .put("times", JSONArray(times))
+        .put("repeat", repeat.name)
+        .put("interval", intervalDays)
+        .put("startDay", startDay)
+        .put("maxRepeats", maxRepeats)
+        .put("logLabel", logLabel)
+        .put("logAmount", logAmount.toDouble())
+        .put("lookBack", lookBackMinutes)
+        .put("logTaken", logWhenTaken)
+
+    companion object {
+        const val UNTIL_TAKEN = -1
+
+        fun fromJson(json: JSONObject?): ReminderSpec {
+            if (json == null) return ReminderSpec()
+            val times = json.optJSONArray("times")?.let { array ->
+                (0 until array.length()).map { array.optInt(it, -1) }.filter { it in 0 until 24 * 60 }
+            }?.distinct()?.sorted()?.takeIf { it.isNotEmpty() } ?: listOf(8 * 60)
+            return ReminderSpec(
+                dose = json.optString("dose", ""),
+                note = json.optString("note", ""),
+                times = times,
+                repeat = runCatching { ReminderRepeat.valueOf(json.getString("repeat")) }.getOrDefault(ReminderRepeat.DAYS_OF_WEEK),
+                intervalDays = json.optInt("interval", 2).coerceIn(1, 365),
+                startDay = json.optLong("startDay", LocalDate.now().toEpochDay()),
+                maxRepeats = json.optInt("maxRepeats", 3).coerceAtLeast(UNTIL_TAKEN),
+                logLabel = json.optInt("logLabel", -1),
+                logAmount = json.optDouble("logAmount", 0.0).toFloat().coerceAtLeast(0f),
+                lookBackMinutes = json.optInt("lookBack", 120).coerceIn(0, 24 * 60),
+                logWhenTaken = json.optBoolean("logTaken", false)
+            )
+        }
+    }
+}
+
 /**
  * One user-configurable alert. Every alert carries its own trigger, schedule and
  * delivery settings, so any number of them can exist side by side.
@@ -167,7 +302,10 @@ data class AlertRule(
     val flash: Boolean = false,
     val announce: Boolean = false,
     /** Stop ringing on its own when a new reading no longer meets the condition. */
-    val stopWhenResolved: Boolean = true
+    val stopWhenResolved: Boolean = true,
+
+    /** REMINDER: medication, times and logbook link. */
+    val reminder: ReminderSpec = ReminderSpec()
 ) {
     val effectiveVibrationTimings: LongArray
         get() = if (vibrationPattern == VibrationPattern.CUSTOM) {
@@ -187,6 +325,7 @@ data class AlertRule(
             AlertKind.HIGH -> 2_000f - thresholdMgdl
             AlertKind.RISING -> 3_000f - rateMgdlPerMin
             AlertKind.SIGNAL_LOSS -> 4_000f + lossMinutes
+            AlertKind.REMINDER -> 5_000f + (reminder.times.firstOrNull() ?: 0) / 10_000f
         }
 
     fun toJson(): JSONObject = JSONObject()
@@ -217,6 +356,7 @@ data class AlertRule(
         .put("flash", flash)
         .put("announce", announce)
         .put("stopResolved", stopWhenResolved)
+        .apply { if (kind == AlertKind.REMINDER) put("reminder", reminder.toJson()) }
 
     companion object {
         fun fromJson(json: JSONObject): AlertRule? {
@@ -248,7 +388,8 @@ data class AlertRule(
                 fullScreen = json.optBoolean("fullScreen", false),
                 flash = json.optBoolean("flash", false),
                 announce = json.optBoolean("announce", false),
-                stopWhenResolved = json.optBoolean("stopResolved", true)
+                stopWhenResolved = json.optBoolean("stopResolved", true),
+                reminder = ReminderSpec.fromJson(json.optJSONObject("reminder"))
             )
         }
 
@@ -291,6 +432,11 @@ data class AlertRule(
                 name = context.getString(R.string.loc_alert_choice_loss), kind = kind, lossMinutes = 20,
                 output = AlertOutput.NOTIFICATION, vibrationPattern = VibrationPattern.SHORT,
                 repeatMinutes = 30, playDurationSec = 30
+            )
+            AlertKind.REMINDER -> AlertRule(
+                name = context.getString(R.string.loc_reminder_default_name), kind = kind,
+                output = AlertOutput.NOTIFICATION, vibrationPattern = VibrationPattern.GENTLE,
+                repeatMinutes = 10, playDurationSec = 30, stopWhenResolved = false
             )
             }
         }
@@ -358,18 +504,36 @@ data class AlertRuntime(
     val lastFired: Long = 0L,
     val snoozedUntil: Long = 0L,
     /** True from the moment the alert fires until a reading no longer meets its condition. */
-    val inEpisode: Boolean = false
+    val inEpisode: Boolean = false,
+
+    // Reminders only
+    /** Due time of the latest occurrence that was dealt with; later ones are still to come. */
+    val handledDue: Long = 0L,
+    /** Due time of the dose waiting for "Taken" or "Skip"; 0 when nothing is open. */
+    val pendingDue: Long = 0L,
+    /** How often the open dose has rung so far. */
+    val ringCount: Int = 0,
+    /** When a dose was last confirmed, by the user or by a matching logbook entry. */
+    val lastTaken: Long = 0L
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("lastFired", lastFired)
         .put("snoozedUntil", snoozedUntil)
         .put("inEpisode", inEpisode)
+        .put("handledDue", handledDue)
+        .put("pendingDue", pendingDue)
+        .put("ringCount", ringCount)
+        .put("lastTaken", lastTaken)
 
     companion object {
         fun fromJson(json: JSONObject): AlertRuntime = AlertRuntime(
             lastFired = json.optLong("lastFired", 0L),
             snoozedUntil = json.optLong("snoozedUntil", 0L),
-            inEpisode = json.optBoolean("inEpisode", false)
+            inEpisode = json.optBoolean("inEpisode", false),
+            handledDue = json.optLong("handledDue", 0L),
+            pendingDue = json.optLong("pendingDue", 0L),
+            ringCount = json.optInt("ringCount", 0),
+            lastTaken = json.optLong("lastTaken", 0L)
         )
     }
 }
