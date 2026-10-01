@@ -678,6 +678,97 @@ public void connectNamedDevice(String id,long delayMillis) {
             }
           }
         }
+
+    /**
+     * Temporary disconnect of one sensor.
+     *
+     * Only the Bluetooth link is dropped: the callback, the native sensor session and the
+     * remembered device address all stay, so nothing has to be scanned for or activated again.
+     * The pause is remembered in {@link SensorPause}, which is what keeps a later app start
+     * from silently reconnecting the sensor.
+     *
+     * @return false when no live GATT callback owns this sensor, for example a sensor whose
+     *         readings arrive over a mirror. Such a sensor has no local link to drop, so the
+     *         pause is not remembered either.
+     */
+    public boolean pauseSensor(String serial) {
+        if(serial==null)
+            return false;
+        SuperGattCallback found=null;
+        for(var cb: gattcallbacks)    {
+            if(serial.equals(cb.SerialNumber)) {
+                found=cb;
+                break;
+                }
+            }
+        if(found==null) {
+            {if(doLog) {Log.i(LOG_ID,"pauseSensor: no gatt for "+serial);};};
+            return false;
+            }
+        SensorPause.setPaused(serial,true);
+        found.pauseSensor();
+        // With this sensor down, scanning for it is pure battery drain. Stop the scan when
+        // nothing is left to look for.
+        if(mBluetoothManager!=null && !hasUnpausedSensors())
+            stopScan(false);
+        if(allSensorsPaused())
+            LossOfSensorAlarm.cancelalarm();
+        SensorLifecycle.changed();
+        return true;
+        }
+
+    /**
+     * Reconnects a paused sensor to the same native sensor session. Uses the stored device
+     * address, so a normal resume does not scan; only a sensor whose address was never stored
+     * falls back to a scan.
+     */
+    public boolean resumeSensor(String serial) {
+        if(serial==null)
+            return false;
+        SensorPause.setPaused(serial,false);
+        SuperGattCallback found=null;
+        for(var cb: gattcallbacks)    {
+            if(serial.equals(cb.SerialNumber)) {
+                found=cb;
+                break;
+                }
+            }
+        if(found==null) {
+            {if(doLog) {Log.i(LOG_ID,"resumeSensor: no gatt for "+serial);};};
+            return false;
+            }
+        found.resumeSensor(0);
+        if(SuperGattCallback.glucosealarms!=null)
+            SuperGattCallback.glucosealarms.setLossAlarm();
+        SensorLifecycle.changed();
+        return true;
+        }
+
+/** Reconnects one previously paused callback, preferring its stored device address. */
+    public void connectPausedDevice(SuperGattCallback cb,long delayMillis) {
+        if(checkandconnectNoScan(cb,delayMillis)) {
+            {if(doLog) {Log.i(LOG_ID,"connectPausedDevice: no address for "+cb.SerialNumber+", scanning");};};
+            // No address to reconnect to: the sensor has to be found again.
+            connectToActiveDevice(cb,delayMillis);
+            }
+        Applic.wakemirrors();
+        }
+
+/** True while at least one sensor still wants a Bluetooth link. */
+    boolean hasUnpausedSensors() {
+        for(var cb: gattcallbacks)
+            if(!cb.isPaused())
+                return true;
+        return false;
+        }
+
+    /** True when every sensor of this device is paused, so nothing should alarm about signal loss. */
+    static boolean allSensorsPaused() {
+        final var blue=blueone;
+        if(blue==null||blue.gattcallbacks.isEmpty())
+            return false;
+        return !blue.hasUnpausedSensors();
+        }
        /*
 public void refreshNamedDevice(String id) {
     Log.i(LOG_ID,"refreshNamedDevice "+id);
@@ -694,6 +785,9 @@ public void refreshNamedDevice(String id) {
 
 private boolean checkandconnectNoScan(SuperGattCallback  cb,long delay) {
     if(doLog) {Log.i(LOG_ID,"checkandconnectNoScan("+cb.SerialNumber+","+ delay+")");};
+    // A paused sensor needs neither a link nor a scan, so it never counts as "needs scanning".
+    if(cb.isPaused())
+        return false;
     if(cb.mActiveDeviceAddress != null) {
         if(BluetoothAdapter.checkBluetoothAddress(cb.mActiveDeviceAddress)) {
             {if(doLog) {Log.i(LOG_ID, cb.SerialNumber+" checkBluetoothAddress(" +cb.mActiveDeviceAddress +") succeeded");};};

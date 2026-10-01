@@ -1003,6 +1003,11 @@
     <string name="sensor_serial_status">Seriennummer: %1$s • Status: %2$s</string>
     <string name="sensor_pause_disconnect">Bluetooth pausieren / trennen</string>
     <string name="sensor_pause_disconnect_desc">Pausiert die Bluetooth-Verbindung, ohne den Sensor zu beenden. Du kannst dich jederzeit wieder verbinden.</string>
+    <string name="sensor_resume_connection">Sensor wieder verbinden</string>
+    <string name="sensor_resume_connection_desc">Dieser Sensor ist pausiert. Stellt die Verbindung zur selben Sensorsitzung wieder her.</string>
+    <string name="sensor_status_paused">Pausiert</string>
+    <string name="sensor_pause_not_supported">Für diesen Sensor gibt es keine Bluetooth-Verbindung zum Pausieren.</string>
+    <string name="sensor_resumed">Verbinde mich neu mit %1$s…</string>
     <string name="sensor_end_replace">Sensor beenden &amp; ersetzen</string>
     <string name="sensor_end_replace_desc">Beendet die aktuelle Tragezeit und bereitet Juggluco auf einen neuen Sensor vor.</string>
     <string name="next">Weiter</string>

@@ -33,8 +33,15 @@ public GlucoseAlarms(Application context) {
     }
 
 public    void handlealarm() {
-    SensorBluetooth.reconnectall();
-    // The existing age alarm wakes us for missing glucose, including values
+        SensorBluetooth.reconnectall();
+        // Every sensor is paused by the user, so the missing glucose is expected.
+        // Stay quiet and do not reschedule: the resume arms the alarm again.
+        if(SensorBluetooth.allSensorsPaused()) {
+            {if(doLog) {Log.i(LOG_ID, "handlealarm all sensors paused");};};
+            LossOfSensorAlarm.cancelalarm();
+            return;
+            }
+        // The existing age alarm wakes us for missing glucose, including values
     // returned by a Garmin watch that owns the Libre3 sensor directly.
     final var garmin=Applic.app.numdata;
     if(garmin!=null) {

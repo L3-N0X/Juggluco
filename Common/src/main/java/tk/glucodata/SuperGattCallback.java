@@ -104,6 +104,8 @@ public static boolean doGadgetbridge=false;
     public final int sensorgen;
     int readrssi=9999;
     protected long sensorstartmsec;
+/** Temporary disconnect: the sensor session stays, Juggluco just stops talking to it. */
+    private volatile boolean paused=false;
 
 protected    SuperGattCallback(String SerialNumber,long dataptr,int gen) {
     this.SerialNumber = SerialNumber;
@@ -111,7 +113,37 @@ protected    SuperGattCallback(String SerialNumber,long dataptr,int gen) {
     mActiveDeviceAddress = Natives.getDeviceAddress(dataptr,true);
     sensorstartmsec=Natives.getSensorStartmsec(dataptr);
     sensorgen=gen;
-    {if(doLog) {Log.i(LOG_ID, "new SuperGattCallback " + SerialNumber + " " + ((mActiveDeviceAddress != null) ? mActiveDeviceAddress : "null"));};};
+    this.paused=SensorPause.isPaused(SerialNumber);
+    {if(doLog) {Log.i(LOG_ID, "new SuperGattCallback " + SerialNumber + " " + ((mActiveDeviceAddress != null) ? mActiveDeviceAddress : "null") + " paused=" + this.paused);};};
+    }
+
+public boolean isPaused() {
+    return paused;
+    }
+
+/**
+ * Drops the Bluetooth link without finishing or forgetting the sensor.
+ * The native session, its history and the remembered device address are all kept, so
+ * {@link SensorBluetooth#resumeSensor} can reconnect the very same session later.
+ */
+public void pauseSensor() {
+    {if(doLog) {Log.i(LOG_ID,"pauseSensor "+SerialNumber);};};
+    paused=true;
+    // Not searchforDeviceAddress(): the address is what lets a resume reconnect
+    // directly instead of scanning for the sensor again.
+    close();
+    }
+
+/** Reconnects a paused sensor to the same native session, without a rescan when possible. */
+public void resumeSensor(long delayMillis) {
+    {if(doLog) {Log.i(LOG_ID,"resumeSensor "+SerialNumber);};};
+    paused=false;
+    final var blue=blueone;
+    if(blue!=null) {
+        blue.connectPausedDevice(this,delayMillis);
+        return;
+        }
+    connectDevice(delayMillis);
     }
 public void disconnect() {
     final var thegatt= mBluetoothGatt;
@@ -124,6 +156,10 @@ public void disconnect() {
       }
     }
 public boolean reconnect(long now,long delay) {
+    // A paused sensor is deliberately silent: report it as handled so the caller
+    // does not interpret the silence as a lost signal and start scanning.
+    if(paused)
+        return true;
     final var old=now-showtime+20;
     if(charcha[1]<old&&connectTime<(now-60*1000))  {
         final BluetoothGatt thegatt;
@@ -230,6 +266,8 @@ void    setConStatus(int status) {
         constatstatusstr = "Status="+status;
         }
 void shouldreconnect(long now) {
+    if(paused)
+        return;
     final var old=now-showtime+20;
     if(starttime<old&&charcha[0]<old&&connectTime<(now-60*1000))
         reconnect(old,0);
@@ -697,6 +735,13 @@ public void searchforDeviceAddress() {
 
  public boolean connectDevice(long delayMillis) {
     if(doLog) {Log.i(LOG_ID,"connectDevice("+delayMillis+") "+ SerialNumber);};
+    // Every automatic path (start, scan found, device update, reconnect loop) ends up
+    // here, so this is the single place that keeps a paused sensor down. Returning true
+    // means "handled", which stops the caller from starting a scan for it.
+    if(paused) {
+        {if(doLog) {Log.i(LOG_ID,"connectDevice paused "+SerialNumber);};};
+        return true;
+        }
     Runnable connect=getConnectDevice();
     if(connect==null) 
         return false;

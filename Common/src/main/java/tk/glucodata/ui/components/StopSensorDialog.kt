@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BluetoothDisabled
+import androidx.compose.material.icons.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -49,6 +50,7 @@ fun StopSensorDialog(
     sensor: SensorDetail,
     onDismiss: () -> Unit,
     onTemporaryDisconnect: () -> Unit,
+    onResume: () -> Unit,
     onEndSensorPermanently: () -> Unit
 ) {
     var showConfirmEnd by remember { mutableStateOf(false) }
@@ -126,12 +128,16 @@ fun StopSensorDialog(
                         }
                     }
 
-                    // Option 1: Temporary Disconnect
+                    // Option 1: Temporary Disconnect, or the way back from it
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                onTemporaryDisconnect()
+                                if (sensor.isPaused) {
+                                    onResume()
+                                } else {
+                                    onTemporaryDisconnect()
+                                }
                                 onDismiss()
                             },
                         shape = RoundedCornerShape(14.dp),
@@ -144,7 +150,7 @@ fun StopSensorDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.BluetoothDisabled,
+                                imageVector = if (sensor.isPaused) Icons.Default.BluetoothSearching else Icons.Default.BluetoothDisabled,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp)
@@ -152,13 +158,19 @@ fun StopSensorDialog(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = stringResource(R.string.sensor_pause_disconnect),
+                                    text = stringResource(
+                                        if (sensor.isPaused) R.string.sensor_resume_connection
+                                        else R.string.sensor_pause_disconnect
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = stringResource(R.string.sensor_pause_disconnect_desc),
+                                    text = stringResource(
+                                        if (sensor.isPaused) R.string.sensor_resume_connection_desc
+                                        else R.string.sensor_pause_disconnect_desc
+                                    ),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
