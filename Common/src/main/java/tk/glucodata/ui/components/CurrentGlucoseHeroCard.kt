@@ -43,6 +43,7 @@ import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.TrendArrow
 import tk.glucodata.ui.theme.LocalClinicalColors
+import tk.glucodata.ui.theme.logbookColors
 
 @Composable
 fun CurrentGlucoseHeroCard(
@@ -51,6 +52,7 @@ fun CurrentGlucoseHeroCard(
     unit: GlucoseUnit,
     sensorName: String? = null,
     minimalistUnits: Boolean = true,
+    insulinOnboard: Float? = null,
     modifier: Modifier = Modifier
 ) {
     val clinicalColors = LocalClinicalColors.current
@@ -219,7 +221,7 @@ fun CurrentGlucoseHeroCard(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Bottom Row: Time ago, Delta
+        // Bottom Row: Time ago, Delta, insulin on board
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -244,6 +246,21 @@ fun CurrentGlucoseHeroCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
+            }
+            // Plain text next to the change rather than another pill: it is a value of its own,
+            // not a status, and it wears the bolus hue so it never reads as the glucose's.
+            insulinOnboard?.let { onBoard ->
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(
+                        R.string.iob_value,
+                        stringResource(R.string.iob),
+                        stringResource(R.string.log_value_insulin, plainAmount(onBoard, 1))
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.logbookColors.rapidInsulin
+                )
             }
         }
     }

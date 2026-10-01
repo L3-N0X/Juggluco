@@ -57,6 +57,7 @@ import tk.glucodata.ui.screens.settings.GarminStatusScreen
 import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
 import tk.glucodata.ui.screens.settings.IngredientsSettingsScreen
+import tk.glucodata.ui.screens.settings.InsulinOnboardSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewTreatmentsScreen
 import tk.glucodata.ui.screens.settings.LogbookSettingsScreen
@@ -231,6 +232,10 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                     onNavigateBack = { activeSettingsDestination = SettingsDestination.LOGBOOK }
                 )
                 SettingsDestination.METERS -> MetersSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.INSULIN_ONBOARD -> InsulinOnboardSettingsScreen(
                     repository = repository,
                     onNavigateBack = { activeSettingsDestination = null }
                 )

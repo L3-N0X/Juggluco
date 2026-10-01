@@ -117,6 +117,7 @@ fun GlucoseScreen(
     val screenStats by repository.screenStats.collectAsState()
     val sensorDetails by repository.sensorDetails.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
+    val insulinOnboard by repository.insulinOnboard.collectAsState()
     remember { AlertStore.ensureLoaded() }
     val alertEvents by AlertStore.events.collectAsState()
     val context = LocalContext.current
@@ -360,7 +361,8 @@ fun GlucoseScreen(
                         deltaReference = deltaReference,
                         unit = unit,
                         sensorName = sensorName,
-                        minimalistUnits = displayConfig.minimalistUnits
+                        minimalistUnits = displayConfig.minimalistUnits,
+                        insulinOnboard = insulinOnboard
                     )
                     GlucoseStatsCard(
                         stats = visibleStats,
@@ -475,7 +477,8 @@ fun GlucoseScreen(
                     deltaReference = deltaReference,
                     unit = unit,
                     sensorName = sensorName,
-                    minimalistUnits = displayConfig.minimalistUnits
+                    minimalistUnits = displayConfig.minimalistUnits,
+                    insulinOnboard = insulinOnboard
                 )
 
                 Spacer(modifier = Modifier.height(28.dp))

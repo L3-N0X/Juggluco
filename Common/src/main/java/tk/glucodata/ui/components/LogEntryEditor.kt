@@ -1213,7 +1213,8 @@ private fun appendDigit(text: String, digit: Char, spec: AmountSpec): String {
 private fun appendDecimal(text: String, spec: AmountSpec): String =
     if (spec.decimals == 0 || '.' in text) text else text.ifEmpty { "0" } + "."
 
-internal fun plainAmount(value: Float, decimals: Int): String =
+/** An amount as the user would type it, without a unit; shared with the watch's own screens. */
+fun plainAmount(value: Float, decimals: Int): String =
     BigDecimal(value.toDouble()).setScale(decimals, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 
 // --- What the editor learns from the logbook. ---

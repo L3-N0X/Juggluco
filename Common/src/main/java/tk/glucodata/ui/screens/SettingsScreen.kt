@@ -53,6 +53,7 @@ import tk.glucodata.ui.screens.settings.GarminStatusScreen
 import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
 import tk.glucodata.ui.screens.settings.IngredientsSettingsScreen
+import tk.glucodata.ui.screens.settings.InsulinOnboardSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewTreatmentsScreen
 import tk.glucodata.ui.screens.settings.LogbookSettingsScreen
@@ -240,6 +241,10 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                 repository = repository,
                 onNavigateBack = { handleNavigate(null) }
             )
+            SettingsDestination.INSULIN_ONBOARD -> InsulinOnboardSettingsScreen(
+                repository = repository,
+                onNavigateBack = { handleNavigate(null) }
+            )
         }
         return
     }
@@ -366,6 +371,15 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                 ),
                 icon = SettingsDestination.LOGBOOK.icon,
                 onClick = { handleNavigate(SettingsDestination.LOGBOOK) }
+            )
+            // A plain row, not a row with a switch: native refuses the switch while no label holds
+            // an insulin type, and a switch that snaps back without a word is the one thing this
+            // screen is not allowed to be. The screen it opens explains that refusal.
+            SettingsNavRow(
+                title = stringResource(SettingsDestination.INSULIN_ONBOARD.titleRes),
+                subtitle = stringResource(SettingsDestination.INSULIN_ONBOARD.descRes),
+                icon = SettingsDestination.INSULIN_ONBOARD.icon,
+                onClick = { handleNavigate(SettingsDestination.INSULIN_ONBOARD) }
             )
         }
 

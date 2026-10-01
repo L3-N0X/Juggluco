@@ -34,6 +34,7 @@ import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.TrendArrow
 import tk.glucodata.ui.theme.LocalClinicalColors
+import tk.glucodata.ui.theme.LocalLogbookColors
 
 @Composable
 fun WearGlucoseHero(
@@ -41,6 +42,7 @@ fun WearGlucoseHero(
     readings: List<GlucosePoint>,
     unit: GlucoseUnit,
     deltaCalculation: DeltaCalculation = DeltaCalculation.ONE_MINUTE,
+    insulinOnboard: Float? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -149,6 +151,22 @@ fun WearGlucoseHero(
                 fontSize = 13.sp,
                 color = if (isStale) clinical.low else MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            // Plain text beside the change, in the bolus hue: a value of its own rather than a
+            // status, and never to be mistaken for the glucose's own colour.
+            insulinOnboard?.let { onBoard ->
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = stringResource(
+                        R.string.iob_value,
+                        stringResource(R.string.iob),
+                        stringResource(R.string.log_value_insulin, plainAmount(onBoard, 1))
+                    ),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = LocalLogbookColors.current.rapidInsulin
+                )
+            }
         }
     }
 }

@@ -63,6 +63,7 @@ import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HardwareConfig
+import tk.glucodata.ui.model.InsulinType
 import tk.glucodata.ui.model.LabelConfig
 import tk.glucodata.ui.model.LabelSaveError
 import tk.glucodata.ui.model.LibreLabelMapping
@@ -266,6 +267,18 @@ class GlucoseRepository(
     private val _labelConfig = MutableStateFlow(LabelConfig())
     /** The native labels, and the label each logbook entry type is saved under. */
     val labelConfig: StateFlow<LabelConfig> = _labelConfig.asStateFlow()
+
+    private val _insulinOnboardEnabled = MutableStateFlow(false)
+    /** Whether the insulin on board calculation runs; off until the user asks for it. */
+    val insulinOnboardEnabled: StateFlow<Boolean> = _insulinOnboardEnabled.asStateFlow()
+
+    private val _insulinOnboard = MutableStateFlow<Float?>(null)
+    /**
+     * The insulin still on board right now, in insulin units, or null while the calculation is
+     * off or native has nothing to say. Only ever published when
+     * [insulinOnboardEnabled] is true, so the glucose screen can leave it out entirely.
+     */
+    val insulinOnboard: StateFlow<Float?> = _insulinOnboard.asStateFlow()
 
     private val _hardwareConfig = MutableStateFlow(HardwareConfig())
     val hardwareConfig: StateFlow<HardwareConfig> = _hardwareConfig.asStateFlow()
@@ -595,6 +608,9 @@ class GlucoseRepository(
 
                 // Read LibreView
                 readLibreViewState()
+
+                // Read the insulin on board flag and its value, which live in native settings
+                publishInsulinOnboard()
             }
         } catch (_: Throwable) {}
     }
@@ -1472,6 +1488,9 @@ class GlucoseRepository(
                     .thenByDescending { it.nativeSource?.position ?: -1 }
             )
             publishLogs(hydratedLogs)
+            // A logged dose is what moves the insulin on board, and this is where every logbook
+            // change ends up, so the value follows one reload too.
+            publishInsulinOnboard()
         }
     }
 
@@ -2340,6 +2359,13 @@ class GlucoseRepository(
                     Natives.setlibrenum(LIBRE_NIGHT, index, kind.nativeValue, weight)
                 }
             } catch (_: Throwable) {}
+            // Native used to assume Aspart for a label mapped as rapid acting insulin, but only as
+            // a one-off upgrade step while the calculation was already on, so a mapping made later
+            // in Compose was never picked up. The same assumption belongs here, where the mapping
+            // is actually changed.
+            if (kind == LibreTreatmentKind.RAPID_INSULIN) {
+                NativeInsulinOnboard.ensureInsulinType(index, InsulinType.ASPART)
+            }
             readLibreViewState()
         }
     }
@@ -3625,6 +3651,13 @@ class GlucoseRepository(
                 LogType.BLOOD_GLUCOSE -> Natives.setbloodvar(index.toByte())
                 LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> {
                     NativeLabels.setInsulinLabel(type, index)
+                    // The calculation reads the insulin types out of native settings rather than
+                    // out of this choice, so a bolus label that carries no insulin would add
+                    // nothing to the insulin on board. Aspart is the one native assumes for a
+                    // label mapped as rapid acting insulin, and a type the user picked is kept.
+                    if (type == LogType.RAPID_INSULIN) {
+                        NativeInsulinOnboard.ensureInsulinType(index, InsulinType.ASPART)
+                    }
                     DisplaySync.onLocalLabelChange()
                 }
                 LogType.CUSTOM -> return
@@ -3656,6 +3689,49 @@ class GlucoseRepository(
             reloadLabels()
             _libreTreatments.value = readLibreTreatments()
             loadLogsFromNative()
+        }
+    }
+
+    // --- INSULIN ONBOARD ---
+
+    /**
+     * Turns the insulin on board calculation on or off.
+     *
+     * Returns whether native accepted it: while no label holds an insulin type there is nothing to
+     * calculate with, and native turns the request down rather than storing a flag that would
+     * show nothing. The screen that offers the switch says so instead of snapping back silently.
+     */
+    fun setInsulinOnboard(enabled: Boolean): Boolean {
+        val accepted = NativeInsulinOnboard.setEnabled(enabled)
+        if (accepted) refreshInsulinOnboard()
+        return accepted
+    }
+
+    /** The insulin [index] holds for the calculation, or [InsulinType.NONE] where native has none. */
+    fun insulinTypeOf(index: Int): InsulinType = NativeInsulinOnboard.insulinType(index)
+
+    /** Stores the insulin label [index] holds and recalculates what is on board. */
+    fun setInsulinType(index: Int, type: InsulinType) {
+        if (!NativeInsulinOnboard.setInsulinType(index, type)) return
+        refreshInsulinOnboard()
+    }
+
+    /**
+     * Re-reads the flag and the value from native. Safe to call as often as the screen needs it:
+     * while the calculation is off it publishes nothing at all.
+     */
+    fun refreshInsulinOnboard() {
+        scope.launch(Dispatchers.IO) { publishInsulinOnboard() }
+    }
+
+    /** The publishing half of [refreshInsulinOnboard], for the calls already off the main thread. */
+    private fun publishInsulinOnboard() {
+        val enabled = NativeInsulinOnboard.isEnabled()
+        _insulinOnboardEnabled.value = enabled
+        _insulinOnboard.value = if (enabled) {
+            NativeInsulinOnboard.valueAt(System.currentTimeMillis())
+        } else {
+            null
         }
     }
 
@@ -4043,6 +4119,11 @@ class GlucoseRepository(
                     if (ticks % FAST_TICKS_PER_SENSOR_SWEEP == 0) {
                         sweepSensors()
                     }
+                    if (_insulinOnboardEnabled.value && ticks % FAST_TICKS_PER_IOB_REFRESH == 0) {
+                        // Nothing on board changes on its own except by decaying, so this is the
+                        // one thing that has to follow the clock rather than an event.
+                        publishInsulinOnboard()
+                    }
                     if (ticks % FAST_TICKS_PER_FULL_REFRESH == 0) {
                         refreshAllLocked()
                     }
@@ -4162,6 +4243,12 @@ class GlucoseRepository(
 
         /** Paired-device sweep, 30 s. */
         const val FAST_TICKS_PER_DEVICE_SWEEP = 10
+
+        /**
+         * Insulin on board refresh, 30 s. Doses decay over hours rather than minutes, and the
+         * value is rounded to a tenth, so a minute apart would not read any differently.
+         */
+        const val FAST_TICKS_PER_IOB_REFRESH = 10
 
         /**
          * Full native reload, 2 minutes. This walks every raw, calibrated and scan record of every
