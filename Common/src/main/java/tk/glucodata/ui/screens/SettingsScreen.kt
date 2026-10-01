@@ -54,6 +54,7 @@ import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewTreatmentsScreen
+import tk.glucodata.ui.screens.settings.MetersSettingsScreen
 import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
 import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
 import tk.glucodata.ui.screens.settings.SettingsActionRow
@@ -225,6 +226,10 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                 repository = repository,
                 onNavigateBack = { handleNavigate(SettingsDestination.GARMIN_CONFIG) }
             )
+            SettingsDestination.METERS -> MetersSettingsScreen(
+                repository = repository,
+                onNavigateBack = { handleNavigate(null) }
+            )
         }
         return
     }
@@ -236,6 +241,8 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
     val alertSettings by tk.glucodata.alerts.AlertStore.settings.collectAsState()
     val alertsOn = alertSettings.enabled && alertRules.any { it.enabled }
     val mirrorConnections by repository.mirrorConnections.collectAsState()
+
+    val metersEnabled by repository.metersEnabled.collectAsState()
 
     val isReceiverActive = mirrorConnections.any { it.isReceiver }
     val isSenderActive = mirrorConnections.any { !it.isReceiver }
@@ -391,6 +398,16 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                 icon = SettingsDestination.MIRROR.icon,
                 onClick = { handleNavigate(SettingsDestination.MIRROR) }
             )
+            if (!Applic.isWearable) {
+                SettingsNavRow(
+                    title = stringResource(SettingsDestination.METERS.titleRes),
+                    subtitle = stringResource(SettingsDestination.METERS.descRes),
+                    icon = SettingsDestination.METERS.icon,
+                    checked = metersEnabled,
+                    onCheckedChange = { repository.setMetersEnabled(it) },
+                    onClick = { handleNavigate(SettingsDestination.METERS) }
+                )
+            }
             SettingsNavRow(
                 title = stringResource(R.string.settings_group_hardware_title),
                 subtitle = stringResource(R.string.settings_group_hardware_desc),

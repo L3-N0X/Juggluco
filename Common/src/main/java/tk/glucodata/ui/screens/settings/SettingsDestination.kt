@@ -2,6 +2,7 @@ package tk.glucodata.ui.screens.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.CloudUpload
@@ -153,5 +154,11 @@ UPLOADER(
         descRes = R.string.loc_garmin_shortcuts_desc,
         categoryRes = R.string.settings_cat_integrations,
         icon = Icons.Default.Bolt
+    ),
+    METERS(
+        titleRes = R.string.meterlist,
+        descRes = R.string.settings_group_meters_desc,
+        categoryRes = R.string.settings_cat_hardware,
+        icon = Icons.Default.Bloodtype
     )
 }
