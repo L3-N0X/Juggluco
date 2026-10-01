@@ -45,6 +45,9 @@ object AlertPlayer {
     const val CHANNEL_ID = "glucoseAlerts"
     private const val WEAR_CHANNEL_ID = "glucoseAlertsWear"
     const val NOTIFICATION_ID = 81450
+    private const val REMINDER_CHANNEL_ID = "medicationReminders"
+    private const val WEAR_REMINDER_CHANNEL_ID = "medicationRemindersWear"
+    private const val REMINDER_NOTIFICATION_BASE = 81500
     private const val RAMP_STEP_MS = 200L
     private const val ANNOUNCE_LEAD_MS = 2500L
     private const val MAX_WAKE_MS = 30 * 60_000L
@@ -61,8 +64,12 @@ object AlertPlayer {
         val remote: Boolean = false,
         val eventId: String? = null,
         /** False once sound and vibration ended while the notification stays up. */
-        val ringing: Boolean = true
-    )
+        val ringing: Boolean = true,
+        /** Reminders: due time of the dose this alert is about. */
+        val reminderDue: Long = 0L
+    ) {
+        val isReminder: Boolean get() = rule.kind == AlertKind.REMINDER
+    }
 
     private val _active = MutableStateFlow<ActiveAlert?>(null)
     val active: StateFlow<ActiveAlert?> = _active.asStateFlow()
@@ -99,6 +106,8 @@ object AlertPlayer {
     private var flashOn = false
     private var vibrating = false
     private var channelCreated = false
+    @Volatile
+    private var reminderChannelCreated = false
     private val scheduled = mutableListOf<Runnable>()
 
     /** Runs [block] after [delayMs] unless the alert stops first. */
@@ -124,15 +133,20 @@ object AlertPlayer {
         isTest: Boolean = false,
         remote: Boolean = false,
         eventId: String? = null,
-        eventTime: Long = System.currentTimeMillis()
+        eventTime: Long = System.currentTimeMillis(),
+        reminderDue: Long = 0L
     ) {
-        val alert = ActiveAlert(rule, reading, lostMinutes, eventTime, isTest, remote, eventId)
+        val alert = ActiveAlert(rule, reading, lostMinutes, eventTime, isTest, remote, eventId, reminderDue = reminderDue)
         _active.value = alert
         handler.post { start(alert) }
     }
 
     /** Rings [rule] as it would for a real reading, using the latest value when there is one. */
     fun test(rule: AlertRule) {
+        if (rule.kind == AlertKind.REMINDER) {
+            play(rule, null, isTest = true, reminderDue = System.currentTimeMillis())
+            return
+        }
         val text = AlertBridge.lastGlucoseText()
         val reading = AlertEngine.Reading(
             mgdl = if (rule.kind == AlertKind.HIGH) rule.thresholdMgdl + 10f else (rule.thresholdMgdl - 5f).coerceAtLeast(40f),
@@ -153,7 +167,12 @@ object AlertPlayer {
         }
         handler.post {
             stopOutputs()
-            if (!keepNotification) notificationManager.cancel(NOTIFICATION_ID)
+            // A reminder's notification stays until the dose is taken or skipped.
+            if (alert.isReminder) {
+                if (alert.isTest && !keepNotification) cancelReminder(alert.rule.id)
+            } else if (!keepNotification) {
+                notificationManager.cancel(NOTIFICATION_ID)
+            }
         }
         if (reason == StopReason.DISMISSED || reason == StopReason.SNOOZED) {
             AlertBridge.stopAlarmOnPeers()
@@ -167,6 +186,10 @@ object AlertPlayer {
     /** Snoozes the shown alert here and on connected devices. */
     fun snooze(minutes: Int) {
         val alert = _active.value ?: return
+        if (alert.isReminder) {
+            Reminders.snooze(alert.rule.id, minutes, isTest = alert.isTest)
+            return
+        }
         if (!alert.isTest) {
             AlertStore.snoozeRule(alert.rule.id, minutes)
             AlertSync.sendSnooze(alert.rule, AlertStore.runtimeOf(alert.rule.id).snoozedUntil)
@@ -179,7 +202,7 @@ object AlertPlayer {
     /** Refreshes the shown value while an alert is up. */
     fun updateReading(reading: AlertEngine.Reading) {
         val alert = _active.value ?: return
-        if (alert.isTest || alert.rule.kind == AlertKind.SIGNAL_LOSS) return
+        if (alert.isTest || alert.rule.kind == AlertKind.SIGNAL_LOSS || alert.isReminder) return
         val updated = alert.copy(reading = reading)
         _active.value = updated
         handler.post { if (_active.value != null) postNotification(updated, silentUpdate = true) }
@@ -193,7 +216,7 @@ object AlertPlayer {
         postNotification(alert, silentUpdate = false)
         if (!alert.remote) {
             AlertSync.sendRing(alert)
-            if (!alert.isTest) {
+            if (!alert.isTest && !alert.isReminder) {
                 val prefix = context.getString(if (rule.kind == AlertKind.HIGH || rule.kind == AlertKind.RISING) R.string.loc_watch_alert_high else R.string.loc_watch_alert_low)
                 alert.reading?.let { AlertBridge.alarmToWatches("$prefix ${it.displayValue}") }
             }
@@ -438,6 +461,8 @@ object AlertPlayer {
 
     private fun announce(alert: ActiveAlert) {
         val text = when {
+            alert.isReminder -> listOf(reminderTitle(alert.rule), alert.rule.reminder.dose)
+                .filter { it.isNotBlank() }.joinToString(", ")
             alert.rule.kind == AlertKind.SIGNAL_LOSS -> context.getString(R.string.loc_alarm_announce_loss, alert.rule.name, alert.lostMinutes)
             else -> alert.reading?.displayValue ?: return
         }
@@ -531,6 +556,7 @@ object AlertPlayer {
         Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
 
     fun title(alert: ActiveAlert): String {
+        if (alert.isReminder) return reminderTitle(alert.rule)
         val value = alert.reading?.let { currentUnit().format(it.mgdl) }
         return when {
             alert.rule.kind == AlertKind.SIGNAL_LOSS -> alert.rule.name
@@ -540,6 +566,7 @@ object AlertPlayer {
     }
 
     fun detail(alert: ActiveAlert): String {
+        if (alert.isReminder) return reminderDetail(alert.rule, alert.reminderDue)
         val rule = alert.rule
         val unit = currentUnit()
         val condition = when (rule.kind) {
@@ -550,6 +577,7 @@ object AlertPlayer {
             AlertKind.FALLING -> context.getString(R.string.alert_detail_falling, unit.formatRate(rule.rateMgdlPerMin), context.getString(unit.labelRes))
             AlertKind.RISING -> context.getString(R.string.alert_detail_rising, unit.formatRate(rule.rateMgdlPerMin), context.getString(unit.labelRes))
             AlertKind.SIGNAL_LOSS -> context.getString(R.string.alert_detail_signal_loss, alert.lostMinutes)
+            AlertKind.REMINDER -> reminderDetail(rule, alert.reminderDue)
         }
         val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(alert.reading?.timeMillis ?: alert.startedAt))
         return if (alert.isTest) context.getString(R.string.alert_test_detail, condition) else context.getString(R.string.loc_alarm_detail_time, condition, time)
@@ -627,6 +655,10 @@ object AlertPlayer {
     }
 
     private fun postNotification(alert: ActiveAlert, silentUpdate: Boolean) {
+        if (alert.isReminder) {
+            postReminder(alert.rule, alert.reminderDue, alert.isTest, silentUpdate, asActive = true)
+            return
+        }
         try {
             ensureChannel()
             val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -671,6 +703,123 @@ object AlertPlayer {
             }
         } catch (th: Throwable) {
             Log.stack(LOG_ID, "postNotification", th)
+        }
+    }
+
+    // --- Medication reminders ------------------------------------------------------------
+
+    /** "Time to take Metformin". */
+    fun reminderTitle(rule: AlertRule): String =
+        context.getString(R.string.loc_reminder_notification_title, rule.name.ifBlank { context.getString(R.string.loc_reminder_default_name) })
+
+    /** Dose, note and due time, e.g. "500 mg · with food · due 08:00". */
+    fun reminderDetail(rule: AlertRule, due: Long, snoozedUntil: Long = 0L): String {
+        val parts = mutableListOf(rule.reminder.dose.trim(), rule.reminder.note.trim()).filter { it.isNotEmpty() }.toMutableList()
+        val time = DateFormat.getTimeInstance(DateFormat.SHORT)
+        if (due > 0L) parts += context.getString(R.string.loc_reminder_due_at, time.format(Date(due)))
+        if (snoozedUntil > System.currentTimeMillis()) parts += context.getString(R.string.loc_reminder_again_at, time.format(Date(snoozedUntil)))
+        return parts.joinToString(" · ")
+    }
+
+    private fun reminderNotificationId(ruleId: String): Int = REMINDER_NOTIFICATION_BASE + (ruleId.hashCode() and 0x3fff)
+
+    fun cancelReminder(ruleId: String) {
+        runCatching { notificationManager.cancel(reminderNotificationId(ruleId)) }
+    }
+
+    private val reminderChannelId: String
+        get() = if (Applic.isWearable) WEAR_REMINDER_CHANNEL_ID else REMINDER_CHANNEL_ID
+
+    private fun ensureReminderChannel() {
+        if (reminderChannelCreated || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val channel = NotificationChannel(
+            reminderChannelId,
+            context.getString(R.string.loc_reminder_channel_title),
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = context.getString(R.string.loc_reminder_channel_description)
+            // Sound and vibration come from the reminder's own settings, played by this player.
+            setSound(null, null)
+            if (Applic.isWearable) {
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0L)
+            } else {
+                enableVibration(false)
+            }
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+        }
+        notificationManager.createNotificationChannel(channel)
+        reminderChannelCreated = true
+    }
+
+    private fun reminderIntent(action: String, rule: AlertRule, due: Long, isTest: Boolean, minutes: Int = 0): PendingIntent {
+        val intent = Intent(context, AlertActionReceiver::class.java)
+            .setAction(action)
+            .putExtra(AlertActionReceiver.EXTRA_RULE_ID, rule.id)
+            .putExtra(AlertActionReceiver.EXTRA_DUE, due)
+            .putExtra(AlertActionReceiver.EXTRA_TEST, isTest)
+            .putExtra(AlertActionReceiver.EXTRA_MINUTES, minutes)
+            // Lets "Taken" log a reminder mirrored from a device whose list is not synced here.
+            .putExtra(AlertActionReceiver.EXTRA_RULE, rule.toJson().toString())
+        return PendingIntent.getBroadcast(
+            context, (action + rule.id).hashCode(), intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun reminderBuilder(): Notification.Builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        Notification.Builder(context, reminderChannelId)
+    } else {
+        @Suppress("DEPRECATION")
+        Notification.Builder(context).setPriority(Notification.PRIORITY_HIGH)
+    }
+
+    /**
+     * Shows the reminder for the dose due at [due] with Taken, Snooze and Skip. [asActive]
+     * is true while it is the alert this player shows, which allows the full-screen alert.
+     */
+    fun postReminder(rule: AlertRule, due: Long, isTest: Boolean, silent: Boolean, asActive: Boolean, snoozedUntil: Long = 0L) {
+        try {
+            ensureReminderChannel()
+            val title = reminderTitle(rule)
+            val text = if (isTest) context.getString(R.string.alert_test_detail, reminderDetail(rule, due)) else reminderDetail(rule, due, snoozedUntil)
+            val snoozeMinutes = AlertStore.settings.value.snoozeOptions.firstOrNull() ?: 15
+            // The lock screen only says that a reminder is due, not which medication.
+            val publicVersion = reminderBuilder()
+                .setSmallIcon(R.drawable.ic_medication)
+                .setContentTitle(context.getString(R.string.loc_reminder_public_title))
+                .setContentText(context.getString(R.string.loc_reminder_due_at, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(due))))
+                .build()
+            val builder = reminderBuilder()
+                .setSmallIcon(R.drawable.ic_medication)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(Notification.BigTextStyle().bigText(text))
+                .setCategory(Notification.CATEGORY_REMINDER)
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .setPublicVersion(publicVersion)
+                .setShowWhen(true)
+                .setWhen(due)
+                .setOnlyAlertOnce(silent)
+                .setAutoCancel(false)
+                .setLocalOnly(AlertSync.hasWearPeer())
+                .setDeleteIntent(reminderIntent(AlertActionReceiver.ACTION_REMINDER_SILENCE, rule, due, isTest))
+                .addAction(Notification.Action.Builder(null, context.getString(R.string.loc_reminder_taken), reminderIntent(AlertActionReceiver.ACTION_REMINDER_TAKEN, rule, due, isTest)).build())
+                .addAction(Notification.Action.Builder(null, context.getString(R.string.snooze_minutes, snoozeMinutes), reminderIntent(AlertActionReceiver.ACTION_REMINDER_SNOOZE, rule, due, isTest, snoozeMinutes)).build())
+                .addAction(Notification.Action.Builder(null, context.getString(R.string.loc_reminder_skip), reminderIntent(AlertActionReceiver.ACTION_REMINDER_SKIP, rule, due, isTest)).build())
+
+            val fullScreen = asActive && (rule.fullScreen || Applic.isWearable)
+            if (fullScreen && canUseFullScreen()) {
+                builder.setContentIntent(fullScreenIntent())
+                if (!silent) builder.setFullScreenIntent(fullScreenIntent(), true)
+            } else {
+                builder.setContentIntent(if (fullScreen) fullScreenIntent() else Notify.mkpending())
+            }
+            notificationManager.notify(reminderNotificationId(rule.id), builder.build())
+            val openNow = Applic.isWearable || AlertStore.settings.value.fullScreenOnActiveScreen
+            if (fullScreen && !silent && openNow) openFullScreenWhileInUse()
+        } catch (th: Throwable) {
+            Log.stack(LOG_ID, "postReminder", th)
         }
     }
 }

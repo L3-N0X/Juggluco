@@ -108,10 +108,13 @@ fun AlertEditorScreen(
     unit: GlucoseUnit,
     onNavigateBack: () -> Unit
 ) {
+    if (rule.kind == AlertKind.REMINDER) {
+        ReminderEditorScreen(rule = rule, runtime = runtime, onNavigateBack = onNavigateBack)
+        return
+    }
     val context = LocalContext.current
     val active by AlertPlayer.active.collectAsState()
     var confirmDelete by remember { mutableStateOf(false) }
-    var showSoundPicker by remember { mutableStateOf(false) }
     val offLabel = stringResource(R.string.loc_common_off)
     val atOnceLabel = stringResource(R.string.loc_common_at_once)
     val onceLabel = stringResource(R.string.loc_common_once)
@@ -223,6 +226,7 @@ fun AlertEditorScreen(
                         )
                     }
                 }
+                AlertKind.REMINDER -> Unit
                 AlertKind.SIGNAL_LOSS -> {
                     ChoiceRow(
                         title = stringResource(R.string.loc_alert_no_reading_for),
@@ -240,93 +244,7 @@ fun AlertEditorScreen(
         ScheduleSection(schedule = rule.schedule, onChange = { schedule -> update { it.copy(schedule = schedule) } })
 
         // --- Sound -----------------------------------------------------------------
-        SettingsSection(title = stringResource(R.string.loc_alert_sound_section)) {
-            SettingsSegmentedRow(
-                title = stringResource(R.string.loc_alert_play_on),
-                subtitle = outputDescription(rule.output),
-                icon = Icons.AutoMirrored.Filled.VolumeUp
-            ) {
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                ) {
-                    val outputs = listOf(
-                        AlertOutput.ALARM to stringResource(R.string.loc_alarm_stream),
-                        AlertOutput.NOTIFICATION to stringResource(R.string.loc_alarm_notification_stream),
-                        AlertOutput.MEDIA to stringResource(R.string.loc_alarm_media_stream),
-                        AlertOutput.NONE to stringResource(R.string.loc_common_off)
-                    )
-                    outputs.forEachIndexed { index, (output, label) ->
-                        SegmentedButton(
-                            selected = rule.output == output,
-                            onClick = { update { it.copy(output = output) } },
-                            shape = SegmentedButtonDefaults.itemShape(index, outputs.size),
-                            label = { Text(label, maxLines = 1) }
-                        )
-                    }
-                }
-            }
-            val soundOn = rule.output != AlertOutput.NONE
-            SettingsActionRow(
-                title = stringResource(R.string.loc_alert_sound),
-                subtitle = AlertSounds.label(context, rule),
-                icon = Icons.Default.MusicNote,
-                enabled = soundOn,
-                onClick = { showSoundPicker = true }
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.loc_alert_set_volume),
-                subtitle = if (rule.volumePercent >= 0) {
-                    stringResource(R.string.loc_alert_raise_volume, outputName(rule.output), rule.volumePercent)
-                } else {
-                    stringResource(R.string.loc_alert_use_phone_volume, outputName(rule.output))
-                },
-                icon = Icons.Default.GraphicEq,
-                enabled = soundOn,
-                checked = rule.volumePercent >= 0,
-                onCheckedChange = { on -> update { it.copy(volumePercent = if (on) 80 else -1) } }
-            )
-            if (rule.volumePercent >= 0) {
-                SettingsSliderRow(
-                    title = stringResource(R.string.loc_alert_volume),
-                    valueText = "${rule.volumePercent}%",
-                    icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    value = rule.volumePercent.toFloat(),
-                    onValueChange = { value -> update { it.copy(volumePercent = (value / 5).roundToInt() * 5) } },
-                    valueRange = 5f..100f,
-                    enabled = soundOn
-                )
-            }
-            ChoiceRow(
-                title = stringResource(R.string.loc_alert_fade_in),
-                subtitle = if (rule.rampUpSec > 0) stringResource(R.string.loc_alert_reaches_full_volume, formatDuration(rule.rampUpSec)) else stringResource(R.string.loc_alert_starts_full_volume),
-                icon = Icons.Default.Speed,
-                enabled = soundOn,
-                options = listOf(0, 5, 10, 20, 30, 60, 120),
-                selected = rule.rampUpSec,
-                label = { if (it == 0) offLabel else formatDuration(it) },
-                onSelect = { seconds -> update { it.copy(rampUpSec = seconds) } }
-            )
-            ChoiceRow(
-                title = stringResource(R.string.loc_alert_sound_starts_after),
-                subtitle = stringResource(R.string.loc_alert_sound_delay),
-                icon = Icons.Default.Timer,
-                enabled = soundOn,
-                options = listOf(0, 10, 30, 60, 120, 300),
-                selected = rule.soundDelaySec,
-                label = { if (it == 0) atOnceLabel else formatDuration(it) },
-                onSelect = { seconds -> update { it.copy(soundDelaySec = seconds) } }
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.loc_alert_override_dnd),
-                subtitle = stringResource(R.string.loc_alert_override_dnd_desc) +
-                    if (!AlertPlayer.hasDndAccess()) stringResource(R.string.loc_alert_override_dnd_needed) else "",
-                icon = Icons.Default.DoNotDisturbOn,
-                checked = rule.overrideDnd,
-                onCheckedChange = { on -> update { it.copy(overrideDnd = on) } }
-            )
-        }
+        AlertSoundSection(rule = rule, onChange = { transform -> update(transform) })
 
         // --- Vibration -------------------------------------------------------------
         VibrationSection(rule = rule, onChange = { transform -> update(transform) })
@@ -403,13 +321,6 @@ fun AlertEditorScreen(
         }
     }
 
-    if (showSoundPicker) {
-        SoundPickerDialog(
-            rule = rule,
-            onPick = { uri -> update { it.copy(soundUri = uri) } },
-            onDismiss = { showSoundPicker = false }
-        )
-    }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -425,6 +336,109 @@ fun AlertEditorScreen(
             dismissButton = {
                 TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) }
             }
+        )
+    }
+}
+
+/** Stream, sound, volume, fade-in, delay and Do Not Disturb of one alert. */
+@Composable
+internal fun AlertSoundSection(rule: AlertRule, onChange: ((AlertRule) -> AlertRule) -> Unit) {
+    val context = LocalContext.current
+    var showSoundPicker by remember { mutableStateOf(false) }
+    val offLabel = stringResource(R.string.loc_common_off)
+    val atOnceLabel = stringResource(R.string.loc_common_at_once)
+    SettingsSection(title = stringResource(R.string.loc_alert_sound_section)) {
+        SettingsSegmentedRow(
+            title = stringResource(R.string.loc_alert_play_on),
+            subtitle = outputDescription(rule.output),
+            icon = Icons.AutoMirrored.Filled.VolumeUp
+        ) {
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                val outputs = listOf(
+                    AlertOutput.ALARM to stringResource(R.string.loc_alarm_stream),
+                    AlertOutput.NOTIFICATION to stringResource(R.string.loc_alarm_notification_stream),
+                    AlertOutput.MEDIA to stringResource(R.string.loc_alarm_media_stream),
+                    AlertOutput.NONE to stringResource(R.string.loc_common_off)
+                )
+                outputs.forEachIndexed { index, (output, label) ->
+                    SegmentedButton(
+                        selected = rule.output == output,
+                        onClick = { onChange { it.copy(output = output) } },
+                        shape = SegmentedButtonDefaults.itemShape(index, outputs.size),
+                        label = { Text(label, maxLines = 1) }
+                    )
+                }
+            }
+        }
+        val soundOn = rule.output != AlertOutput.NONE
+        SettingsActionRow(
+            title = stringResource(R.string.loc_alert_sound),
+            subtitle = AlertSounds.label(context, rule),
+            icon = Icons.Default.MusicNote,
+            enabled = soundOn,
+            onClick = { showSoundPicker = true }
+        )
+        SettingsSwitchRow(
+            title = stringResource(R.string.loc_alert_set_volume),
+            subtitle = if (rule.volumePercent >= 0) {
+                stringResource(R.string.loc_alert_raise_volume, outputName(rule.output), rule.volumePercent)
+            } else {
+                stringResource(R.string.loc_alert_use_phone_volume, outputName(rule.output))
+            },
+            icon = Icons.Default.GraphicEq,
+            enabled = soundOn,
+            checked = rule.volumePercent >= 0,
+            onCheckedChange = { on -> onChange { it.copy(volumePercent = if (on) 80 else -1) } }
+        )
+        if (rule.volumePercent >= 0) {
+            SettingsSliderRow(
+                title = stringResource(R.string.loc_alert_volume),
+                valueText = "${rule.volumePercent}%",
+                icon = Icons.AutoMirrored.Filled.VolumeUp,
+                value = rule.volumePercent.toFloat(),
+                onValueChange = { value -> onChange { it.copy(volumePercent = (value / 5).roundToInt() * 5) } },
+                valueRange = 5f..100f,
+                enabled = soundOn
+            )
+        }
+        ChoiceRow(
+            title = stringResource(R.string.loc_alert_fade_in),
+            subtitle = if (rule.rampUpSec > 0) stringResource(R.string.loc_alert_reaches_full_volume, formatDuration(rule.rampUpSec)) else stringResource(R.string.loc_alert_starts_full_volume),
+            icon = Icons.Default.Speed,
+            enabled = soundOn,
+            options = listOf(0, 5, 10, 20, 30, 60, 120),
+            selected = rule.rampUpSec,
+            label = { if (it == 0) offLabel else formatDuration(it) },
+            onSelect = { seconds -> onChange { it.copy(rampUpSec = seconds) } }
+        )
+        ChoiceRow(
+            title = stringResource(R.string.loc_alert_sound_starts_after),
+            subtitle = stringResource(R.string.loc_alert_sound_delay),
+            icon = Icons.Default.Timer,
+            enabled = soundOn,
+            options = listOf(0, 10, 30, 60, 120, 300),
+            selected = rule.soundDelaySec,
+            label = { if (it == 0) atOnceLabel else formatDuration(it) },
+            onSelect = { seconds -> onChange { it.copy(soundDelaySec = seconds) } }
+        )
+        SettingsSwitchRow(
+            title = stringResource(R.string.loc_alert_override_dnd),
+            subtitle = stringResource(R.string.loc_alert_override_dnd_desc) +
+                if (!AlertPlayer.hasDndAccess()) stringResource(R.string.loc_alert_override_dnd_needed) else "",
+            icon = Icons.Default.DoNotDisturbOn,
+            checked = rule.overrideDnd,
+            onCheckedChange = { on -> onChange { it.copy(overrideDnd = on) } }
+        )
+    }
+    if (showSoundPicker) {
+        SoundPickerDialog(
+            rule = rule,
+            onPick = { uri -> onChange { it.copy(soundUri = uri) } },
+            onDismiss = { showSoundPicker = false }
         )
     }
 }
@@ -542,7 +556,7 @@ private fun RateRow(rateMgdl: Float, unit: GlucoseUnit, falling: Boolean, onChan
 
 /** Row with a title and a horizontally scrolling set of mutually exclusive chips. */
 @Composable
-private fun <T> ChoiceRow(
+internal fun <T> ChoiceRow(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     options: List<T>,
@@ -645,7 +659,7 @@ private fun ScheduleSection(schedule: AlertSchedule, onChange: (AlertSchedule) -
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun VibrationSection(rule: AlertRule, onChange: ((AlertRule) -> AlertRule) -> Unit) {
+internal fun VibrationSection(rule: AlertRule, onChange: ((AlertRule) -> AlertRule) -> Unit) {
     val atOnceLabel = stringResource(R.string.loc_common_at_once)
     SettingsSection(title = stringResource(R.string.loc_vibration_section)) {
         SettingsSwitchRow(

@@ -24,6 +24,7 @@ object AlertStore {
     private const val KEY_SETTINGS = "settings"
     private const val KEY_RUNTIME = "runtime"
     private const val KEY_EVENTS = "events"
+    private const val KEY_LEGACY_REMINDERS = "legacyRemindersImported"
     private const val MAX_EVENTS = 2_000
     private const val MAX_EVENT_AGE_MILLIS = 90L * 24L * 60L * 60L * 1_000L
 
@@ -102,12 +103,14 @@ object AlertStore {
         rule(id)?.let { upsert(it.copy(enabled = enabled)) }
     }
 
+    /** Restores the default glucose alerts; medication reminders are the user's own and stay. */
     fun resetToDefaults() {
         ensureLoaded()
         synchronized(this) {
-            saveRules(defaultRules())
-            _runtime.value = emptyMap()
-            runtimePrefs.edit().remove(KEY_RUNTIME).apply()
+            val reminders = _rules.value.filter { it.kind.isReminder }
+            saveRules(defaultRules() + reminders)
+            val kept = reminders.map { it.id }.toSet()
+            _runtime.value.keys.filter { it !in kept }.forEach { id -> updateRuntime(id) { null } }
         }
     }
 
@@ -121,6 +124,7 @@ object AlertStore {
             before.snoozeOptions != updated.snoozeOptions
         }
         if (changed) onConfigChanged?.invoke()
+        Reminders.refresh()
     }
 
     /**
@@ -131,6 +135,7 @@ object AlertStore {
         ensureLoaded()
         synchronized(this) {
             val sorted = rules.sortedBy { it.priority }
+            Reminders.onRulesChanged(_rules.value, sorted)
             _rules.value = sorted
             prefs.edit().putString(KEY_RULES, AlertRule.listToJson(sorted)).apply()
             val updated = _settings.value.copy(snoozeOptions = snoozeOptions.ifEmpty { _settings.value.snoozeOptions })
@@ -195,6 +200,7 @@ object AlertStore {
 
     private fun saveRules(rules: List<AlertRule>) {
         val sorted = rules.sortedBy { it.priority }
+        Reminders.onRulesChanged(_rules.value, sorted)
         _rules.value = sorted
         prefs.edit().putString(KEY_RULES, AlertRule.listToJson(sorted)).apply()
         onConfigChanged?.invoke()
@@ -213,6 +219,61 @@ object AlertStore {
         return AlertEvent.listFromJson(runtimePrefs.getString(KEY_EVENTS, null))
             .filter { it.timestamp >= oldestAllowed }
             .takeLast(MAX_EVENTS)
+    }
+
+    /** True once the native numeric alarms were turned into reminders on this device. */
+    val legacyRemindersImported: Boolean
+        get() {
+            ensureLoaded()
+            return prefs.getBoolean(KEY_LEGACY_REMINDERS, false)
+        }
+
+    /**
+     * Turns the old native numeric alarms ("if no X of at least N was logged between start and
+     * alarm time, remind me") into medication reminders linked to the same logbook label, once.
+     * The native list is left as it was; [Reminders.replacesLegacyAlarms] stops it ringing.
+     */
+    fun importLegacyReminders() {
+        ensureLoaded()
+        if (prefs.getBoolean(KEY_LEGACY_REMINDERS, false) || !Applic.Nativesloaded) return
+        val imported = try {
+            val labels = Natives.getLabels()
+            val ringtone = Natives.readring(3)?.takeIf { it.isNotEmpty() }
+            val sound = Natives.alarmhassound(3)
+            val vibrate = Natives.alarmhasvibration(3)
+            (0 until Natives.getNumAlarmCount()).mapNotNull { index ->
+                val data = Natives.getNumAlarm(index) ?: return@mapNotNull null
+                val amount = data[0] as? Float ?: return@mapNotNull null
+                val packed = data[1] as? ShortArray ?: return@mapNotNull null
+                // struct amountalarm { float value; uint16_t start, alarm, end, type; }
+                val start = packed[0].toInt() and 0xffff
+                val alarm = packed[1].toInt() and 0xffff
+                val label = packed[3].toInt() and 0xffff
+                if (alarm >= 24 * 60) return@mapNotNull null
+                val window = ((alarm - start) % (24 * 60) + 24 * 60) % (24 * 60)
+                val template = AlertRule.template(AlertKind.REMINDER)
+                template.copy(
+                    name = labels.getOrNull(label) ?: template.name,
+                    output = if (sound) AlertOutput.NOTIFICATION else AlertOutput.NONE,
+                    soundUri = ringtone,
+                    vibrate = vibrate,
+                    reminder = ReminderSpec(
+                        times = listOf(alarm),
+                        logLabel = label,
+                        logAmount = amount.coerceAtLeast(0f),
+                        lookBackMinutes = if (window == 0) 24 * 60 else window
+                    )
+                )
+            }
+        } catch (th: Throwable) {
+            Log.stack(LOG_ID, "importLegacyReminders", th)
+            return
+        }
+        synchronized(this) {
+            if (imported.isNotEmpty()) saveRules(_rules.value + imported)
+            prefs.edit().putBoolean(KEY_LEGACY_REMINDERS, true).apply()
+        }
+        Log.i(LOG_ID, "imported ${imported.size} legacy reminders")
     }
 
     /** The starter set for new users: the safety-critical alerts on, the noisy ones off. */

@@ -16,6 +16,7 @@ import tk.glucodata.MessageSender
  * - `ring`: an alert started; the other device rings the same alert too.
  * - `stop`: dismissed on one device, so it stops everywhere.
  * - `snooze` / `snoozeAll`: snoozes travel with the dismissal.
+ * - `reminder`: a medication reminder's dose was taken or skipped.
  * - `config`: the phone's alert list, applied on a watch that uses the phone's alerts.
  * - `requestConfig`: a watch asks the phone for its alert list.
  *
@@ -53,6 +54,7 @@ object AlertSync {
             .put("test", alert.isTest)
             .put("eventId", alert.eventId ?: JSONObject.NULL)
             .put("eventTime", alert.startedAt)
+            .put("reminderDue", alert.reminderDue)
         alert.reading?.let { reading ->
             json.put(
                 "reading", JSONObject()
@@ -69,6 +71,10 @@ object AlertSync {
 
     fun sendSnooze(rule: AlertRule, until: Long) =
         send(JSONObject().put("t", "snooze").put("rule", rule.id).put("kind", rule.kind.name).put("until", until))
+
+    /** A reminder's dose was dealt with here; the other device closes it without logging it again. */
+    fun sendReminderDone(ruleId: String, due: Long, taken: Boolean) =
+        send(JSONObject().put("t", "reminder").put("rule", ruleId).put("due", due).put("taken", taken))
 
     fun sendSnoozeAll(until: Long) = send(JSONObject().put("t", "snoozeAll").put("until", until))
 
@@ -115,6 +121,11 @@ object AlertSync {
                     AlertStore.setSnoozeAllUntil(until)
                     if (until > System.currentTimeMillis()) AlertPlayer.stop(AlertPlayer.StopReason.REMOTE)
                 }
+                "reminder" -> {
+                    val id = json.optString("rule")
+                    val due = json.optLong("due", 0L)
+                    if (json.optBoolean("taken")) Reminders.taken(id, due, remote = true) else Reminders.skip(id, due, remote = true)
+                }
                 "config" -> receiveConfig(json)
                 "requestConfig" -> pushConfig()
             }
@@ -130,6 +141,10 @@ object AlertSync {
         val now = System.currentTimeMillis()
         val eventId = json.optString("eventId").ifEmpty { UUID.randomUUID().toString() }
         val eventTime = json.optLong("eventTime", now)
+        if (remoteRule.kind.isReminder) {
+            receiveReminderRing(json, remoteRule, isTest)
+            return
+        }
         if (!isTest) {
             AlertStore.recordEvent(
                 AlertEvent(
@@ -175,10 +190,36 @@ object AlertSync {
         )
     }
 
+    /** A reminder rang on the other device: ring it here too, and count it as rung. */
+    private fun receiveReminderRing(json: JSONObject, remoteRule: AlertRule, isTest: Boolean) {
+        val settings = AlertStore.settings.value
+        if (!settings.mirrorAlerts || !settings.enabled || (!isTest && settings.isSnoozed())) return
+        val due = json.optLong("reminderDue", 0L)
+        val local = AlertStore.rule(remoteRule.id)
+        if (!isTest) Reminders.markRungRemotely(remoteRule.id, due)
+        val rule = local ?: remoteRule
+        val shown = AlertPlayer.active.value
+        if (shown != null && shown.ringing && shown.rule.id == rule.id) return
+        if (!isTest && !AlertPlayer.canPlay(rule)) {
+            AlertPlayer.postReminder(rule, due, isTest = false, silent = true, asActive = false)
+            return
+        }
+        AlertPlayer.play(rule, null, isTest = isTest, remote = true, eventTime = json.optLong("eventTime", System.currentTimeMillis()), reminderDue = due)
+    }
+
     private fun receiveSnooze(json: JSONObject) {
         val until = json.optLong("until", 0L)
         val id = json.optString("rule")
         val kind = runCatching { AlertKind.valueOf(json.optString("kind")) }.getOrNull()
+        if (kind == AlertKind.REMINDER) {
+            // Only the same reminder; never all reminders by kind.
+            if (AlertStore.rule(id) != null) {
+                Reminders.snooze(id, 0, remote = true, until = until)
+            } else if (AlertPlayer.shownRuleId == id) {
+                AlertPlayer.stop(AlertPlayer.StopReason.REMOTE)
+            }
+            return
+        }
         val targets = AlertStore.rule(id)?.let { listOf(it) }
             ?: AlertStore.rules.value.filter { it.kind == kind }
         targets.forEach { rule -> AlertStore.updateRuntime(rule.id) { it.copy(snoozedUntil = until) } }
