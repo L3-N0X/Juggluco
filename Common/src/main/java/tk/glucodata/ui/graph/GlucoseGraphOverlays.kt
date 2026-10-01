@@ -113,6 +113,54 @@ internal fun DrawScope.drawEventStrip(
     }
 }
 
+/**
+ * Draws meal ingredient names for carbs entries that carry a composed meal.
+ *
+ * When [drawDots] is true (Amounts layer hidden), the carbs dot is drawn here as well so meals
+ * remain visible without the event strip. Ingredient names are listed above the dot.
+ */
+internal fun DrawScope.drawMealLayer(
+    chart: ChartTransform,
+    meals: GraphMeals,
+    surfaceColor: Color,
+    paints: GraphPaints,
+    logbookColors: LogbookColors,
+    drawDots: Boolean
+) {
+    if (meals.size == 0) return
+    val y = chart.metrics.chartBottom - chart.px(4f)
+    val radius = chart.px(4f)
+    val lineHeight = chart.px(10f)
+    var index = meals.firstIndexAtOrAfter(chart.startTime)
+
+    while (index < meals.size && meals.times[index] <= chart.endTime) {
+        val record = meals.records[index]
+        val x = chart.x(record.timestamp)
+        val color = logbookColors.colorFor(record.type)
+
+        if (drawDots) {
+            drawCircle(color, radius, Offset(x, y))
+            drawCircle(surfaceColor, radius * 0.4f, Offset(x, y))
+        }
+
+        val ingredients = record.mealSummary.split(", ").filter { it.isNotBlank() }
+        if (ingredients.isNotEmpty()) {
+            paints.event.color = color.toArgb()
+            var textY = y - chart.px(12f)
+            for (ingredient in ingredients) {
+                drawContext.canvas.nativeCanvas.drawText(
+                    ingredient,
+                    x,
+                    textY,
+                    paints.event
+                )
+                textY -= lineHeight
+            }
+        }
+        index++
+    }
+}
+
 internal fun DrawScope.drawScrubber(
     chart: ChartTransform,
     reading: InspectedReading,
