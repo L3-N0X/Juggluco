@@ -3625,7 +3625,7 @@ class GlucoseRepository(
         val periodStart = lowerBound(all, now - period.durationMillis)
         val toUse = if (periodStart < all.size) all.subList(periodStart, all.size) else all
 
-        _stats.value = GlucoseStats.calculate(toUse, range)
+        _stats.value = GlucoseStats.calculate(toUse, range, period.durationMillis)
 
         val agpKey = agpCacheKey(toUse, period, range)
         if (agpKey != publishedAgpKey) {
@@ -3637,7 +3637,7 @@ class GlucoseRepository(
         val screenDuration = _selectedTimeRange.value?.durationMillis ?: (6 * 3600 * 1000L)
         val screenStart = lowerBound(all, now - screenDuration)
         val screenToUse = if (screenStart < all.size) all.subList(screenStart, all.size) else all
-        _screenStats.value = GlucoseStats.calculate(screenToUse, range)
+        _screenStats.value = GlucoseStats.calculate(screenToUse, range, screenDuration)
     }
 
     private data class AgpCacheKey(

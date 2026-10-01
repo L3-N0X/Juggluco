@@ -187,7 +187,7 @@ fun GlucoseScreen(
             val pointsToUse = if (filtered.isNotEmpty()) filtered else {
                 readings.subList(range.first, range.last + 1)
             }
-            tk.glucodata.ui.model.GlucoseStats.calculate(pointsToUse, glucoseRange)
+            tk.glucodata.ui.model.GlucoseStats.calculate(pointsToUse, glucoseRange, settledWindow.durationMillis)
         }
     }
 
