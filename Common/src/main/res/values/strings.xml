@@ -852,6 +852,8 @@
     <string name="tir_range_less_than">&lt; %s</string>
     <string name="tir_range_with_target">%1$s, Target: %2$s</string>
     <string name="tir_duration_format">%1$dh %2$dm</string>
+    <string name="tir_duration_minutes">%1$dm</string>
+    <string name="tir_observed_coverage">%1$s of %2$s measured</string>
     <string name="tir_percent">%d%%</string>
     <string name="tir_target_very_high">&lt; 5%</string>
     <string name="tir_target_high">&lt; 25%</string>
