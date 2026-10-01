@@ -1899,6 +1899,20 @@
     <string name="loc_rest_endpoints_title">Nightscout and xDrip endpoints</string>
     <string name="loc_rest_endpoints">• Entries: http://127.0.0.1:%1$s/api/v1/entries.json\n• Status: http://127.0.0.1:%1$s/api/v1/status.json\n• AGP Report: http://127.0.0.1:%1$s/x/report</string>
     <string name="loc_web_server_info">The local web server lets external apps, Nightscout widgets, emulator environments, and other phone apps consume glucose Streams without Bluetooth pairing.</string>
+    <string name="loc_https_certificates">HTTPS and certificates</string>
+    <string name="loc_https_server">Serve HTTPS</string>
+    <string name="loc_https_active">Certificate loaded, serving HTTPS on port %1$s</string>
+    <string name="loc_https_inactive">Off, only plain HTTP is served</string>
+    <string name="loc_https_private_key">Private key</string>
+    <string name="loc_https_full_chain">Certificate chain</string>
+    <string name="loc_https_info">Import a private key and the full certificate chain to serve the API over HTTPS on the SSL port. Both files are kept in the app\'s private storage. Without them the server keeps serving plain HTTP.</string>
+    <string name="loc_cert_installed">%1$s installed, %2$s</string>
+    <string name="loc_cert_not_installed">%1$s is not installed, tap to import a file</string>
+    <string name="loc_cert_imported">%1$s imported</string>
+    <string name="loc_cert_import_failed">Could not read the selected file</string>
+    <string name="loc_cert_too_small">The selected file is too small to be a certificate</string>
+    <string name="loc_cert_too_large">The selected file is too large to be a certificate</string>
+    <string name="loc_https_start_failed">HTTPS was not started: %1$s</string>
 
     <string name="loc_target_range">Target range</string>
     <string name="loc_example_value">e.g. %1$s</string>

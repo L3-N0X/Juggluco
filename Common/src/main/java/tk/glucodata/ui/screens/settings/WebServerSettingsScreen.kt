@@ -1,6 +1,11 @@
 package tk.glucodata.ui.screens.settings
 
+import android.content.Context
+import android.net.Uri
+import android.text.format.Formatter
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,10 +20,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +53,83 @@ import androidx.compose.ui.unit.sp
 import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.screens.ScreenLayout
+import java.io.File
+
+/** Names the native SSL listener reads from the app's file directory. */
+private const val PRIVATE_KEY_FILE = "privkey.pem"
+private const val FULL_CHAIN_FILE = "fullchain.pem"
+
+/** A PEM header alone is longer than this, anything smaller is not a usable certificate. */
+private const val MIN_CERTIFICATE_BYTES = 50L
+private const val MAX_CERTIFICATE_BYTES = 512L * 1024L
+
+/** Why a picked document did not become an installed certificate. */
+private enum class CertificateImport {
+    OK,
+    UNREADABLE,
+    TOO_SMALL,
+    TOO_LARGE,
+    WRITE_FAILED
+}
+
+/** The persisted HTTPS state, native settings keep it across restarts. */
+private fun httpsEnabled(): Boolean = try { Natives.getuseSSL() } catch (_: Throwable) { false }
+
+/** Size of an installed certificate, zero when there is none. */
+private fun certificateSize(context: Context, name: String): Long = try {
+    val file = File(context.filesDir, name)
+    if (file.isFile) file.length() else 0L
+} catch (_: Throwable) {
+    0L
+}
+
+private fun writeCertificate(context: Context, uri: Uri, target: File): CertificateImport = try {
+    val input = context.contentResolver.openInputStream(uri) ?: return CertificateImport.UNREADABLE
+    input.use { stream ->
+        target.outputStream().use { output ->
+            val buffer = ByteArray(16 * 1024)
+            var total = 0L
+            while (true) {
+                val read = stream.read(buffer)
+                if (read <= 0) break
+                total += read
+                if (total > MAX_CERTIFICATE_BYTES) return CertificateImport.TOO_LARGE
+                output.write(buffer, 0, read)
+            }
+            if (total < MIN_CERTIFICATE_BYTES) return CertificateImport.TOO_SMALL
+            output.flush()
+            output.fd.sync()
+        }
+    }
+    CertificateImport.OK
+} catch (_: Throwable) {
+    CertificateImport.WRITE_FAILED
+}
+
+/**
+ * Install a picked document as one of the certificate files. The copy is staged next to
+ * the target and only swapped in when it is complete, so a failed or truncated import
+ * never destroys a certificate that is already working.
+ */
+private fun importCertificate(context: Context, uri: Uri, name: String): CertificateImport {
+    val target = File(context.filesDir, name)
+    val staged = File(context.filesDir, "$name.import")
+    val result = writeCertificate(context, uri, staged)
+    if (result != CertificateImport.OK) {
+        staged.delete()
+        return result
+    }
+    if (target.exists() && !target.delete()) {
+        staged.delete()
+        return CertificateImport.WRITE_FAILED
+    }
+    if (!staged.renameTo(target)) {
+        staged.delete()
+        return CertificateImport.WRITE_FAILED
+    }
+    return CertificateImport.OK
+}
 
 @Composable
 fun WebServerSettingsScreen(
@@ -81,6 +167,61 @@ fun WebServerSettingsScreen(
     var sslPort by remember { mutableStateOf(oldSslPort) }
     var pollInterval by remember { mutableStateOf(oldInterval) }
     var showSecret by remember { mutableStateOf(false) }
+
+    var httpsOn by remember { mutableStateOf(httpsEnabled()) }
+    var privateKeySize by remember { mutableStateOf(certificateSize(context, PRIVATE_KEY_FILE)) }
+    var chainSize by remember { mutableStateOf(certificateSize(context, FULL_CHAIN_FILE)) }
+    var pickedCertificate by remember { mutableStateOf(PRIVATE_KEY_FILE) }
+
+    /**
+     * Hand the wanted state to native and mirror what it actually stored. When a
+     * certificate is rejected the stored flag would still claim HTTPS is on while its
+     * listener is down, so it is cleared and the error is handed back to the caller.
+     * The plain HTTP server is never touched here, it stays usable.
+     */
+    fun applyHttps(enabled: Boolean): String? {
+        val error = try {
+            Natives.setuseSSL(enabled)
+        } catch (e: Throwable) {
+            e.message ?: e.javaClass.simpleName
+        }
+        if (!error.isNullOrEmpty()) {
+            try { Natives.setuseSSL(false) } catch (_: Throwable) {}
+            httpsOn = false
+            return error
+        }
+        httpsOn = enabled
+        return null
+    }
+
+    fun refreshCertificates() {
+        privateKeySize = certificateSize(context, PRIVATE_KEY_FILE)
+        chainSize = certificateSize(context, FULL_CHAIN_FILE)
+    }
+
+    val certificateLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val name = pickedCertificate
+        if (uri == null) return@rememberLauncherForActivityResult
+        when (importCertificate(context, uri, name)) {
+            CertificateImport.OK -> {
+                refreshCertificates()
+                // Replacing a file under a running listener only takes effect after a restart.
+                val error = if (httpsOn) applyHttps(true) else null
+                Toast.makeText(
+                    context,
+                    if (error != null) context.getString(R.string.loc_https_start_failed, error)
+                    else context.getString(R.string.loc_cert_imported, name),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            CertificateImport.UNREADABLE, CertificateImport.WRITE_FAILED ->
+                Toast.makeText(context, context.getString(R.string.loc_cert_import_failed), Toast.LENGTH_LONG).show()
+            CertificateImport.TOO_SMALL ->
+                Toast.makeText(context, context.getString(R.string.loc_cert_too_small), Toast.LENGTH_LONG).show()
+            CertificateImport.TOO_LARGE ->
+                Toast.makeText(context, context.getString(R.string.loc_cert_too_large), Toast.LENGTH_LONG).show()
+        }
+    }
 
     val secretTooLong = apiSecret.length > Natives.WEBSERVER_MAX_APISECRET
     val secretCharset = apiSecret.any { it.code !in 0x20..0x7E }
@@ -225,6 +366,14 @@ fun WebServerSettingsScreen(
                             if (exchanges.xdripWebServer) {
                                 repository.restartXdripWebServer()
                             }
+                            //A running SSL listener keeps its old port, rebind it when it moved.
+                            if (httpsOn && sp != oldSslPort.toIntOrNull()) {
+                                val error = applyHttps(true)
+                                if (error != null) {
+                                    Toast.makeText(context, context.getString(R.string.loc_https_start_failed, error), Toast.LENGTH_LONG).show()
+                                    return@Button
+                                }
+                            }
                             Toast.makeText(context, context.getString(R.string.loc_web_server_saved), Toast.LENGTH_SHORT).show()
                         } catch (e: Throwable) {
                             Toast.makeText(context, context.getString(R.string.loc_error_saving, e.message), Toast.LENGTH_SHORT).show()
@@ -238,6 +387,87 @@ fun WebServerSettingsScreen(
                     Text(stringResource(R.string.loc_save_restart_server), fontWeight = FontWeight.Bold)
                 }
             }
+        }
+
+        // HTTPS & CERTIFICATES
+        SettingsSection(title = stringResource(R.string.loc_https_certificates)) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.loc_https_server),
+                subtitle = if (httpsOn) {
+                    stringResource(R.string.loc_https_active, sslPort.ifBlank { oldSslPort })
+                } else {
+                    stringResource(R.string.loc_https_inactive)
+                },
+                icon = Icons.Default.Lock,
+                checked = httpsOn,
+                onCheckedChange = { wanted ->
+                    val error = applyHttps(wanted)
+                    if (error != null) {
+                        Toast.makeText(context, context.getString(R.string.loc_https_start_failed, error), Toast.LENGTH_LONG).show()
+                    } else if (wanted && !exchanges.xdripWebServer) {
+                        repository.setXdripWebServer(true)
+                    }
+                }
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = ScreenLayout.CardPadding),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            )
+
+            SettingsActionRow(
+                title = stringResource(R.string.loc_https_private_key),
+                subtitle = if (privateKeySize > 0) {
+                    stringResource(
+                        R.string.loc_cert_installed,
+                        PRIVATE_KEY_FILE,
+                        Formatter.formatFileSize(context, privateKeySize)
+                    )
+                } else {
+                    stringResource(R.string.loc_cert_not_installed, PRIVATE_KEY_FILE)
+                },
+                icon = Icons.Default.Key,
+                onClick = {
+                    pickedCertificate = PRIVATE_KEY_FILE
+                    certificateLauncher.launch(arrayOf("*/*"))
+                }
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = ScreenLayout.CardPadding),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            )
+
+            SettingsActionRow(
+                title = stringResource(R.string.loc_https_full_chain),
+                subtitle = if (chainSize > 0) {
+                    stringResource(
+                        R.string.loc_cert_installed,
+                        FULL_CHAIN_FILE,
+                        Formatter.formatFileSize(context, chainSize)
+                    )
+                } else {
+                    stringResource(R.string.loc_cert_not_installed, FULL_CHAIN_FILE)
+                },
+                icon = Icons.Default.VerifiedUser,
+                onClick = {
+                    pickedCertificate = FULL_CHAIN_FILE
+                    certificateLauncher.launch(arrayOf("*/*"))
+                }
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = ScreenLayout.CardPadding),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            )
+
+            Text(
+                text = stringResource(R.string.loc_https_info),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(horizontal = ScreenLayout.CardPadding, vertical = 12.dp)
+            )
         }
 
         // ENDPOINT REFERENCE CARD
