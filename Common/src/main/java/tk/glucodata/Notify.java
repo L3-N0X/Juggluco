@@ -982,7 +982,9 @@ void fornotify(Notification notif) {
     else  {
          {
             // A Live Update is updated in place: taking it away first would drop its status bar chip every minute.
-            if(!notif.extras.getBoolean("android.requestPromotedOngoing"))
+            // So is anything meant to stay quiet: a cancelled notification posts as a new one, which pops up on the HIGH channel despite setOnlyAlertOnce.
+            final boolean inplace=notif.extras.getBoolean("android.requestPromotedOngoing")||(notif.flags&Notification.FLAG_ONLY_ALERT_ONCE)!=0;
+            if(!inplace)
                 notificationManager.cancel(glucosenotificationid);
             if(keeprunning.theservice!=null) {
                 keeprunning.theservice.startForeground(glucosenotificationid,notif);
