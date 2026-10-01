@@ -55,6 +55,8 @@ import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStats
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HardwareConfig
+import tk.glucodata.ui.model.LabelConfig
+import tk.glucodata.ui.model.LabelSaveError
 import tk.glucodata.ui.model.LibreLabelMapping
 import tk.glucodata.ui.model.LibreRegion
 import tk.glucodata.ui.model.LibreSaveError
@@ -62,6 +64,7 @@ import tk.glucodata.ui.model.LibreTreatmentKind
 import tk.glucodata.ui.model.LibreViewConfig
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
+import tk.glucodata.ui.model.MealItem
 import tk.glucodata.ui.model.MirrorConnection
 import tk.glucodata.ui.model.MirrorConnectionDraft
 import tk.glucodata.ui.model.MirrorDataStart
@@ -252,9 +255,9 @@ class GlucoseRepository(
     private val _bloodLabels = MutableStateFlow<List<String>>(emptyList())
     val bloodLabels: StateFlow<List<String>> = _bloodLabels.asStateFlow()
 
-    private val bloodLabelLock = Any()
-    private val bloodLabelHistory = mutableSetOf(LEGACY_COMPOSE_BLOOD_LABEL)
-    @Volatile private var bloodLabelIndex = -1
+    private val _labelConfig = MutableStateFlow(LabelConfig())
+    /** The native labels, and the label each logbook entry type is saved under. */
+    val labelConfig: StateFlow<LabelConfig> = _labelConfig.asStateFlow()
 
     private val _hardwareConfig = MutableStateFlow(HardwareConfig())
     val hardwareConfig: StateFlow<HardwareConfig> = _hardwareConfig.asStateFlow()
@@ -289,7 +292,6 @@ class GlucoseRepository(
 
     init {
         DisplaySync.install(this)
-        bloodLabelHistory += readBloodLabelHistory().filterNot { it in RESERVED_COMPOSE_LABELS }
         // Never touch JNI or SharedPreferences from whatever thread constructs the repository:
         // on Wear that is the main thread, during activity creation.
         scope.launch(Dispatchers.IO) {
@@ -367,65 +369,52 @@ class GlucoseRepository(
         setGlucoseRange(_range.value.withLevel(level, valueMgDl))
     }
 
-    private fun readBloodLabelHistory(): Set<Int> {
-        return try {
-            Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
-                .getStringSet(KEY_BLOOD_LABELS, emptySet())
-                .orEmpty()
-                .mapNotNull { it.toIntOrNull() }
-                .toSet()
-        } catch (_: Throwable) {
-            emptySet()
-        }
-    }
-
     fun canSelectBloodLabel(index: Int): Boolean {
-        return index in _bloodLabels.value.indices &&
-            _bloodLabels.value[index].isNotBlank() &&
-            index !in RESERVED_COMPOSE_LABELS
+        val config = _labelConfig.value
+        return config.label(index)?.name?.isNotBlank() == true &&
+            config.roleOf(index, except = LogType.BLOOD_GLUCOSE) == null
     }
 
-    private fun rememberBloodLabel(index: Int) {
-        if (!canSelectBloodLabel(index) && index != LEGACY_COMPOSE_BLOOD_LABEL) return
-        val changed = synchronized(bloodLabelLock) { bloodLabelHistory.add(index) }
-        if (!changed) return
+    /**
+     * Native calibration only looks at the blood label, so one that is not set falls back to the
+     * "Blood" label of the native defaults, as long as that one is not the meal label.
+     */
+    private fun ensureBloodLabel() {
         try {
-            val persisted = synchronized(bloodLabelLock) { bloodLabelHistory.map(Int::toString).toSet() }
-            Applic.app.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putStringSet(KEY_BLOOD_LABELS, persisted)
-                .apply()
+            val names = Natives.getLabels().orEmpty().dropLast(1)
+            val configured = Natives.getbloodvar().toInt()
+            if (names.getOrNull(configured)?.isNotBlank() != true &&
+                names.getOrNull(DEFAULT_BLOOD_LABEL)?.isNotBlank() == true &&
+                Natives.getmealvar().toInt() != DEFAULT_BLOOD_LABEL
+            ) {
+                Natives.setbloodvar(DEFAULT_BLOOD_LABEL.toByte())
+            }
         } catch (_: Throwable) {}
     }
 
-    private fun isBloodLabel(label: Int): Boolean {
-        return synchronized(bloodLabelLock) {
-            label !in RESERVED_COMPOSE_LABELS && label in bloodLabelHistory
+    /** Re-reads the labels from native and publishes them. */
+    private fun reloadLabels(): LabelConfig {
+        if (!Applic.Nativesloaded) return _labelConfig.value
+        ensureBloodLabel()
+        val config = NativeLabels.read()
+        _labelConfig.value = config
+        _bloodLabels.value = config.labels.map { it.name }
+        if (_displayConfig.value.bloodLabelIndex != config.bloodLabel) {
+            _displayConfig.value = _displayConfig.value.copy(bloodLabelIndex = config.bloodLabel)
         }
+        return config
     }
 
-    private fun currentBloodLabelForSave(): Int {
-        if (_bloodLabels.value.isEmpty() && Applic.Nativesloaded) {
-            try { _bloodLabels.value = Natives.getLabels().toList() } catch (_: Throwable) {}
+    /** The labels as currently configured, reading them first if that never happened yet. */
+    private fun currentLabels(): LabelConfig =
+        _labelConfig.value.takeIf { it.labels.isNotEmpty() } ?: reloadLabels()
+
+    /** Reloads the labels and the logbook, for a change made elsewhere (classic view, the phone). */
+    fun refreshLabels() {
+        scope.launch(Dispatchers.IO) {
+            reloadLabels()
+            loadLogsFromNative()
         }
-        val labels = _bloodLabels.value
-        val configured = try { Natives.getbloodvar().toInt() } catch (_: Throwable) { -1 }
-        val resolved = when {
-            labels.getOrNull(configured)?.isNotBlank() == true -> configured
-            labels.getOrNull(DEFAULT_BLOOD_LABEL)?.isNotBlank() == true -> {
-                if (Applic.Nativesloaded) Natives.setbloodvar(DEFAULT_BLOOD_LABEL.toByte())
-                DEFAULT_BLOOD_LABEL
-            }
-            else -> -1
-        }
-        bloodLabelIndex = resolved
-        if (resolved >= 0) {
-            rememberBloodLabel(resolved)
-            if (_displayConfig.value.bloodLabelIndex != resolved) {
-                _displayConfig.value = _displayConfig.value.copy(bloodLabelIndex = resolved)
-            }
-        }
-        return resolved
     }
 
     fun refreshSettings() {
@@ -529,19 +518,7 @@ class GlucoseRepository(
                         .getBoolean(KEY_SHOW_ALERT_LINES, false)
                 } catch (_: Throwable) { false }
                 val deltaCalculation = DeltaCalculation.fromMinutes(savedDeltaMinutes)
-                val nativeLabels = Natives.getLabels().toList()
-                _bloodLabels.value = nativeLabels
-                val configuredBloodLabel = try { Natives.getbloodvar().toInt() } catch (_: Throwable) { -1 }
-                val resolvedBloodLabel = when {
-                    nativeLabels.getOrNull(configuredBloodLabel)?.isNotBlank() == true -> configuredBloodLabel
-                    nativeLabels.getOrNull(DEFAULT_BLOOD_LABEL)?.isNotBlank() == true -> {
-                        Natives.setbloodvar(DEFAULT_BLOOD_LABEL.toByte())
-                        DEFAULT_BLOOD_LABEL
-                    }
-                    else -> -1
-                }
-                bloodLabelIndex = resolvedBloodLabel
-                rememberBloodLabel(resolvedBloodLabel)
+                val resolvedBloodLabel = reloadLabels().bloodLabel
 
                 // Read Display
                 _displayConfig.value = DisplayConfig(
@@ -1218,21 +1195,7 @@ class GlucoseRepository(
         return numio.numptrs[index].takeIf { it != 0L }
     }
 
-    private fun nativeType(label: Int): LogType = when {
-        isBloodLabel(label) -> LogType.BLOOD_GLUCOSE
-        label == 0 -> LogType.RAPID_INSULIN
-        label == 1 -> LogType.CARBS
-        label == 2 -> LogType.BASAL_INSULIN
-        else -> LogType.NOTE
-    }
-
-    private fun nativeLabel(type: LogType): Int = when (type) {
-        LogType.RAPID_INSULIN -> 0
-        LogType.CARBS, LogType.MEAL -> 1
-        LogType.BASAL_INSULIN -> 2
-        LogType.BLOOD_GLUCOSE -> bloodLabelIndex
-        LogType.NOTE -> 4
-    }
+    private fun nativeLabel(type: LogType): Int = currentLabels().labelFor(type)
 
     private fun sameSource(first: LogRecord, second: LogRecord): Boolean {
         val firstSource = first.nativeSource
@@ -1404,6 +1367,7 @@ class GlucoseRepository(
         synchronized(logNoteLock) {
             val logList = ArrayList<LogRecord>()
             val availableStores = mutableSetOf<NumberStore>()
+            val labels = currentLabels()
             if (Applic.Nativesloaded) {
                 for (store in NumberStore.values()) {
                     try {
@@ -1417,15 +1381,20 @@ class GlucoseRepository(
                         for (pos in first until last) {
                             val itm = Natives.getNumitem(ptr, pos) ?: continue
                             if (itm.time <= 0) continue
+                            val type = labels.typeOf(itm.label)
                             logList.add(
                                 LogRecord(
                                     id = LogRecord.nativeId(resolvedStore, pos),
                                     timestamp = itm.time * 1000L,
-                                    type = nativeType(itm.label),
+                                    type = type,
                                     value = itm.value,
                                     nativeSource = NumberStoreSource(resolvedStore, pos),
                                     nativeLabel = itm.label,
-                                    mealPointer = itm.mealptr
+                                    mealPointer = itm.mealptr,
+                                    labelName = labels.nameOf(itm.label),
+                                    mealSummary = if (type == LogType.CARBS && itm.mealptr > 0 && MealStore.available) {
+                                        MealStore.summary(itm.mealptr)
+                                    } else ""
                                 )
                             )
                         }
@@ -1467,6 +1436,10 @@ class GlucoseRepository(
             hash = hash * 31 + record.value.toRawBits()
             hash = hash * 31 + record.type.hashCode()
             hash = hash * 31 + record.note.hashCode()
+            hash = hash * 31 + (record.nativeLabel ?: -1)
+            hash = hash * 31 + record.labelName.hashCode()
+            hash = hash * 31 + record.mealPointer
+            hash = hash * 31 + record.mealSummary.hashCode()
             hash = hash * 31 + (record.nativeSource?.store?.nativeIndex ?: -1)
             hash = hash * 31 + (record.nativeSource?.position ?: -1)
         }
@@ -1481,19 +1454,33 @@ class GlucoseRepository(
         return addLogEntry(LogType.BLOOD_GLUCOSE, valueMgDl, note, timestamp)
     }
 
-    fun addLogEntry(type: LogType, value: Float, note: String, timestamp: Long = System.currentTimeMillis()): Boolean {
-        val targetNativeLabel = if (type == LogType.BLOOD_GLUCOSE) {
-            synchronized(bloodLabelLock) { currentBloodLabelForSave() }
+    /**
+     * Logs an entry of [type], saved under the label configured for it, or under [label] for a
+     * [LogType.CUSTOM] entry. A carbs entry can carry the items of a [meal], which are written to
+     * the native meal store and attached to it.
+     */
+    fun addLogEntry(
+        type: LogType,
+        value: Float,
+        note: String,
+        timestamp: Long = System.currentTimeMillis(),
+        label: Int = -1,
+        meal: List<MealItem> = emptyList()
+    ): Boolean {
+        val labels = currentLabels()
+        val targetNativeLabel = if (type == LogType.CUSTOM) {
+            label.takeIf { it in labels.labels.indices } ?: -1
         } else {
-            nativeLabel(type)
+            labels.labelFor(type)
         }
-        if (type == LogType.BLOOD_GLUCOSE && targetNativeLabel < 0) return false
+        if (targetNativeLabel < 0) return false
         val entry = LogRecord(
             timestamp = timestamp,
             type = type,
             value = value,
             note = note,
-            nativeLabel = targetNativeLabel
+            nativeLabel = targetNativeLabel,
+            labelName = labels.nameOf(targetNativeLabel)
         )
         publishLogs((listOf(entry) + _logs.value).sortedByDescending { it.timestamp })
 
@@ -1505,37 +1492,24 @@ class GlucoseRepository(
                     if (ptr != null) {
                         synchronized(logNoteLock) {
                             val persistedNote = note.trim()
-                            val labelToSave = if (type == LogType.BLOOD_GLUCOSE) {
-                                synchronized(bloodLabelLock) { currentBloodLabelForSave() }
-                            } else {
-                                targetNativeLabel
-                            }
+                            // The blood label is what native calibration reads, so it is taken
+                            // as it is right now rather than as it was when the editor opened.
+                            val labelToSave = if (type == LogType.BLOOD_GLUCOSE) reloadLabels().bloodLabel else targetNativeLabel
                             if (labelToSave < 0) return@synchronized
-                            var identity = NativeEntryIdentity(
+                            val mealPointer = if (type == LogType.CARBS) MealStore.createMeal(meal) else 0
+                            val identity = NativeEntryIdentity(
                                 store = store,
                                 timeSeconds = timestamp / 1000L,
                                 valueBits = java.lang.Float.floatToRawIntBits(value).toLong() and 0xffffffffL,
                                 label = labelToSave,
-                                mealPointer = 0
+                                mealPointer = mealPointer
                             )
                             if (persistedNote.isNotEmpty()) {
                                 upsertPersistedLogNote(
                                     PersistedLogNote(entry.id, store, -1, identity, persistedNote)
                                 )
                             }
-                            val position = if (type == LogType.BLOOD_GLUCOSE) {
-                                synchronized(bloodLabelLock) {
-                                    val saveLabel = currentBloodLabelForSave()
-                                    if (saveLabel < 0) {
-                                        -1
-                                    } else {
-                                        identity = identity.copy(label = saveLabel)
-                                        Natives.saveNum(ptr, timestamp / 1000L, value, saveLabel, 0)
-                                    }
-                                }
-                            } else {
-                                Natives.saveNum(ptr, timestamp / 1000L, value, labelToSave, 0)
-                            }
+                            val position = Natives.saveNum(ptr, timestamp / 1000L, value, labelToSave, mealPointer)
                             if (position >= 0 && persistedNote.isNotEmpty()) {
                                 val notes = readPersistedLogNotes().toMutableList()
                                 notes.replaceAll {
@@ -1555,21 +1529,26 @@ class GlucoseRepository(
         return true
     }
 
+    /**
+     * Changes a logged entry. [meal] replaces the items of the meal attached to a carbs entry;
+     * null leaves the meal as it is.
+     */
     fun updateLogEntry(
         entry: LogRecord,
         type: LogType,
         value: Float,
         timestamp: Long = entry.timestamp,
-        note: String = entry.note
+        note: String = entry.note,
+        meal: List<MealItem>? = null
     ) {
         val targetNativeLabel = if (type == entry.type && entry.nativeLabel != null) {
             entry.nativeLabel
         } else if (type == LogType.BLOOD_GLUCOSE) {
-            synchronized(bloodLabelLock) { currentBloodLabelForSave() }
+            reloadLabels().bloodLabel
         } else {
             nativeLabel(type)
         }
-        if (type == LogType.BLOOD_GLUCOSE && targetNativeLabel < 0) return
+        if (targetNativeLabel < 0) return
         val source = entry.nativeSource
         if (source == null) {
             publishLogs(_logs.value.map {
@@ -1602,23 +1581,30 @@ class GlucoseRepository(
                         if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
                             val hitPtr = Natives.mkhitptr(ptr, source.position)
                             if (hitPtr != 0L) {
+                                val ownsMeal = entry.type == LogType.CARBS && source.store == NumberStore.HERE
+                                val mealPointer = if (meal != null && type == LogType.CARBS && ownsMeal) {
+                                    MealStore.createMeal(meal)
+                                } else {
+                                    entry.mealPointer
+                                }
                                 try {
                                     Natives.hitchange(
                                         hitPtr,
                                         timestamp / 1000L,
                                         value,
                                         targetNativeLabel,
-                                        entry.mealPointer
+                                        mealPointer
                                     )
                                 } finally {
                                     Natives.freehitptr(hitPtr)
                                 }
+                                if (ownsMeal && mealPointer != entry.mealPointer) MealStore.deleteMeal(entry.mealPointer)
                                 val newIdentity = NativeEntryIdentity(
                                     store = source.store,
                                     timeSeconds = timestamp / 1000L,
                                     valueBits = java.lang.Float.floatToRawIntBits(value).toLong() and 0xffffffffL,
                                     label = targetNativeLabel,
-                                    mealPointer = entry.mealPointer
+                                    mealPointer = mealPointer
                                 )
                                 val newSource = findNativeSource(source.store, newIdentity, source.position)
                                 if (newSource != null) {
@@ -1656,6 +1642,9 @@ class GlucoseRepository(
                         val itm = ptr?.let { Natives.getNumitem(it, source.position) }
                         if (ptr != null && itm != null && matchesNativeEntry(itm, entry)) {
                             Natives.removeNum(ptr, source.position)
+                            if (entry.type == LogType.CARBS && source.store == NumberStore.HERE) {
+                                MealStore.deleteMeal(entry.mealPointer)
+                            }
                             removePersistedLogNote(entry.id)
                             syncNumberStore(source.store)
                         }
@@ -3341,21 +3330,93 @@ class GlucoseRepository(
     }
 
     fun setBloodLabelIndex(index: Int) {
-        if (!canSelectBloodLabel(index)) return
+        setLabelForType(LogType.BLOOD_GLUCOSE, index)
+    }
+
+    // --- LOGBOOK LABELS ---
+
+    /**
+     * Saves label [index] (a new one at the end when below zero). [roundTo] is the Garmin rounding
+     * step and [weight] the classic graph's height factor, see [tk.glucodata.ui.model.LogLabel].
+     */
+    fun saveLabel(index: Int, name: String, weight: Float, roundTo: Float): LabelSaveError? {
+        val config = currentLabels()
+        if (!config.editable) return LabelSaveError.READ_ONLY
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return LabelSaveError.EMPTY
+        if (trimmed.toByteArray(Charsets.UTF_8).size > LabelConfig.MAX_NAME_BYTES) return LabelSaveError.TOO_LONG
+        val position = if (index in config.labels.indices) index else config.labels.size
+        if (position >= LabelConfig.MAX_LABELS) return LabelSaveError.TOO_MANY
+        val saved = try {
+            Applic.Nativesloaded && Natives.setlabel(position, trimmed, roundTo, weight.coerceAtLeast(0f))
+        } catch (_: Throwable) {
+            false
+        }
+        if (!saved) return LabelSaveError.TOO_LONG
+        onLabelsChanged()
+        return null
+    }
+
+    /** Removes the last label; native keeps labels as a list that only shrinks from the end. */
+    fun deleteLastLabel(): Boolean {
+        val config = currentLabels()
+        val last = config.labels.lastIndex
+        if (!config.canDelete(last)) return false
         try {
-            synchronized(bloodLabelLock) {
-                if (Applic.Nativesloaded) {
-                    Natives.setbloodvar(index.toByte())
+            Natives.setnrlabel(last)
+        } catch (_: Throwable) {
+            return false
+        }
+        onLabelsChanged()
+        return true
+    }
+
+    /**
+     * Saves new entries of [type] under label [index]. Carbs and finger-pricks are the native meal
+     * and blood labels; bolus and basal are kept on this side and handed to a mirroring watch.
+     */
+    fun setLabelForType(type: LogType, index: Int) {
+        val config = currentLabels()
+        if (index !in config.labels.indices || config.roleOf(index, except = type) != null) return
+        if (!config.editable && type != LogType.BLOOD_GLUCOSE) return
+        try {
+            when (type) {
+                LogType.CARBS, LogType.MEAL -> Natives.setmealvar(index.toByte())
+                LogType.BLOOD_GLUCOSE -> Natives.setbloodvar(index.toByte())
+                LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> {
+                    NativeLabels.setInsulinLabel(type, index)
+                    DisplaySync.onLocalLabelChange()
                 }
-                rememberBloodLabel(bloodLabelIndex)
-                rememberBloodLabel(index)
-                bloodLabelIndex = index
+                LogType.CUSTOM -> return
             }
-            _displayConfig.value = _displayConfig.value.copy(bloodLabelIndex = index)
-            scope.launch(Dispatchers.IO) {
-                loadLogsFromNative()
-            }
-        } catch (_: Throwable) {}
+        } catch (_: Throwable) {
+            return
+        }
+        _labelConfig.value = config.copy(
+            carbsLabel = if (type == LogType.CARBS) index else config.carbsLabel,
+            bolusLabel = if (type == LogType.RAPID_INSULIN) index else config.bolusLabel,
+            basalLabel = if (type == LogType.BASAL_INSULIN) index else config.basalLabel,
+            bloodLabel = if (type == LogType.BLOOD_GLUCOSE) index else config.bloodLabel
+        )
+        onLabelsChanged()
+    }
+
+    /**
+     * Hands changed labels to the mirrors and the Garmin watch, the way the classic label screen
+     * did on closing, and reloads everything that shows a label.
+     */
+    private fun onLabelsChanged() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Natives.shouldsendlabels()) {
+                    Applic.wakemirrors()
+                    Applic.app?.sendlabels()
+                }
+            } catch (_: Throwable) {}
+            reloadLabels()
+            _libreTreatments.value = readLibreTreatments()
+            loadLogsFromNative()
+        }
     }
 
     fun setCalibratePastReadings(enabled: Boolean) {
@@ -3538,16 +3599,20 @@ class GlucoseRepository(
         }
 
         // 2. Search in event logs
+        val category = when (label) {
+            0 -> LogType.RAPID_INSULIN
+            1 -> LogType.CARBS
+            2 -> LogType.BASAL_INSULIN
+            3 -> LogType.BLOOD_GLUCOSE
+            else -> null
+        }
         for (log in _logs.value) {
-            val categoryMatches = when (label) {
-                0 -> log.type == LogType.RAPID_INSULIN
-                1 -> log.type == LogType.CARBS || log.type == LogType.MEAL
-                2 -> log.type == LogType.BASAL_INSULIN
-                3 -> log.type == LogType.BLOOD_GLUCOSE
-                else -> true
-            }
+            val categoryMatches = category == null || log.type == category ||
+                (category == LogType.CARBS && log.type == LogType.MEAL)
             val keywordMatches = if (keyword.isNotEmpty()) {
-                (log.note?.contains(keyword, ignoreCase = true) == true) ||
+                log.note.contains(keyword, ignoreCase = true) ||
+                    log.labelName.contains(keyword, ignoreCase = true) ||
+                    log.mealSummary.contains(keyword, ignoreCase = true) ||
                     typeLabels[log.type]?.contains(keyword, ignoreCase = true) == true
             } else true
 
@@ -3558,7 +3623,8 @@ class GlucoseRepository(
 
         try {
             if (Applic.Nativesloaded) {
-                Natives.search(label, under, above, 0, 0, true, keyword, 0f)
+                // Native searches by label code, not by the category picked here.
+                Natives.search(category?.let(::nativeLabel) ?: -1, under, above, 0, 0, true, keyword, 0f)
             }
         } catch (_: Throwable) {}
 
@@ -3838,10 +3904,8 @@ class GlucoseRepository(
         const val KEY_DELTA_CALCULATION = "delta_calculation_minutes"
         const val KEY_MINIMALIST_UNITS = "minimalist_units"
         const val KEY_SHOW_ALERT_LINES = "show_alert_lines"
-        const val KEY_BLOOD_LABELS = "blood_label_indices"
+        /** The "Blood" label of the native default label set. */
         const val DEFAULT_BLOOD_LABEL = 6
-        const val LEGACY_COMPOSE_BLOOD_LABEL = 3
-        val RESERVED_COMPOSE_LABELS = setOf(0, 1, 2, 4)
         const val LOG_NOTES_PREFS = "log_notes"
         const val LOG_NOTES_KEY = "notes"
         /** Native alarm kinds with user-facing sound behavior, in UI order. */

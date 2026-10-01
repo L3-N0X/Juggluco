@@ -58,7 +58,7 @@ import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.components.LogEntryEditor
 import tk.glucodata.ui.components.icon
-import tk.glucodata.ui.components.shortLabelRes
+import tk.glucodata.ui.components.title
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogRecord
@@ -124,6 +124,8 @@ fun LogbookScreen(
         }
     }
 
+    val hasCustomEntries = remember(timeFilteredLogs) { timeFilteredLogs.any { it.type == LogType.CUSTOM } }
+
     val finalFilteredLogs = remember(timeFilteredLogs, selectedTypeFilter) {
         if (selectedTypeFilter == null) timeFilteredLogs else timeFilteredLogs.filter { it.type == selectedTypeFilter }
     }
@@ -142,7 +144,7 @@ fun LogbookScreen(
                     LogType.BASAL_INSULIN -> basal += entry.value
                     LogType.CARBS, LogType.MEAL -> carbs += entry.value
                     LogType.BLOOD_GLUCOSE -> checks++
-                    LogType.NOTE -> Unit
+                    LogType.CUSTOM -> Unit
                 }
             }
             WindowTotals(bolus, basal, carbs, checks)
@@ -314,6 +316,14 @@ fun LogbookScreen(
                     onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BLOOD_GLUCOSE) null else LogType.BLOOD_GLUCOSE },
                     label = { Text(stringResource(R.string.log_short_bg), fontSize = 12.sp) }
                 )
+                // Custom labels only get a filter once there is something to filter.
+                if (hasCustomEntries || selectedTypeFilter == LogType.CUSTOM) {
+                    FilterChip(
+                        selected = selectedTypeFilter == LogType.CUSTOM,
+                        onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.CUSTOM) null else LogType.CUSTOM },
+                        label = { Text(stringResource(R.string.log_type_custom), fontSize = 12.sp) }
+                    )
+                }
             }
 
             if (finalFilteredLogs.isEmpty()) {
@@ -424,7 +434,7 @@ fun LogItemCard(
         } else {
             stringResource(R.string.log_glucose_value, unit.format(record.value), stringResource(unit.labelRes))
         }
-        LogType.NOTE -> if (record.value > 0) record.value.toString() else ""
+        LogType.CUSTOM -> if (record.value != 0f) LogRecord.formatCustomAmount(record.value) else ""
     }
 
     val time = timeFormat.format(Date(record.timestamp))
@@ -434,7 +444,9 @@ fun LogItemCard(
         dateFormat.format(Date(record.timestamp)),
         time
     )
-    val subtitle = if (record.note.isBlank()) whenText else "$whenText · ${record.note}"
+    val subtitle = listOf(whenText, record.mealSummary, record.note)
+        .filter { it.isNotBlank() }
+        .joinToString(" · ")
 
     // Flat M3 list row placed directly on the page: no Card container, no
     // elevation. Parents separate rows with HorizontalDivider.
@@ -463,7 +475,7 @@ fun LogItemCard(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(record.type.shortLabelRes),
+                text = record.title(),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface

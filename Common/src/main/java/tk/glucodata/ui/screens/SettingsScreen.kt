@@ -52,8 +52,10 @@ import tk.glucodata.ui.screens.settings.GarminShortcutsScreen
 import tk.glucodata.ui.screens.settings.GarminStatusScreen
 import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
+import tk.glucodata.ui.screens.settings.IngredientsSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewTreatmentsScreen
+import tk.glucodata.ui.screens.settings.LogbookSettingsScreen
 import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
 import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
 import tk.glucodata.ui.screens.settings.SettingsActionRow
@@ -225,6 +227,14 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                 repository = repository,
                 onNavigateBack = { handleNavigate(SettingsDestination.GARMIN_CONFIG) }
             )
+            SettingsDestination.LOGBOOK -> LogbookSettingsScreen(
+                repository = repository,
+                onOpenIngredients = { handleNavigate(SettingsDestination.INGREDIENTS) },
+                onNavigateBack = { handleNavigate(null) }
+            )
+            SettingsDestination.INGREDIENTS -> IngredientsSettingsScreen(
+                onNavigateBack = { handleNavigate(SettingsDestination.LOGBOOK) }
+            )
         }
         return
     }
@@ -341,6 +351,14 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                 subtitle = stringResource(R.string.settings_group_alarms_desc),
                 icon = SettingsDestination.ALARMS.icon,
                 onClick = { handleNavigate(SettingsDestination.ALARMS) }
+            )
+            SettingsNavRow(
+                title = stringResource(R.string.settings_group_logbook_title),
+                subtitle = stringResource(
+                    if (Applic.isWearable) R.string.settings_group_logbook_desc_labels else R.string.settings_group_logbook_desc
+                ),
+                icon = SettingsDestination.LOGBOOK.icon,
+                onClick = { handleNavigate(SettingsDestination.LOGBOOK) }
             )
         }
 

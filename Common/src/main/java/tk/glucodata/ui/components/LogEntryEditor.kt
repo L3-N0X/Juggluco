@@ -47,6 +47,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
@@ -60,6 +61,8 @@ import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -117,9 +120,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import tk.glucodata.R
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.data.MealStore
 import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.ui.model.Ingredient
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
+import tk.glucodata.ui.model.MealItem
+import tk.glucodata.ui.model.NumberStore
 import tk.glucodata.ui.model.toStoredLogValue
 import tk.glucodata.ui.screens.ScreenLayout
 import tk.glucodata.ui.theme.LocalLogbookColors
@@ -142,14 +149,25 @@ private val KEYPAD_GAPS = 8.dp * 3 + 12.dp
 private val MIN_KEY_HEIGHT = 40.dp
 private val MAX_KEY_HEIGHT = 52.dp
 
+/** A tile of the editor: an entry type, plus the label of a custom one. */
+private data class Field(val type: LogType, val label: Int = -1)
+
+private val CarbsField = Field(LogType.CARBS)
+
 /** The pair most meals are logged with, shown side by side on every new entry. */
-private val PrimaryTypes = listOf(LogType.CARBS, LogType.RAPID_INSULIN)
+private val PrimaryFields = listOf(CarbsField, Field(LogType.RAPID_INSULIN))
 
 /** Logged a few times a day at most, so they are one tap away instead of always on screen. */
-private val OccasionalTypes = listOf(LogType.BASAL_INSULIN, LogType.BLOOD_GLUCOSE)
+private val OccasionalFields = listOf(Field(LogType.BASAL_INSULIN), Field(LogType.BLOOD_GLUCOSE))
 
 /** Order in which a combined entry is saved; the note goes to the first entry saved. */
-private val SaveOrder = listOf(LogType.CARBS, LogType.RAPID_INSULIN, LogType.BASAL_INSULIN, LogType.BLOOD_GLUCOSE)
+private val SaveOrder = listOf(
+    LogType.CARBS,
+    LogType.RAPID_INSULIN,
+    LogType.BASAL_INSULIN,
+    LogType.BLOOD_GLUCOSE,
+    LogType.CUSTOM
+)
 
 /**
  * Full-screen editor for logbook entries.
@@ -202,7 +220,7 @@ fun LogEntryEditor(
  */
 @Suppress("DEPRECATION")
 @Composable
-private fun EditorWindowSetup() {
+internal fun EditorWindowSetup() {
     val view = LocalView.current
     val lightSurface = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     SideEffect {
@@ -237,25 +255,50 @@ private fun EditorContent(
     val focusManager = LocalFocusManager.current
     val unit by repository.unit.collectAsState()
     val logs by repository.logs.collectAsState()
+    val labels by repository.labelConfig.collectAsState()
     val editing = entry != null
-    val entryType = entry?.type?.let { if (it == LogType.MEAL) LogType.CARBS else it }
+    val entryField = entry?.let {
+        when (it.type) {
+            LogType.CUSTOM -> Field(LogType.CUSTOM, it.nativeLabel ?: -1)
+            LogType.MEAL -> CarbsField
+            else -> Field(it.type)
+        }
+    }
 
-    val fields = remember { mutableStateListOf<LogType>().apply { addAll(entryType?.let(::listOf) ?: PrimaryTypes) } }
+    val fields = remember { mutableStateListOf<Field>().apply { addAll(entryField?.let(::listOf) ?: PrimaryFields) } }
     val amounts = remember {
-        mutableStateMapOf<LogType, String>().apply {
-            if (entry != null && entryType != null) {
-                val shown = if (entryType == LogType.BLOOD_GLUCOSE) unit.toDisplay(entry.value) else entry.value
-                put(entryType, plainAmount(shown, amountSpec(entryType, unit).decimals))
+        mutableStateMapOf<Field, String>().apply {
+            if (entry != null && entryField != null) {
+                val shown = if (entryField.type == LogType.BLOOD_GLUCOSE) unit.toDisplay(entry.value) else entry.value
+                put(entryField, plainAmount(shown, amountSpec(entryField.type, unit).decimals))
             }
         }
     }
-    var activeType by remember { mutableStateOf(entryType ?: LogType.CARBS) }
+    var activeField by remember { mutableStateOf(entryField ?: CarbsField) }
     var customTime by remember { mutableStateOf(entry?.timestamp) }
     var note by remember { mutableStateOf(entry?.note.orEmpty()) }
     var noteFocused by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+
+    // A meal is composed from ingredients and attached to the carbs entry. Like in the classic
+    // view this is a phone feature, and only for entries this device logged itself.
+    val mealsAvailable = MealStore.available && labels.editable &&
+        (entry == null || (entryField == CarbsField && entry.nativeSource?.store == NumberStore.HERE))
+    var mealItems by remember { mutableStateOf<List<MealItem>>(emptyList()) }
+    var mealChanged by remember { mutableStateOf(false) }
+    var catalog by remember { mutableStateOf<List<Ingredient>>(emptyList()) }
+    var showMealComposer by remember { mutableStateOf(false) }
+    LaunchedEffect(mealsAvailable) {
+        if (!mealsAvailable) return@LaunchedEffect
+        val (loadedCatalog, loadedItems) = withContext(Dispatchers.IO) {
+            MealStore.ingredients() to (entry?.takeIf { it.mealPointer > 0 }?.let { MealStore.readMeal(it.mealPointer) }.orEmpty())
+        }
+        catalog = loadedCatalog
+        if (!mealChanged) mealItems = loadedItems
+    }
+    val mealSummary = mealItems.mapNotNull { catalog.getOrNull(it.ingredient)?.name }.joinToString(", ")
 
     val history by produceState(LogHistory(), logs, unit) {
         value = withContext(Dispatchers.Default) { analyzeHistory(logs, unit, System.currentTimeMillis()) }
@@ -265,11 +308,18 @@ private fun EditorContent(
     val glucoseUnitLabel = stringResource(unit.labelRes)
     val insulinUnitLabel = stringResource(R.string.unit_insulin_short)
     val carbsUnitLabel = stringResource(R.string.unit_carbs_short)
-    fun unitLabel(type: LogType): String = when {
-        type == LogType.BLOOD_GLUCOSE -> glucoseUnitLabel
-        type.unitLabelRes == R.string.unit_carbs_short -> carbsUnitLabel
-        type.unitLabelRes == R.string.unit_insulin_short -> insulinUnitLabel
+    val customFallback = stringResource(R.string.log_type_custom)
+    val typeNames = LogType.entries.associateWith { stringResource(it.shortLabelRes) }
+    fun unitLabel(field: Field): String = when {
+        field.type == LogType.BLOOD_GLUCOSE -> glucoseUnitLabel
+        field.type.unitLabelRes == R.string.unit_carbs_short -> carbsUnitLabel
+        field.type.unitLabelRes == R.string.unit_insulin_short -> insulinUnitLabel
         else -> ""
+    }
+    fun fieldName(field: Field): String = if (field.type == LogType.CUSTOM) {
+        labels.nameOf(field.label).ifBlank { entry?.labelName.orEmpty() }.ifBlank { customFallback }
+    } else {
+        typeNames.getValue(field.type)
     }
     fun shown(text: String) = text.replace('.', separator)
 
@@ -277,11 +327,11 @@ private fun EditorContent(
 
     // A field is saved when it holds a value inside its range. A value that is too small is only
     // an error once the user has moved on: "0." on the way to "0.5" is still being typed.
-    val parsed = fields.associateWith { type ->
-        val text = amounts[type].orEmpty()
-        val spec = amountSpec(type, unit)
+    val parsed = fields.associateWith { field ->
+        val text = amounts[field].orEmpty()
+        val spec = amountSpec(field.type, unit)
         val value = text.toFloatOrNull()
-        val typing = type == activeType && keypadVisible
+        val typing = field == activeField && keypadVisible
         when {
             text.isEmpty() -> AmountState.Empty
             value == null || value > spec.max -> AmountState.Invalid
@@ -289,64 +339,75 @@ private fun EditorContent(
             else -> AmountState.Valid(value)
         }
     }
-    val saveOrder = fields.sortedBy { type -> SaveOrder.indexOf(type).takeIf { it >= 0 } ?: SaveOrder.size }
-    val validParts = saveOrder.mapNotNull { type ->
-        if (parsed[type] !is AmountState.Valid) return@mapNotNull null
-        type to formatAmount(type, shown(amounts[type].orEmpty()), unitLabel(type))
+    val saveOrder = fields.sortedBy { field -> SaveOrder.indexOf(field.type) }
+    val validParts = saveOrder.mapNotNull { field ->
+        if (parsed[field] !is AmountState.Valid) return@mapNotNull null
+        val amount = shown(amounts[field].orEmpty())
+        field to if (field.type == LogType.CUSTOM) {
+            "${fieldName(field)} $amount"
+        } else {
+            formatAmount(field.type, amount, unitLabel(field))
+        }
     }
     val canSave = validParts.isNotEmpty() &&
         parsed.values.none { it == AmountState.Invalid || it == AmountState.Incomplete }
 
-    fun select(type: LogType) {
+    fun select(field: Field) {
         focusManager.clearFocus()
-        activeType = type
+        activeField = field
     }
 
     fun edit(transform: (String, AmountSpec) -> String) {
-        val spec = amountSpec(activeType, unit)
-        amounts[activeType] = transform(amounts[activeType].orEmpty(), spec)
+        val spec = amountSpec(activeField.type, unit)
+        amounts[activeField] = transform(amounts[activeField].orEmpty(), spec)
     }
 
+    val bolusField = PrimaryFields[1]
     fun pickQuickValue(value: Float) {
-        amounts[activeType] = plainAmount(value, amountSpec(activeType, unit).decimals)
+        amounts[activeField] = plainAmount(value, amountSpec(activeField.type, unit).decimals)
         // Carbs are usually followed by the bolus for them, so move straight on to it.
-        if (activeType == LogType.CARBS && LogType.RAPID_INSULIN in fields &&
-            amounts[LogType.RAPID_INSULIN].isNullOrEmpty()
-        ) {
-            activeType = LogType.RAPID_INSULIN
+        if (activeField == CarbsField && bolusField in fields && amounts[bolusField].isNullOrEmpty()) {
+            activeField = bolusField
         }
     }
 
-    fun addField(type: LogType, prefill: Float? = null) {
-        if (type !in fields) fields.add(type)
-        if (prefill != null) amounts[type] = plainAmount(prefill, amountSpec(type, unit).decimals)
-        select(type)
+    fun addField(field: Field, prefill: Float? = null) {
+        if (field !in fields) fields.add(field)
+        if (prefill != null) amounts[field] = plainAmount(prefill, amountSpec(field.type, unit).decimals)
+        select(field)
     }
 
-    fun removeField(type: LogType) {
-        fields.remove(type)
-        amounts.remove(type)
-        if (activeType == type) activeType = fields.first()
+    fun removeField(field: Field) {
+        fields.remove(field)
+        amounts.remove(field)
+        if (activeField == field) activeField = fields.first()
     }
 
     fun save() {
         if (!canSave) return
-        if (entry != null && entryType != null) {
-            val value = (parsed[entryType] as AmountState.Valid).value
+        if (entry != null && entryField != null) {
+            val value = (parsed[entryField] as AmountState.Valid).value
             repository.updateLogEntry(
                 entry,
                 entry.type,
-                toStoredLogValue(entryType, value, unit),
+                toStoredLogValue(entryField.type, value, unit),
                 timestamp = customTime ?: entry.timestamp,
-                note = note.trim()
+                note = note.trim(),
+                meal = mealItems.takeIf { mealChanged }
             )
         } else {
             val timestamp = customTime ?: System.currentTimeMillis()
             var pendingNote = note.trim()
-            val saved = validParts.filter { (type, _) ->
-                val value = (parsed[type] as AmountState.Valid).value
-                repository.addLogEntry(type, toStoredLogValue(type, value, unit), pendingNote, timestamp)
-                    .also { if (it) pendingNote = "" }
+            val saved = validParts.filter { (field, _) ->
+                val value = (parsed[field] as AmountState.Valid).value
+                repository.addLogEntry(
+                    field.type,
+                    toStoredLogValue(field.type, value, unit),
+                    pendingNote,
+                    timestamp,
+                    label = field.label,
+                    meal = if (field == CarbsField) mealItems else emptyList()
+                ).also { if (it) pendingNote = "" }
             }
             if (saved.isNotEmpty()) {
                 onSaved(context.getString(R.string.log_entry_saved, saved.joinToString(" · ") { it.second }))
@@ -355,8 +416,8 @@ private fun EditorContent(
         onClose()
     }
 
-    val activeSpec = amountSpec(activeType, unit)
-    val quickValues = history.quickValues[activeType].orEmpty()
+    val activeSpec = amountSpec(activeField.type, unit)
+    val quickValues = history.quickValues[activeField].orEmpty()
     val saveLabel = when {
         editing || validParts.isEmpty() -> stringResource(R.string.save)
         else -> stringResource(R.string.log_entry_save_summary, validParts.joinToString(" · ") { it.second })
@@ -376,39 +437,48 @@ private fun EditorContent(
                 onReset = { customTime = null }.takeIf { !editing && customTime != null }
             )
             Spacer(Modifier.height(12.dp))
-            fields.chunked(2).forEachIndexed { rowIndex, rowTypes ->
+            fields.chunked(2).forEachIndexed { rowIndex, rowFields ->
                 if (rowIndex > 0) Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    rowTypes.forEach { type ->
-                        val spec = amountSpec(type, unit)
+                    rowFields.forEach { field ->
+                        val spec = amountSpec(field.type, unit)
+                        val withMeal = field == CarbsField && mealsAvailable
                         AmountTile(
-                            type = type,
-                            valueText = shown(amounts[type].orEmpty()),
-                            unitText = unitLabel(type),
-                            active = type == activeType && keypadVisible,
-                            rangeHint = if (parsed[type] == AmountState.Invalid) {
+                            type = field.type,
+                            label = fieldName(field),
+                            valueText = shown(amounts[field].orEmpty()),
+                            unitText = unitLabel(field),
+                            active = field == activeField && keypadVisible,
+                            rangeHint = if (parsed[field] == AmountState.Invalid) {
                                 stringResource(
                                     R.string.log_entry_out_of_range,
                                     shown(plainAmount(spec.min, spec.decimals)),
                                     shown(plainAmount(spec.max, spec.decimals))
                                 )
                             } else null,
-                            onClick = { select(type) },
-                            onRemove = if (!editing && type in OccasionalTypes) ({ removeField(type) }) else null,
+                            detail = mealSummary.takeIf { withMeal && it.isNotEmpty() },
+                            onClick = { select(field) },
+                            onMeal = if (withMeal) ({ showMealComposer = true }) else null,
+                            onRemove = if (!editing && field !in PrimaryFields) ({ removeField(field) }) else null,
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
             }
             if (!editing) {
-                val addable = OccasionalTypes.filter { it !in fields }
-                if (addable.isNotEmpty()) {
+                // Until the labels are read every type is offered; after that only those that
+                // have a label to be saved under.
+                val hasLabel = { field: Field -> labels.labels.isEmpty() || labels.labelFor(field.type) >= 0 }
+                val addable = OccasionalFields.filter { it !in fields && hasLabel(it) }
+                val customLabels = labels.customLabels.filter { Field(LogType.CUSTOM, it.index) !in fields }
+                if (addable.isNotEmpty() || customLabels.isNotEmpty()) {
                     Spacer(Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        addable.forEach { type ->
+                        addable.forEach { field ->
+                            val type = field.type
                             val usual = history.usualBasal.takeIf { type == LogType.BASAL_INSULIN }
                             AddTypeChip(
                                 type = type,
@@ -418,15 +488,44 @@ private fun EditorContent(
                                         formatAmount(
                                             type,
                                             shown(plainAmount(usual, amountSpec(type, unit).decimals)),
-                                            unitLabel(type)
+                                            unitLabel(field)
                                         )
                                     )
                                 } else {
-                                    stringResource(type.shortLabelRes)
+                                    fieldName(field)
                                 },
                                 highlighted = usual != null,
-                                onClick = { addField(type, usual) }
+                                onClick = { addField(field, usual) }
                             )
+                        }
+                        if (customLabels.isNotEmpty()) {
+                            Box {
+                                var menuOpen by remember { mutableStateOf(false) }
+                                AddTypeChip(
+                                    type = LogType.CUSTOM,
+                                    label = stringResource(R.string.log_entry_other_label),
+                                    highlighted = false,
+                                    onClick = { menuOpen = true }
+                                )
+                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    customLabels.forEach { label ->
+                                        DropdownMenuItem(
+                                            text = { Text(label.name.ifBlank { customFallback }) },
+                                            leadingIcon = {
+                                                Icon(
+                                                    LogType.CUSTOM.icon,
+                                                    contentDescription = null,
+                                                    tint = LocalLogbookColors.current.forType(LogType.CUSTOM).primary
+                                                )
+                                            },
+                                            onClick = {
+                                                menuOpen = false
+                                                addField(Field(LogType.CUSTOM, label.index))
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -456,15 +555,13 @@ private fun EditorContent(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         quickValues.forEach { value ->
+                            val amount = shown(plainAmount(value, activeSpec.decimals))
                             SuggestionChip(
                                 onClick = { pickQuickValue(value) },
                                 label = {
                                     Text(
-                                        formatAmount(
-                                            activeType,
-                                            shown(plainAmount(value, activeSpec.decimals)),
-                                            unitLabel(activeType)
-                                        )
+                                        if (activeField.type == LogType.CUSTOM) amount
+                                        else formatAmount(activeField.type, amount, unitLabel(activeField))
                                     )
                                 }
                             )
@@ -612,6 +709,24 @@ private fun EditorContent(
                 TextButton(onClick = { confirmDelete = false }) {
                     Text(stringResource(R.string.cancel))
                 }
+            }
+        )
+    }
+
+    if (showMealComposer) {
+        MealComposer(
+            initialItems = mealItems,
+            logs = logs,
+            onDismiss = { showMealComposer = false },
+            onDone = { items, updatedCatalog, carbs ->
+                showMealComposer = false
+                catalog = updatedCatalog
+                mealItems = items
+                mealChanged = true
+                if (items.isNotEmpty()) {
+                    amounts[CarbsField] = plainAmount(carbs, amountSpec(LogType.CARBS, unit).decimals)
+                }
+                select(CarbsField)
             }
         )
     }
@@ -778,14 +893,21 @@ private fun EntryTimePickerDialog(
     }
 }
 
+/**
+ * One amount of the editor. [detail] is an extra line under the value (the ingredients of an
+ * attached meal), and [onMeal] opens the meal composer from the tile's corner.
+ */
 @Composable
 private fun AmountTile(
     type: LogType,
+    label: String,
     valueText: String,
     unitText: String,
     active: Boolean,
     rangeHint: String?,
+    detail: String?,
     onClick: () -> Unit,
+    onMeal: (() -> Unit)?,
     onRemove: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
@@ -804,7 +926,6 @@ private fun AmountTile(
         label = "tileBorder"
     )
     val content = if (active) typeColors.onContainer else scheme.onSurface
-    val label = stringResource(type.shortLabelRes)
     val tileDescription =
         stringResource(R.string.log_entry_tile_description, label, valueText.ifEmpty { "0" }, unitText)
 
@@ -832,6 +953,16 @@ private fun AmountTile(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
+                if (onMeal != null) {
+                    IconButton(onClick = onMeal, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ListAlt,
+                            contentDescription = stringResource(R.string.meal_compose),
+                            tint = if (detail != null) typeColors.primary else scheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
                 if (onRemove != null) {
                     IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
                         Icon(
@@ -861,6 +992,15 @@ private fun AmountTile(
                     color = if (active) typeColors.onContainer else scheme.onSurfaceVariant,
                     maxLines = 1,
                     modifier = Modifier.alignByBaseline()
+                )
+            }
+            if (detail != null) {
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (active) typeColors.onContainer else scheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             if (rangeHint != null) {
@@ -1073,14 +1213,14 @@ private fun appendDigit(text: String, digit: Char, spec: AmountSpec): String {
 private fun appendDecimal(text: String, spec: AmountSpec): String =
     if (spec.decimals == 0 || '.' in text) text else text.ifEmpty { "0" } + "."
 
-private fun plainAmount(value: Float, decimals: Int): String =
+internal fun plainAmount(value: Float, decimals: Int): String =
     BigDecimal(value.toDouble()).setScale(decimals, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 
 // --- What the editor learns from the logbook. ---
 
 private data class LogHistory(
-    /** The amounts the user logs most, per type, ascending. */
-    val quickValues: Map<LogType, List<Float>> = emptyMap(),
+    /** The amounts the user logs most, per field, ascending. */
+    val quickValues: Map<Field, List<Float>> = emptyMap(),
     /** Notes the user has written before, most used first. */
     val recentNotes: List<String> = emptyList(),
     /** The basal dose usually taken around this time of day, if it has not been logged yet. */
@@ -1093,18 +1233,22 @@ private const val NOTE_SUGGESTION_COUNT = 6
 private fun analyzeHistory(logs: List<LogRecord>, unit: GlucoseUnit, now: Long): LogHistory {
     val since = now - 90 * DAY_MS
     // value -> (times used, last used)
-    val usage = HashMap<LogType, HashMap<Float, Pair<Int, Long>>>()
+    val usage = HashMap<Field, HashMap<Float, Pair<Int, Long>>>()
     val notes = HashMap<String, Triple<String, Int, Long>>()
     for (record in logs) {
         if (record.timestamp < since || record.timestamp > now + HOUR_MS) continue
-        val type = if (record.type == LogType.MEAL) LogType.CARBS else record.type
-        if (type == LogType.CARBS || type == LogType.RAPID_INSULIN || type == LogType.BASAL_INSULIN) {
-            val decimals = amountSpec(type, unit).decimals
+        val field = when (record.type) {
+            LogType.MEAL -> CarbsField
+            LogType.CUSTOM -> Field(LogType.CUSTOM, record.nativeLabel ?: -1)
+            else -> Field(record.type)
+        }
+        if (field.type != LogType.BLOOD_GLUCOSE) {
+            val decimals = amountSpec(field.type, unit).decimals
             val key = plainAmount(record.value, decimals).toFloat()
             if (key > 0f) {
-                val perType = usage.getOrPut(type) { HashMap() }
-                val (count, last) = perType[key] ?: (0 to 0L)
-                perType[key] = (count + 1) to maxOf(last, record.timestamp)
+                val perField = usage.getOrPut(field) { HashMap() }
+                val (count, last) = perField[key] ?: (0 to 0L)
+                perField[key] = (count + 1) to maxOf(last, record.timestamp)
             }
         }
         val note = record.note.trim()

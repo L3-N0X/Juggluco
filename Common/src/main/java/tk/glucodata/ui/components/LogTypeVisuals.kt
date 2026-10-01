@@ -2,14 +2,17 @@ package tk.glucodata.ui.components
 
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Timelapse
 import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
 
 /** One icon per log type, shared by the logbook rows and the entry editor. */
@@ -19,7 +22,7 @@ val LogType.icon: ImageVector
         LogType.BASAL_INSULIN -> Icons.Default.Timelapse
         LogType.CARBS, LogType.MEAL -> Icons.Default.Restaurant
         LogType.BLOOD_GLUCOSE -> Icons.Default.WaterDrop
-        LogType.NOTE -> Icons.AutoMirrored.Filled.Notes
+        LogType.CUSTOM -> Icons.AutoMirrored.Filled.Label
     }
 
 /** The short everyday name ("Bolus", "Carbs") used wherever space is tight. */
@@ -30,8 +33,13 @@ val LogType.shortLabelRes: Int
         LogType.BASAL_INSULIN -> R.string.log_short_basal
         LogType.CARBS, LogType.MEAL -> R.string.log_short_carbs
         LogType.BLOOD_GLUCOSE -> R.string.log_type_finger_prick
-        LogType.NOTE -> R.string.log_type_note
+        LogType.CUSTOM -> R.string.log_type_custom
     }
+
+/** What a logged entry is called: its type, or the label's own name for a custom label. */
+@Composable
+fun LogRecord.title(): String =
+    if (type == LogType.CUSTOM) labelName.ifBlank { stringResource(R.string.log_type_custom) } else stringResource(type.shortLabelRes)
 
 /**
  * Input rules for an amount of [type], in the unit the user types it in.
@@ -55,7 +63,7 @@ internal fun amountSpec(type: LogType, unit: GlucoseUnit): AmountSpec = when (ty
     } else {
         AmountSpec(maxIntegerDigits = 3, decimals = 0, min = 20f, max = 600f)
     }
-    LogType.NOTE -> AmountSpec(maxIntegerDigits = 4, decimals = 1, min = 0f, max = 9999f)
+    LogType.CUSTOM -> AmountSpec(maxIntegerDigits = 4, decimals = 2, min = 0f, max = 9999f)
 }
 
 /** The unit suffix shown next to a typed amount. */

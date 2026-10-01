@@ -56,8 +56,10 @@ import tk.glucodata.ui.screens.settings.GarminShortcutsScreen
 import tk.glucodata.ui.screens.settings.GarminStatusScreen
 import tk.glucodata.ui.screens.settings.GlucoseTargetsSettingsScreen
 import tk.glucodata.ui.screens.settings.HardwareSettingsScreen
+import tk.glucodata.ui.screens.settings.IngredientsSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewTreatmentsScreen
+import tk.glucodata.ui.screens.settings.LogbookSettingsScreen
 import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
 import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
 import tk.glucodata.ui.screens.settings.SettingsDestination
@@ -218,6 +220,14 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                 SettingsDestination.GARMIN_SHORTCUTS -> GarminShortcutsScreen(
                     repository = repository,
                     onNavigateBack = { activeSettingsDestination = SettingsDestination.GARMIN_CONFIG }
+                )
+                SettingsDestination.LOGBOOK -> LogbookSettingsScreen(
+                    repository = repository,
+                    onOpenIngredients = { activeSettingsDestination = SettingsDestination.INGREDIENTS },
+                    onNavigateBack = { activeSettingsDestination = null }
+                )
+                SettingsDestination.INGREDIENTS -> IngredientsSettingsScreen(
+                    onNavigateBack = { activeSettingsDestination = SettingsDestination.LOGBOOK }
                 )
                 null -> {}
             }

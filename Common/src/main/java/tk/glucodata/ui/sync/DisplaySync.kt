@@ -5,7 +5,9 @@ import org.json.JSONObject
 import tk.glucodata.Applic
 import tk.glucodata.Log
 import tk.glucodata.MessageSender
+import tk.glucodata.Natives
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.data.NativeLabels
 import tk.glucodata.ui.model.DeltaCalculation
 
 /**
@@ -13,7 +15,10 @@ import tk.glucodata.ui.model.DeltaCalculation
  * the Wear message channel ([PATH]):
  *
  * - `delta`: the delta window this device uses, tagged with the moment it was chosen.
- * - `request`: the other device asks for the value this one has.
+ * - `labels`: the labels bolus and basal are saved under. Native sends the labels themselves from
+ *   the device that owns them to the one that mirrors them, so this follows the same direction:
+ *   only a device that can edit its labels sends, and only one that mirrors them applies.
+ * - `request`: the other device asks for the values this one has.
  *
  * Every value travels with the moment it was chosen, so the most recent change wins. A device
  * that never had the setting changed sends no moment at all, which marks it as having no choice
@@ -49,6 +54,11 @@ object DisplaySync {
         push(calculation, now)
     }
 
+    /** The user picked another bolus or basal label here. */
+    fun onLocalLabelChange() {
+        pushLabels()
+    }
+
     /** Asks the other device for its delta window; used when this device starts. */
     fun request() {
         send(JSONObject().put("t", "request"))
@@ -71,6 +81,15 @@ object DisplaySync {
         )
     }
 
+    private fun pushLabels() {
+        if (labelsMirrored()) return
+        val (bolus, basal) = NativeLabels.storedInsulinLabels()
+        if (bolus < 0 && basal < 0) return
+        send(JSONObject().put("t", "labels").put("bolus", bolus).put("basal", basal))
+    }
+
+    private fun labelsMirrored(): Boolean = try { Natives.staticnum() } catch (_: Throwable) { false }
+
     private fun send(json: JSONObject) {
         try {
             MessageSender.sendDisplaySettings(json.toString().toByteArray(Charsets.UTF_8))
@@ -87,8 +106,11 @@ object DisplaySync {
             val json = JSONObject(String(data, Charsets.UTF_8))
             when (json.optString("t")) {
                 "delta" -> receiveDelta(json)
-                "request" -> push(repository?.displayConfig?.value?.deltaCalculation
-                    ?: DeltaCalculation.ONE_MINUTE)
+                "labels" -> receiveLabels(json)
+                "request" -> {
+                    push(repository?.displayConfig?.value?.deltaCalculation ?: DeltaCalculation.ONE_MINUTE)
+                    pushLabels()
+                }
             }
         } catch (th: Throwable) {
             Log.stack(LOG_ID, "receive", th)
@@ -119,6 +141,16 @@ object DisplaySync {
         if (current == remote) return
         Log.i(LOG_ID, "Applying the delta window from the other device: $remote")
         repository?.setDeltaCalculation(remote, fromRemote = true)
+    }
+
+    private fun receiveLabels(json: JSONObject) {
+        if (!labelsMirrored()) return
+        val bolus = json.optInt("bolus", -1)
+        val basal = json.optInt("basal", -1)
+        if (NativeLabels.applyMirroredInsulinLabels(bolus, basal)) {
+            Log.i(LOG_ID, "Applying the bolus and basal labels of the other device: $bolus, $basal")
+            repository?.refreshLabels()
+        }
     }
 
     // --- Persistence ------------------------------------------------------------------
