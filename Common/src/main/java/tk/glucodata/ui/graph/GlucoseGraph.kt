@@ -261,7 +261,9 @@ fun GlucoseGraph(
                         range = range,
                         surfaceColor = surfaceColor,
                         scratch = scratch,
-                        showHead = true
+                        showHead = true,
+                        primarySensorId = data.primarySensorId,
+                        primaryStartTime = data.primaryStartTime
                     )
                 }
                 if (displayConfig.showCalibratedStream) {

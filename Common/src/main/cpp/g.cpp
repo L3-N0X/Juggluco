@@ -540,6 +540,10 @@ extern "C" JNIEXPORT jboolean JNICALL   fromjava(hasHistory)(JNIEnv *env, jclass
     if(!sensorptr) return false;
     return reinterpret_cast<const SensorGlucoseData*>(sensorptr)->hasHistory();
      }
+extern "C" JNIEXPORT jint JNICALL   fromjava(getSensorIndexFromSensorptr)(JNIEnv *env, jclass cl,jlong sensorptr) {
+    if(!sensorptr) return -1;
+    return reinterpret_cast<const SensorGlucoseData*>(sensorptr)->sensorIndex;
+     }
 
 extern std::vector<int> usedsensors;
 extern "C" JNIEXPORT jboolean JNICALL   fromjava(activeSensor)(JNIEnv *env, jclass cl,jlong sensorptr) {

@@ -1117,6 +1117,7 @@ public static native int getmaxmgdL(int sensorgen);
 public static native int getminmgdL(int sensorgen);
 public static native int getSerialLength(long dataptr);
 public static native boolean hasHistory(long sensorptr);
+public static native int getSensorIndexFromSensorptr(long sensorptr);
 
 public static native boolean hasAidexX();
 public static native byte[] aidexXaskKey(long dataptr);

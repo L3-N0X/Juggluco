@@ -17,6 +17,12 @@ private const val HISTORY_GAP_MILLIS = 35 * 60 * 1000L
  * The main sensor curve. Two modes: a smoothed spline while individual readings are resolvable,
  * and a per-pixel min/max envelope once the window holds more points than the chart has columns -
  * which keeps multi-day views both honest (peaks survive) and cheap.
+ *
+ * Two sensors worn in parallel produce two interleaved curves in one [series]. They are never
+ * stitched into each other: the curve is cut wherever the sensor changes, and every curve that
+ * belongs to a sensor other than [primarySensorId] is darkened from [primaryStartTime] onwards,
+ * which is where that sensor started and the two began to overlap. Before that point the older
+ * sensor is on its own and keeps the normal colours, so the dimming always marks the overlap.
  */
 internal fun DrawScope.drawCurveLayer(
     chart: ChartTransform,
@@ -25,7 +31,9 @@ internal fun DrawScope.drawCurveLayer(
     range: GlucoseRange,
     surfaceColor: Color,
     scratch: GraphScratch,
-    showHead: Boolean
+    showHead: Boolean,
+    primarySensorId: Int,
+    primaryStartTime: Long
 ) {
     if (series.isEmpty) return
     val from = (series.firstIndexAtOrAfter(chart.startTime) - 1).coerceAtLeast(0)
@@ -33,12 +41,13 @@ internal fun DrawScope.drawCurveLayer(
     if (to < from) return
 
     val brushes = scratch.zoneBrushes(chart, clinicalColors, range)
+    val dimmedBrushes = scratch.zoneBrushes(chart, clinicalColors, range, dimmed = true)
     val visibleCount = to - from + 1
 
     if (visibleCount > chart.metrics.chartWidth * 1.2f) {
-        drawEnvelope(chart, series, from, to, brushes, scratch)
+        drawEnvelope(chart, series, from, to, brushes, dimmedBrushes, primarySensorId, primaryStartTime, scratch)
     } else {
-        drawSpline(chart, series, from, to, brushes, scratch)
+        drawSpline(chart, series, from, to, brushes, dimmedBrushes, primarySensorId, primaryStartTime, scratch)
     }
 
     if (showHead && to == series.size - 1) {
@@ -54,66 +63,126 @@ internal fun DrawScope.drawCurveLayer(
     }
 }
 
+/**
+ * A point is dimmed when it belongs to a sensor other than the primary one *and* the primary
+ * sensor had already started by then, so the darkening begins exactly at the first overlap.
+ */
+private fun GraphSeries.isDimmedAt(index: Int, primarySensorId: Int, primaryStartTime: Long): Boolean =
+    sensorIds[index] != primarySensorId && times[index] >= primaryStartTime
+
+/** Starts a new curve run: no point before it, a reading gap, a different sensor, or a dim switch. */
+private fun GraphSeries.breaksRunAt(index: Int, from: Int, primarySensorId: Int, primaryStartTime: Long): Boolean {
+    if (index <= from) return false
+    val previous = index - 1
+    return times[index] - times[previous] > STREAM_GAP_MILLIS ||
+        sensorIds[index] != sensorIds[previous] ||
+        isDimmedAt(index, primarySensorId, primaryStartTime) != isDimmedAt(previous, primarySensorId, primaryStartTime)
+}
+
+/**
+ * Smoothed curve, drawn as one run per sensor per dim state. The two passes rebuild the identical
+ * runs: all areas go down first, so an older sensor's fill can never paint over the primary curve
+ * that shares the same columns, and only then are the curves stroked on top.
+ */
 private fun DrawScope.drawSpline(
     chart: ChartTransform,
     series: GraphSeries,
     from: Int,
     to: Int,
     brushes: ZoneBrushes,
+    dimmedBrushes: ZoneBrushes,
+    primarySensorId: Int,
+    primaryStartTime: Long,
     scratch: GraphScratch
 ) {
-    val line = scratch.linePath.apply { reset() }
-    val area = scratch.areaPath.apply { reset() }
     val bottom = chart.metrics.chartBottom
-    var segmentStartX = 0f
-    var hasSegment = false
-    var prevX = 0f
-    var prevY = 0f
 
-    fun closeSegment() {
-        if (!hasSegment) return
-        area.lineTo(prevX, bottom)
-        area.lineTo(segmentStartX, bottom)
+    val area = scratch.areaPath.apply { reset() }
+    var areaStartX = 0f
+    var areaOpen = false
+    var areaDimmed = false
+    var areaPrevX = 0f
+    var areaPrevY = 0f
+
+    fun flushArea() {
+        if (!areaOpen) return
+        area.lineTo(areaPrevX, bottom)
+        area.lineTo(areaStartX, bottom)
         area.close()
-        hasSegment = false
+        drawPath(area, if (areaDimmed) dimmedBrushes.area else brushes.area)
+        area.reset()
+        areaOpen = false
     }
 
     for (i in from..to) {
         val x = chart.x(series.times[i])
         val y = chart.y(series.values[i])
-        val gap = i > from && (series.times[i] - series.times[i - 1] > STREAM_GAP_MILLIS)
-
-        if (!hasSegment || gap) {
-            closeSegment()
-            line.moveTo(x, y)
+        if (!areaOpen || series.breaksRunAt(i, from, primarySensorId, primaryStartTime)) {
+            flushArea()
             area.moveTo(x, bottom)
             area.lineTo(x, y)
-            segmentStartX = x
-            hasSegment = true
+            areaStartX = x
+            areaDimmed = series.isDimmedAt(i, primarySensorId, primaryStartTime)
+            areaOpen = true
         } else {
-            val midX = (prevX + x) / 2f
-            line.cubicTo(midX, prevY, midX, y, x, y)
-            area.cubicTo(midX, prevY, midX, y, x, y)
+            val midX = (areaPrevX + x) / 2f
+            area.cubicTo(midX, areaPrevY, midX, y, x, y)
         }
-        prevX = x
-        prevY = y
+        areaPrevX = x
+        areaPrevY = y
     }
-    closeSegment()
+    flushArea()
 
-    drawPath(area, brushes.area)
-    drawPath(
-        path = line,
-        brush = brushes.line,
-        style = Stroke(width = chart.px(2.2f), cap = StrokeCap.Round, join = StrokeJoin.Round)
-    )
+    val line = scratch.linePath.apply { reset() }
+    var lineOpen = false
+    var lineDimmed = false
+    var linePrevX = 0f
+    var linePrevY = 0f
+
+    fun flushLine() {
+        if (!lineOpen) return
+        drawPath(
+            path = line,
+            brush = if (lineDimmed) dimmedBrushes.line else brushes.line,
+            style = Stroke(width = chart.px(2.2f), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+        line.reset()
+        lineOpen = false
+    }
+
+    for (i in from..to) {
+        val x = chart.x(series.times[i])
+        val y = chart.y(series.values[i])
+        if (!lineOpen || series.breaksRunAt(i, from, primarySensorId, primaryStartTime)) {
+            flushLine()
+            line.moveTo(x, y)
+            lineDimmed = series.isDimmedAt(i, primarySensorId, primaryStartTime)
+            lineOpen = true
+        } else {
+            val midX = (linePrevX + x) / 2f
+            line.cubicTo(midX, linePrevY, midX, y, x, y)
+        }
+        linePrevX = x
+        linePrevY = y
+    }
+    flushLine()
 }
 
+/**
+ * Per-column min/max envelope with a mean line, used once the window holds more points than the
+ * chart has columns. A column that saw a primary-sensor reading is drawn in the normal colours; a
+ * column holding only an older sensor's readings is drawn dimmed, so a zoomed-out view darkens
+ * exactly where the two sensors overlap rather than merging them into one band.
+ */
 private fun DrawScope.drawEnvelope(
     chart: ChartTransform,
     series: GraphSeries,
     from: Int,
     to: Int,
     brushes: ZoneBrushes,
+    dimmedBrushes: ZoneBrushes,
+    primarySensorId: Int,
+    primaryStartTime: Long,
     scratch: GraphScratch
 ) {
     val metrics = chart.metrics
@@ -123,6 +192,7 @@ private fun DrawScope.drawEnvelope(
     val maxV = scratch.columnMax
     val sumV = scratch.columnSum
     val counts = scratch.columnCount
+    val primary = scratch.columnPrimary
 
     for (i in from..to) {
         val time = series.times[i]
@@ -140,12 +210,14 @@ private fun DrawScope.drawEnvelope(
             sumV[col] += v
         }
         counts[col]++
+        if (!series.isDimmedAt(i, primarySensorId, primaryStartTime)) primary[col] = true
     }
 
     val band = scratch.areaPath.apply { reset() }
     val mean = scratch.linePath.apply { reset() }
     val columnWidth = metrics.chartWidth / columns
     var runStart = -1
+    var runPrimary = false
 
     fun flushRun(runEnd: Int) {
         if (runStart < 0) return
@@ -164,20 +236,32 @@ private fun DrawScope.drawEnvelope(
             val y = chart.y(sumV[c] / counts[c])
             if (c == runStart) mean.moveTo(x, y) else mean.lineTo(x, y)
         }
+        // Runs are horizontally disjoint, so each can be drawn as soon as it is complete and the
+        // dimming decided per run instead of needing a second pass.
+        val runBrushes = if (runPrimary) brushes.line else dimmedBrushes.line
+        drawPath(band, runBrushes, alpha = 0.28f)
+        drawPath(mean, runBrushes, style = Stroke(width = chart.px(1.6f), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        band.reset()
+        mean.reset()
         runStart = -1
     }
 
     for (c in 0 until columns) {
         if (counts[c] > 0) {
-            if (runStart < 0) runStart = c
+            if (runStart < 0) {
+                runStart = c
+                runPrimary = primary[c]
+            } else if (primary[c] != runPrimary) {
+                // A column of the other kind starts a new run rather than being blended into this.
+                flushRun(c - 1)
+                runStart = c
+                runPrimary = primary[c]
+            }
         } else if (runStart >= 0) {
             flushRun(c - 1)
         }
     }
     if (runStart >= 0) flushRun(columns - 1)
-
-    drawPath(band, brushes.line, alpha = 0.28f)
-    drawPath(mean, brushes.line, style = Stroke(width = chart.px(1.6f), cap = StrokeCap.Round, join = StrokeJoin.Round))
 }
 
 /** 15-minute sensor history: dots joined by a light dashed line. */

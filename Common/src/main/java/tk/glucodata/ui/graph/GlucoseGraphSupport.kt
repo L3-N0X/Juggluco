@@ -78,6 +78,16 @@ internal class GraphPaints(density: Density, textColor: Color, clinicalColors: C
 internal class ZoneBrushes(val line: Brush, val area: Brush)
 
 /**
+ * How far a non-primary sensor's curve is darkened. Dark enough to read as "not the current
+ * sensor" at a glance, light enough that its range colouring is still recognisable.
+ */
+private const val SENSOR_DIM_FACTOR = 0.45f
+
+/** Darkens [this] towards black; used to push an older sensor behind the primary one. */
+private fun Color.dimmed(dimmed: Boolean): Color =
+    if (!dimmed) this else Color(red * SENSOR_DIM_FACTOR, green * SENSOR_DIM_FACTOR, blue * SENSOR_DIM_FACTOR, alpha)
+
+/**
  * Per-frame scratch space: paths, envelope column buffers and the cached value-zone gradients.
  * Nothing here is allocated while panning unless the chart geometry or palette actually changed.
  */
@@ -96,39 +106,51 @@ internal class GraphScratch {
     var columnCount = IntArray(0)
         private set
 
+    /** True per column that saw at least one reading of the primary sensor, so runs can be dimmed. */
+    var columnPrimary = BooleanArray(0)
+        private set
+
     fun prepareColumns(count: Int) {
         if (columnMin.size < count) {
             columnMin = FloatArray(count)
             columnMax = FloatArray(count)
             columnSum = FloatArray(count)
             columnCount = IntArray(count)
+            columnPrimary = BooleanArray(count)
         }
         java.util.Arrays.fill(columnCount, 0, count, 0)
+        java.util.Arrays.fill(columnPrimary, 0, count, false)
     }
 
     private var brushes: ZoneBrushes? = null
+    private var dimBrushes: ZoneBrushes? = null
     private var brushTop = Float.NaN
     private var brushBottom = Float.NaN
     private var brushMin = Float.NaN
     private var brushMax = Float.NaN
     private var brushRange: GlucoseRange? = null
     private var brushPalette: ClinicalColors? = null
+    private var brushDimmed = false
 
     /**
      * Gradient that paints the curve in the colour of the range it passes through, built from the
      * current axis mapping. Rebuilt only when the mapping or the palette changes.
+     *
+     * [dimmed] darkens every stop, which is how an older sensor running next to the primary one
+     * is told apart without introducing a second palette.
      */
     fun zoneBrushes(
         chart: ChartTransform,
         colors: ClinicalColors,
-        range: GlucoseRange
+        range: GlucoseRange,
+        dimmed: Boolean = false
     ): ZoneBrushes {
         val top = chart.metrics.chartTop
         val bottom = chart.metrics.chartBottom
-        val cached = brushes
+        val cached = if (dimmed) dimBrushes else brushes
         if (cached != null && brushTop == top && brushBottom == bottom &&
             brushMin == chart.minValue && brushMax == chart.maxValue &&
-            brushRange == range && brushPalette === colors
+            brushRange == range && brushPalette === colors && brushDimmed == dimmed
         ) {
             return cached
         }
@@ -138,16 +160,16 @@ internal class GraphScratch {
 
         val eps = 0.0008f
         val raw = ArrayList<Pair<Float, Color>>(10)
-        raw.add(0f to colors.veryHigh)
-        raw.add(stopAt(range.veryHighMgDl) to colors.veryHigh)
-        raw.add((stopAt(range.veryHighMgDl) + eps) to colors.high)
-        raw.add(stopAt(range.highMgDl) to colors.high)
-        raw.add((stopAt(range.highMgDl) + eps) to colors.inRange)
-        raw.add(stopAt(range.lowMgDl) to colors.inRange)
-        raw.add((stopAt(range.lowMgDl) + eps) to colors.low)
-        raw.add(stopAt(range.veryLowMgDl) to colors.low)
-        raw.add((stopAt(range.veryLowMgDl) + eps) to colors.veryLow)
-        raw.add(1f to colors.veryLow)
+        raw.add(0f to colors.veryHigh.dimmed(dimmed))
+        raw.add(stopAt(range.veryHighMgDl) to colors.veryHigh.dimmed(dimmed))
+        raw.add((stopAt(range.veryHighMgDl) + eps) to colors.high.dimmed(dimmed))
+        raw.add(stopAt(range.highMgDl) to colors.high.dimmed(dimmed))
+        raw.add((stopAt(range.highMgDl) + eps) to colors.inRange.dimmed(dimmed))
+        raw.add(stopAt(range.lowMgDl) to colors.inRange.dimmed(dimmed))
+        raw.add((stopAt(range.lowMgDl) + eps) to colors.low.dimmed(dimmed))
+        raw.add(stopAt(range.veryLowMgDl) to colors.low.dimmed(dimmed))
+        raw.add((stopAt(range.veryLowMgDl) + eps) to colors.veryLow.dimmed(dimmed))
+        raw.add(1f to colors.veryLow.dimmed(dimmed))
 
         var previous = 0f
         val stops = Array(raw.size) { index ->
@@ -165,13 +187,14 @@ internal class GraphScratch {
             line = Brush.verticalGradient(colorStops = stops, startY = top, endY = bottom),
             area = Brush.verticalGradient(colorStops = areaStops, startY = top, endY = bottom)
         )
-        brushes = result
+        if (dimmed) dimBrushes = result else brushes = result
         brushTop = top
         brushBottom = bottom
         brushMin = chart.minValue
         brushMax = chart.maxValue
         brushRange = range
         brushPalette = colors
+        brushDimmed = dimmed
         return result
     }
 
