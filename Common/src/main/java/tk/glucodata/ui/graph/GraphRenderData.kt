@@ -33,7 +33,9 @@ class GraphSeries(
     val times: LongArray,
     val values: FloatArray,
     /** Ordinal of [tk.glucodata.ui.model.GlucoseStatus] per point. */
-    val statuses: ByteArray
+    val statuses: ByteArray,
+    /** [tk.glucodata.ui.model.GlucosePoint.sensorIndex] per point, so overlapping sensors can be told apart. */
+    val sensorIds: IntArray
 ) {
     val size: Int get() = times.size
     val isEmpty: Boolean get() = times.isEmpty()
@@ -73,7 +75,7 @@ class GraphSeries(
     }
 
     companion object {
-        val Empty = GraphSeries(LongArray(0), FloatArray(0), ByteArray(0))
+        val Empty = GraphSeries(LongArray(0), FloatArray(0), ByteArray(0), IntArray(0))
     }
 }
 
@@ -128,7 +130,11 @@ class GraphRenderData(
     val events: GraphEvents,
     val alertEvents: GraphAlertEvents,
     val oldestTime: Long,
-    val newestTime: Long
+    val newestTime: Long,
+    /** Sensor that owns the newest reading; its curve keeps the full colours. */
+    val primarySensorId: Int,
+    /** First timestamp of [primarySensorId]; older sensors are dimmed from here on. */
+    val primaryStartTime: Long
 ) {
     val isEmpty: Boolean
         get() = stream.isEmpty && calibratedStream.isEmpty && history.isEmpty &&
@@ -150,7 +156,7 @@ class GraphRenderData(
         val Empty = GraphRenderData(
             GraphSeries.Empty, GraphSeries.Empty, GraphSeries.Empty,
             GraphSeries.Empty, GraphSeries.Empty, GraphSeries.Empty,
-            GraphEvents.Empty, GraphAlertEvents.Empty, 0L, 0L
+            GraphEvents.Empty, GraphAlertEvents.Empty, 0L, 0L, 0, 0L
         )
 
         fun build(
@@ -195,6 +201,25 @@ class GraphRenderData(
                 sortedAlerts.lastOrNull()?.timestamp ?: 0L
             )
 
+            // The primary sensor is the one holding the newest reading. Every other sensor is an
+            // older one whose curve is dimmed from the moment the primary sensor started, so the
+            // two can be told apart while they overlap.
+            var primarySensorId = 0
+            var newestReadingTime = Long.MIN_VALUE
+            for (pt in readings) {
+                if (pt.timestamp > newestReadingTime) {
+                    newestReadingTime = pt.timestamp
+                    primarySensorId = pt.sensorIndex
+                }
+            }
+            var primaryStartTime = Long.MAX_VALUE
+            for (pt in readings) {
+                if (pt.sensorIndex == primarySensorId && pt.timestamp < primaryStartTime) {
+                    primaryStartTime = pt.timestamp
+                }
+            }
+            if (primaryStartTime == Long.MAX_VALUE) primaryStartTime = 0L
+
             return GraphRenderData(
                 stream = toSeries(stream),
                 calibratedStream = toSeries(calibratedStream),
@@ -205,7 +230,9 @@ class GraphRenderData(
                 events = GraphEvents(eventTimes, sortedLogs),
                 alertEvents = GraphAlertEvents(alertTimes, sortedAlerts),
                 oldestTime = oldest,
-                newestTime = newest
+                newestTime = newest,
+                primarySensorId = primarySensorId,
+                primaryStartTime = primaryStartTime
             )
         }
 
@@ -216,13 +243,15 @@ class GraphRenderData(
             val times = LongArray(n)
             val values = FloatArray(n)
             val statuses = ByteArray(n)
+            val sensorIds = IntArray(n)
             for (i in 0 until n) {
                 val pt = sorted[i]
                 times[i] = pt.timestamp
                 values[i] = pt.valueMgDl
                 statuses[i] = pt.status.ordinal.toByte()
+                sensorIds[i] = pt.sensorIndex
             }
-            return GraphSeries(times, values, statuses)
+            return GraphSeries(times, values, statuses, sensorIds)
         }
 
         private fun isSortedByTime(points: List<GlucosePoint>): Boolean {

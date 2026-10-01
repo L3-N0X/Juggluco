@@ -7,6 +7,8 @@ data class GlucosePoint(
     val isScan: Boolean = false,
     val isHistory: Boolean = false,
     val isCalibrated: Boolean = false,
+    /** Which sensor produced this reading. Only meaningful for graph points; 0 when unknown. */
+    val sensorIndex: Int = 0,
     val status: GlucoseStatus = GlucoseStatus.fromValue(valueMgDl, GlucoseRange.DEFAULT)
 ) {
     fun valueIn(unit: GlucoseUnit): Float = unit.toDisplay(valueMgDl)

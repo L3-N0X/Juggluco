@@ -827,6 +827,7 @@ class GlucoseRepository(
             hash = hash * 31 + point.valueMgDl.toRawBits()
             hash = hash * 31 + (if (point.isCalibrated) 1L else 0L)
             hash = hash * 31 + (if (point.isScan) 1L else 0L)
+            hash = hash * 31 + point.sensorIndex
             // Status is part of the identity: reclassifying after a range change has to be
             // publishable, or the graph markers and logbook keep the old colours.
             hash = hash * 31 + point.status.ordinal.toLong()
@@ -874,6 +875,7 @@ class GlucoseRepository(
                 if (sensorPtrs.isNotEmpty()) {
                     for (ptr in sensorPtrs) {
                         if (ptr == 0L) continue
+                        val sensorIndex = try { Natives.getSensorIndexFromSensorptr(ptr) } catch (_: Throwable) { 0 }
 
                         // 1. Raw Stream Readings
                         var pos = 0
@@ -892,6 +894,7 @@ class GlucoseRepository(
                                         isScan = false,
                                         isHistory = false,
                                         isCalibrated = false,
+                                        sensorIndex = sensorIndex,
                                         status = range.statusOf(mgdL.toFloat())
                                     )
                                 )
@@ -916,6 +919,7 @@ class GlucoseRepository(
                                         isScan = false,
                                         isHistory = false,
                                         isCalibrated = true,
+                                        sensorIndex = sensorIndex,
                                         status = range.statusOf(mgdL.toFloat())
                                     )
                                 )
@@ -940,6 +944,7 @@ class GlucoseRepository(
                                         isScan = true,
                                         isHistory = false,
                                         isCalibrated = false,
+                                        sensorIndex = sensorIndex,
                                         status = range.statusOf(mgdL.toFloat())
                                     )
                                 )
@@ -963,6 +968,7 @@ class GlucoseRepository(
                                         isScan = true,
                                         isHistory = false,
                                         isCalibrated = true,
+                                        sensorIndex = sensorIndex,
                                         status = range.statusOf(mgdL.toFloat())
                                     )
                                 )
