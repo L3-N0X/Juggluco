@@ -287,6 +287,23 @@ public static void startAdapterScanner(DeviceList.DeviceListViewAdapter adapt,bo
     scanner.scanStarter(0);
     }
 
+/**
+ * Searches for meters for a listener instead of the old device list, so the Compose meter screen
+ * can show what turns up without a RecyclerView behind it.
+ */
+public static void startAdapterScanner(MeterScanner.DeviceFoundListener found,boolean aidexx ) {
+     if(scanner!=null) {
+        scanner.stopScan(false);
+        }
+
+    initBluetooth();
+    scanner=new MeterScanner();
+    scanner.knowName=false;
+    scanner.listener=found;
+    scanner.takeAidexX=aidexx;
+    scanner.scanStarter(0);
+    }
+
 public static void stopScanner() {
      if(scanner!=null) {
         scanner.reset();
@@ -381,7 +398,7 @@ public static boolean initBluetooth() {
         }
     }
 
-static boolean bluetoothIsEnabled() {
+public static boolean bluetoothIsEnabled() {
         if (mBluetoothAdapter!= null) {
             return  mBluetoothAdapter.isEnabled();
         }

@@ -20,9 +20,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import tk.glucodata.Applic
 import tk.glucodata.BleMirror
+import tk.glucodata.BluetoothGlucoseMeter
 import tk.glucodata.BuildConfig
 import tk.glucodata.Log
 import tk.glucodata.MainActivity
+import tk.glucodata.MeterBleSupport
 import tk.glucodata.GarminBridge
 import tk.glucodata.JugglucoSend
 import tk.glucodata.MessageSender
@@ -38,6 +40,12 @@ import tk.glucodata.SuperGattCallback
 import tk.glucodata.WatchBridge
 import tk.glucodata.XInfuus
 import tk.glucodata.nums.numio
+import tk.glucodata.ui.meters.MeterFound
+import tk.glucodata.ui.meters.MeterInfo
+import tk.glucodata.ui.meters.MeterRuntime
+import tk.glucodata.ui.meters.MeterScanState
+import tk.glucodata.ui.meters.MeterScanStatus
+import tk.glucodata.ui.meters.MeterSettings
 import tk.glucodata.ui.model.AgpProfile
 import tk.glucodata.ui.model.AlarmBehavior
 import tk.glucodata.ui.model.AlarmConfig
@@ -258,6 +266,18 @@ class GlucoseRepository(
 
     private val _hardwareConfig = MutableStateFlow(HardwareConfig())
     val hardwareConfig: StateFlow<HardwareConfig> = _hardwareConfig.asStateFlow()
+
+    private val _metersEnabled = MutableStateFlow(false)
+    val metersEnabled: StateFlow<Boolean> = _metersEnabled.asStateFlow()
+
+    private val _meters = MutableStateFlow<List<MeterInfo>>(emptyList())
+    val meters: StateFlow<List<MeterInfo>> = _meters.asStateFlow()
+
+    private val _meterRuntimes = MutableStateFlow<List<MeterRuntime>>(emptyList())
+    val meterRuntimes: StateFlow<List<MeterRuntime>> = _meterRuntimes.asStateFlow()
+
+    private val _meterScan = MutableStateFlow(MeterScanState())
+    val meterScan: StateFlow<MeterScanState> = _meterScan.asStateFlow()
 
     private val _watchConfig = MutableStateFlow(WatchConfig())
     val watchConfig: StateFlow<WatchConfig> = _watchConfig.asStateFlow()
@@ -576,6 +596,10 @@ class GlucoseRepository(
                     googleScan = try { Natives.getGoogleScan() } catch (_: Throwable) { false },
                     hasNfc = MainActivity.hasnfc
                 )
+
+                // Read the glucose meter feature, which is only used when someone switched it on.
+                _metersEnabled.value = MeterSettings.isEnabled(Applic.app)
+                if (_metersEnabled.value) readMetersNow()
 
                 // Read Watch & Wear OS
                 _watchConfig.value = WatchConfig(
@@ -1861,6 +1885,149 @@ class GlucoseRepository(
                 )
             } catch (_: Throwable) {}
         }
+    }
+
+    // --- Glucose meters
+
+    /**
+     * Switches the whole meter feature on or off. Switching it off drops the Bluetooth
+     * connections but keeps the stored meters, so switching it back on picks them up again.
+     */
+    fun setMetersEnabled(enabled: Boolean) {
+        _metersEnabled.value = enabled
+        scope.launch(Dispatchers.IO) {
+            MeterSettings.setEnabled(Applic.app, enabled)
+            if (enabled) {
+                BluetoothGlucoseMeter.startDevices()
+            } else {
+                MeterBleSupport.stopDiscovery()
+                _meterScan.value = MeterScanState()
+                _meterRuntimes.value = emptyList()
+                BluetoothGlucoseMeter.stopDevices()
+            }
+        }
+        if (enabled) refreshMeters() else _meters.value = emptyList()
+    }
+
+    /**
+     * Rereads the stored meters and what their connections are doing. The meter list is small, but
+     * it comes out of the native settings file, so it is read off the main thread.
+     */
+    fun refreshMeters() {
+        scope.launch(Dispatchers.Default) {
+            if (_metersEnabled.value) {
+                readMetersNow()
+            } else {
+                _meters.value = emptyList()
+                _meterRuntimes.value = emptyList()
+            }
+        }
+    }
+
+    /** Reads the stored meters and publishes them. Returns the same list it published. */
+    private fun readMetersNow(): List<MeterInfo> {
+        val list = try {
+            val count = Natives.GlucoseMeterCount()
+            (0 until count).mapNotNull { index ->
+                val name = Natives.GlucoseMeterDeviceName(index) ?: return@mapNotNull null
+                MeterInfo(
+                    index = index,
+                    name = name,
+                    address = Natives.GlucoseMeterDeviceAddress(index).orEmpty(),
+                    active = Natives.GlucoseMeterGetActive(index),
+                    lastReadingTime = Natives.GlucoseMeterGetLastTime(index)
+                )
+            }
+        } catch (_: Throwable) {
+            emptyList()
+        }
+        _meters.value = list
+        _meterRuntimes.value = try {
+            MeterBleSupport.runtimeStates()
+        } catch (_: Throwable) {
+            emptyList()
+        }
+        return list
+    }
+
+    /**
+     * Turns a meter on or off. A meter that is switched on is talked to right away instead of
+     * waiting for the next app start.
+     */
+    fun setMeterActive(meter: MeterInfo, active: Boolean) {
+        try {
+            if (Natives.GlucoseMeterSetActive(meter.index, active)) {
+                if (active) MeterBleSupport.activate(meter.index, null) else MeterBleSupport.deactivate(meter.index)
+            }
+        } catch (_: Throwable) {}
+        refreshMeters()
+    }
+
+    /**
+     * Puts a meter that was just scanned into the list and returns it, or null when it could not
+     * be added. Adding is what the native call does; the meter stays in the list even when the
+     * setup is left unfinished, so the scan is not lost.
+     */
+    fun addMeter(name: String, address: String?): MeterInfo? {
+        val index = try {
+            Natives.GlucoseMeterGetIndex(name, address)
+        } catch (_: Throwable) {
+            -1
+        }
+        if (index < 0) return null
+        val list = readMetersNow()
+        refreshMeters()
+        return list.firstOrNull { it.index == index }
+    }
+
+    /** Forgets a meter, keeping the readings it brought in. */
+    fun removeMeter(index: Int) {
+        try {
+            if (Natives.GlucoseMeterRemoveIndex(index)) MeterBleSupport.restart()
+        } catch (_: Throwable) {}
+        refreshMeters()
+    }
+
+    /**
+     * Saves a meter's setup. Setting the cutoff also switches the meter on, because a meter
+     * nobody talks to would collect nothing; [found] is the scanned device when the meter was just
+     * added, so it does not have to be looked up again to start connecting.
+     */
+    fun saveMeter(meter: MeterInfo, bloodAfter: Long, found: MeterFound? = null) {
+        try {
+            Natives.GlucoseMeterSetLastTime(meter.index, bloodAfter)
+            MeterBleSupport.activate(meter.index, found)
+        } catch (_: Throwable) {}
+        refreshMeters()
+    }
+
+    /** Searches for meters that can be added. */
+    fun startMeterScan() {
+        if (!MeterBleSupport.supported) {
+            _meterScan.value = MeterScanState(MeterScanStatus.UNSUPPORTED)
+            return
+        }
+        if (!MeterBleSupport.bluetoothEnabled) {
+            _meterScan.value = MeterScanState(MeterScanStatus.UNAVAILABLE)
+            return
+        }
+        _meterScan.value = MeterScanState(MeterScanStatus.SCANNING)
+        try {
+            MeterBleSupport.startDiscovery(false) { found ->
+                _meterScan.value = _meterScan.value.copy(
+                    found = (_meterScan.value.found.filterNot { it.name == found.name } + found)
+                )
+            }
+        } catch (_: Throwable) {
+            _meterScan.value = MeterScanState(MeterScanStatus.UNAVAILABLE)
+        }
+    }
+
+    fun stopMeterScan() {
+        try {
+            MeterBleSupport.stopDiscovery()
+        } catch (_: Throwable) {}
+        _meterScan.value = MeterScanState()
     }
 
     fun setHour24(use24Hour: Boolean) {
