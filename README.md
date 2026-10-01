@@ -1,4 +1,4 @@
-# Juggluco Material
+# Juggluco Material UI
 
 A continuous glucose monitor client for Android phones and Wear OS watches.
 
