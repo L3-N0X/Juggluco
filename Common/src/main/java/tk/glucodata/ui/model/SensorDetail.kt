@@ -75,7 +75,9 @@ data class SensorDetail(
     @StringRes val handshakeStatusRes: Int? = null,
     val lastHandshakeTime: Long = 0L,
     val rawDiagnosticText: String = "",
-    val isMirrored: Boolean = false
+    val isMirrored: Boolean = false,
+    /** Temporary disconnect: the sensor session is intact, only the Bluetooth link is down. */
+    val isPaused: Boolean = false
 ) {
     val daysRemaining: Float
         get() {

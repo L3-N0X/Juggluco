@@ -1042,7 +1042,8 @@ class GlucoseRepository(
                                     else R.string.sensor_handshake_disconnected
                                 ),
                                 handshakeStatusStr = info.handshakeStr ?: "",
-                                rawDiagnosticText = info.infoHtml ?: ""
+                                rawDiagnosticText = info.infoHtml ?: "",
+                                isPaused = info.isPaused
                             )
                         )
                         legacyList.add(
@@ -1115,7 +1116,10 @@ class GlucoseRepository(
                                     connectionStatusStr = res(R.string.sensor_handshake_connected),
                                     handshakeStatusStr = res(R.string.sensor_handshake_authenticated),
                                     handshakeStatusRes = R.string.sensor_handshake_authenticated,
-                                    rawDiagnosticText = infoText
+                                    rawDiagnosticText = infoText,
+                                    // No GATT callback here, but the pause flag is global, so a
+                                    // sensor paused before it lost its callback still reads as paused.
+                                    isPaused = SensorBridge.isPaused(name)
                                 )
                             )
                             legacyList.add(
@@ -1183,6 +1187,7 @@ class GlucoseRepository(
             hash = hash * 31 + (if (sensor.isConnected) 1L else 0L)
             hash = hash * 31 + (if (sensor.isStreaming) 1L else 0L)
             hash = hash * 31 + (if (sensor.isMirrored) 1L else 0L)
+            hash = hash * 31 + (if (sensor.isPaused) 1L else 0L)
         }
         return hash * 31 + details.size
     }
@@ -1701,6 +1706,39 @@ class GlucoseRepository(
         }
     }
 
+    /**
+     * Temporarily disconnects [sensor]: the native sensor session is kept, so reconnecting
+     * later restores the same session rather than scanning or activating anything new.
+     * Mirrored sensors have no local Bluetooth link, so there is nothing to pause.
+     */
+    fun pauseSensor(sensor: SensorDetail) {
+        scope.launch(Dispatchers.IO) {
+            val paused = try {
+                Applic.Nativesloaded && SensorBridge.pauseSensor(sensor.id)
+            } catch (_: Throwable) {
+                false
+            }
+            if (paused) {
+                _sensorDetails.value = _sensorDetails.value.map {
+                    if (it.id == sensor.id) it.copy(isPaused = true) else it
+                }
+            }
+            loadSensorsFromNative()
+        }
+    }
+
+    /** Reconnects a paused sensor to the same native sensor session. */
+    fun resumeSensor(sensor: SensorDetail) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (Applic.Nativesloaded) {
+                    SensorBridge.resumeSensor(sensor.id)
+                }
+            } catch (_: Throwable) {}
+            loadSensorsFromNative()
+        }
+    }
+
     fun endSensorPermanently(sensor: SensorDetail) {
         scope.launch(Dispatchers.IO) {
             val ended = try {
@@ -1708,12 +1746,18 @@ class GlucoseRepository(
             } catch (_: Throwable) {
                 false
             }
+            // A finished sensor is no longer paused, otherwise the flag would outlive the
+            // session it was set for and apply to the next sensor with the same serial.
+            if (ended) {
+                SensorBridge.clearPaused(sensor.id)
+            }
             loadSensorsFromNative()
             if (ended) {
                 val previous = sensor.copy(
                     status = SensorStatus.ENDED,
                     isConnected = false,
                     isStreaming = false,
+                    isPaused = false,
                     rssi = null,
                     signalQuality = SignalQuality.LOST
                 )

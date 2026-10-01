@@ -1252,6 +1252,11 @@
     <string name="sensor_serial_status">Serial: %1$s • Status: %2$s</string>
     <string name="sensor_pause_disconnect">Pause / Disconnect Bluetooth</string>
     <string name="sensor_pause_disconnect_desc">Pauses the Bluetooth connection without ending the sensor. You can reconnect anytime.</string>
+    <string name="sensor_resume_connection">Reconnect Sensor</string>
+    <string name="sensor_resume_connection_desc">This sensor is paused. Reconnects to the same sensor session.</string>
+    <string name="sensor_status_paused">Paused</string>
+    <string name="sensor_pause_not_supported">This sensor has no Bluetooth link to pause.</string>
+    <string name="sensor_resumed">Reconnecting to %1$s…</string>
     <string name="sensor_end_replace">End &amp; Replace Sensor</string>
     <string name="sensor_end_replace_desc">Ends the current wear session and prepares Juggluco for a new sensor.</string>
     <string name="next">Next</string>
