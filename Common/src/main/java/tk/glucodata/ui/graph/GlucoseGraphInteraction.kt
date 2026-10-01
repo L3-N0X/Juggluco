@@ -46,6 +46,14 @@ internal fun handleTap(
         }
     }
 
+    if (config.showMeals && touchY > metrics.chartBottom - metrics.chartHeight * 0.14f) {
+        val meal = findNearestMeal(data.meals, touchTime, (span * 0.04f).toLong())
+        if (meal != null) {
+            onLogTapped(meal)
+            return
+        }
+    }
+
     val nearest = findNearestReading(data, config, touchTime, (span * 0.05f).toLong())
     onSelectionChanged(
         if (nearest != null && nearest.timestamp == currentSelection?.timestamp) null else nearest
@@ -63,6 +71,22 @@ private fun findNearestEvent(events: GraphEvents, targetTime: Long, tolerance: L
         if (distance < bestDistance) {
             bestDistance = distance
             best = events.records[i]
+        }
+    }
+    return if (bestDistance <= tolerance) best else null
+}
+
+private fun findNearestMeal(meals: GraphMeals, targetTime: Long, tolerance: Long): LogRecord? {
+    if (meals.size == 0) return null
+    val index = meals.firstIndexAtOrAfter(targetTime)
+    var best: LogRecord? = null
+    var bestDistance = Long.MAX_VALUE
+    for (i in (index - 1)..index) {
+        if (i < 0 || i >= meals.size) continue
+        val distance = abs(meals.times[i] - targetTime)
+        if (distance < bestDistance) {
+            bestDistance = distance
+            best = meals.records[i]
         }
     }
     return if (bestDistance <= tolerance) best else null
