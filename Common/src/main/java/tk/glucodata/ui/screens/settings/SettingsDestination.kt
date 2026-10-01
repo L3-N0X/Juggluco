@@ -1,6 +1,7 @@
 package tk.glucodata.ui.screens.settings
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.Bolt
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Sync
@@ -154,6 +156,18 @@ UPLOADER(
         descRes = R.string.loc_garmin_shortcuts_desc,
         categoryRes = R.string.settings_cat_integrations,
         icon = Icons.Default.Bolt
+    ),
+    LOGBOOK(
+        titleRes = R.string.settings_group_logbook_title,
+        descRes = R.string.settings_group_logbook_desc,
+        categoryRes = R.string.settings_cat_glucose,
+        icon = Icons.AutoMirrored.Filled.MenuBook
+    ),
+    INGREDIENTS(
+        titleRes = R.string.meals_ingredients,
+        descRes = R.string.settings_group_logbook_desc,
+        categoryRes = R.string.settings_cat_glucose,
+        icon = Icons.Default.Restaurant
     ),
     METERS(
         titleRes = R.string.meterlist,

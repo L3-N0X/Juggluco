@@ -28,51 +28,50 @@
 
 extern jstring myNewStringUTF(JNIEnv *env,const std::string_view str);
 extern Meal *meals;
+/* Copies a Java string as UTF-8 into dest, which holds maxbytes bytes plus the terminating zero.
+   A string that does not fit is cut before the first character that would not fit whole. */
+static void copyutf8(JNIEnv *env,jstring jstr,char *dest,const int maxbytes) {
+    const jint chars=env->GetStringLength(jstr);
+    const jint bytes=env->GetStringUTFLength(jstr);
+    if(bytes<=maxbytes) {
+        env->GetStringUTFRegion(jstr,0,chars,dest);
+        dest[bytes]='\0';
+        return;
+        }
+    char tmpbuf[bytes+1];
+    env->GetStringUTFRegion(jstr,0,chars,tmpbuf);
+    int len=maxbytes;
+    while(len>0&&(tmpbuf[len]&0xC0)==0x80)
+        --len;
+    memcpy(dest,tmpbuf,len);
+    dest[len]='\0';
+    }
 extern "C" JNIEXPORT void JNICALL fromjava(saveingredient)(JNIEnv *env, jclass thiz,jint pos, jstring jname,jstring junit,jfloat carbo) {
+    mealdata *data=meals->datameal();
     ingredients_t &ingr=meals->getingredients();
+    if(pos>=(int)data->ingredientnr)
+        return;
+    if(pos<0&&data->ingredientnr>=ingr.size())
+        return;
+    units_ingredient_t &units=meals->getunits();
+    ingredientunit_t newunit{};
+    copyutf8(env,junit,newunit.data(),newunit.size()-1);
+    const int unitnr= data->unitnr;
+    auto unit_it=std::find_if(units.begin(),units.begin()+unitnr,[&newunit](const ingredientunit_t &one) {
+        return !strcasecmp(one.data(),newunit.data()) ;
+        });
+    const int index=unit_it-units.begin();
+    if(index==unitnr) {
+        if(unitnr>=(int)units.size())
+            return;
+        units[unitnr]=newunit;
+        ++(data->unitnr);
+        }
     if(pos<0) {
-        pos=meals->datameal()->ingredientnr++;
+        pos=data->ingredientnr++;
         }
     ingredient_t &add=ingr[pos];
-
-    {jint jnamelen = env->GetStringLength( jname);
-    jint rawlen = env->GetStringUTFLength( jname);
-    int maxnamelen=add.name.size()-1;
-    if(rawlen<=maxnamelen||(jnamelen==rawlen&&(jnamelen=maxnamelen))) {
-        env->GetStringUTFRegion(jname, 0,jnamelen, add.name.data());
-        add.name.data()[rawlen]='\0';
-        }
-    else {
-        char tmpbuf[rawlen];
-        env->GetStringUTFRegion(jname, 0,jnamelen, tmpbuf);
-        memcpy(add.name.data(),tmpbuf,maxnamelen);
-        add.name.data()[maxnamelen]='\0';
-        }
-    }
-    units_ingredient_t &units=meals->getunits();
-    int unitnr= meals->datameal()->unitnr;
-    ingredientunit_t &unit=units[unitnr];
-    jint junitlen = env->GetStringLength( junit);
-    jint rawunitlen = env->GetStringUTFLength( jname);
-    const int maxunitlen=unit.size()-1;    
-    char *newunit= unit.data();
-    if(junitlen<=maxunitlen||(rawunitlen==junitlen&&(junitlen=maxunitlen))) {
-        env->GetStringUTFRegion(junit, 0,junitlen,newunit);
-        newunit[rawunitlen]='\0';
-        }
-    else {
-        char tmpbuf[rawunitlen];
-        env->GetStringUTFRegion(junit, 0,junitlen,tmpbuf);
-        memcpy(newunit,tmpbuf,maxunitlen);
-        newunit[maxunitlen]='\0';
-        }
-    auto unit_it=std::find_if(units.begin(),&units[unitnr],[newunit](ingredientunit_t &one) {
-        return !strcasecmp(one.data(),newunit) ;
-        });
-    int index=unit_it-units.begin();
-    if(index==meals->datameal()->unitnr) {
-        ++(meals->datameal()->unitnr);
-        }
+    copyutf8(env,jname,add.name.data(),add.name.size()-1);
     add.unit=index;
     add.carb=carbo;
     }

@@ -141,7 +141,7 @@ data class LogbookColors(
         LogType.BASAL_INSULIN -> basal
         LogType.CARBS, LogType.MEAL -> carbs
         LogType.BLOOD_GLUCOSE -> bloodGlucose
-        LogType.NOTE -> note
+        LogType.CUSTOM -> note
     }
 
     val rapidInsulin: Color get() = bolus.primary

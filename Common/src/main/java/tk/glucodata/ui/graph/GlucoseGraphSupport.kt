@@ -196,7 +196,7 @@ internal fun eventLabel(context: Context, record: LogRecord, unit: GlucoseUnit):
     LogType.CARBS, LogType.MEAL ->
         context.getString(R.string.value_with_unit, "${record.value.roundToInt()}", context.getString(R.string.unit_carbs_short))
     LogType.BLOOD_GLUCOSE -> unit.format(record.value)
-    LogType.NOTE -> "•"
+    LogType.CUSTOM -> if (record.value != 0f) LogRecord.formatCustomAmount(record.value) else "•"
 }
 
 /** Coarse ladder for the top of the value axis, so the scale stays put while panning. */

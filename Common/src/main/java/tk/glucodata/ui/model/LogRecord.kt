@@ -12,7 +12,9 @@ enum class LogType(@StringRes val labelRes: Int, @StringRes val unitLabelRes: In
     CARBS(R.string.log_type_carbs, R.string.unit_carbs_short),
     BLOOD_GLUCOSE(R.string.log_type_finger_prick, null),
     MEAL(R.string.log_type_meal, R.string.unit_carbs_short),
-    NOTE(R.string.log_type_note, null);
+
+    /** Any other native label ("Bike", "Dextro", ...), shown under the label's own name. */
+    CUSTOM(R.string.log_type_custom, null);
 }
 
 enum class NumberStore(val nativeIndex: Int) {
@@ -35,8 +37,15 @@ data class LogRecord(
     val note: String = "",
     val nativeSource: NumberStoreSource? = null,
     val nativeLabel: Int? = null,
-    val mealPointer: Int = 0
+    val mealPointer: Int = 0,
+    /** The configured name of [nativeLabel], so a custom label reads the way the user named it. */
+    val labelName: String = "",
+    /** The ingredients of an attached meal, comma separated, or empty without one. */
+    val mealSummary: String = ""
 ) {
+    /** Whether [mealPointer] refers to a composed meal (on the blood label it is the exclude flag). */
+    val hasMeal: Boolean get() = type == LogType.CARBS && mealPointer > 0 && mealSummary.isNotEmpty()
+
     fun formattedValue(context: Context, unit: GlucoseUnit): String {
         val locale = Locale.getDefault()
         return when (type) {
@@ -53,11 +62,16 @@ data class LogRecord(
                 unit.format(value),
                 context.getString(unit.labelRes)
             )
-            LogType.NOTE -> note
+            LogType.CUSTOM -> formatCustomAmount(value)
         }
     }
 
     companion object {
+        /** A custom label's amount without a unit, trimmed to what it holds ("30", "2.5"). */
+        fun formatCustomAmount(value: Float): String =
+            java.math.BigDecimal(value.toDouble()).setScale(2, java.math.RoundingMode.HALF_UP)
+                .stripTrailingZeros().toPlainString()
+
         /**
          * Stable identifier for an entry that came from a native log store.
          *
