@@ -1,6 +1,4 @@
-# Juggluco
-
-![Juggluco](valuemmolL.png)
+# Juggluco Material
 
 A continuous glucose monitor client for Android phones and Wear OS watches.
 
