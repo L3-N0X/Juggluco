@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -174,5 +175,11 @@ UPLOADER(
         descRes = R.string.settings_group_meters_desc,
         categoryRes = R.string.settings_cat_hardware,
         icon = Icons.Default.Bloodtype
+    ),
+    INSULIN_ONBOARD(
+        titleRes = R.string.iob_title,
+        descRes = R.string.iob_desc,
+        categoryRes = R.string.settings_cat_glucose,
+        icon = Icons.Default.Vaccines
     )
 }

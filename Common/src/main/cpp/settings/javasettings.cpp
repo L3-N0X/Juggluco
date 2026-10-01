@@ -1949,13 +1949,19 @@ void Settings::setIOBtype() {
          }
     LOGGER("end setIOBtype() update=%d\n",update);
     }
+#endif
+
+/*
+Reading the value is exported for Wear OS as well: a watch draws its own curve with the insulin
+on board on it (curve.cpp), so it has the types the phone sent over datbackup.cpp and can run the
+same calculation. Only the two calls that change those types stay phone only.
+*/
 extern double getiob(uint32_t now);
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(getIOBvalue)(JNIEnv *env, jclass cl,long time) {
     if(!settings->data()->IOB)
         return NAN;
     return getiob(time/1000LL);
     }
-#endif
 
 
 extern "C" JNIEXPORT void  JNICALL   fromjava(setfloattime)(JNIEnv *env, jclass cl,jboolean val) {

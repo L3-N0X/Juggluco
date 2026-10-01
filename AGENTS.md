@@ -20,6 +20,16 @@
 
 ---
 
+## Insulin Onboard (IOB)
+- **Off by default, and that is a decision:** the toggle lives in Settings → Glucose & alerts → Insulin on board (`SettingsDestination.INSULIN_ONBOARD`, `ui/screens/settings/InsulinOnboardSettingsScreen.kt`). Nothing is calculated or shown until someone turns it on.
+- **The types come first:** native refuses `setIOB(true)` while every label still holds `Insulin::Not` (`javasettings.cpp` `hasRapidInsulin()`), so the screen offers the per-label picker *and* spells the refusal out under the switch. Never add a switch somewhere that can only snap back silently.
+- **Two stores, one bridge:** Compose keeps the bolus label in `NativeLabels`, the calculation reads native `insulintypes[]`. `NativeInsulinOnboard.ensureInsulinType()` closes the gap — picking a bolus label or mapping a label as rapid acting insulin in LibreView gives it Aspart unless it already holds a type. A type the user chose is never overwritten.
+- **Wrapper, not `Natives`:** go through `ui/data/NativeInsulinOnboard.kt`. `setInsulinType`/`getInsulinType` are phone-only exports and `getIOBvalue` is the one read that Wear OS has too, so every call answers with the safe value instead of throwing.
+- **Shown where the reading is:** `CurrentGlucoseHeroCard` and `WearGlucoseHero` carry the value next to the delta, as plain text in the bolus hue (never a pill, never a glucose range hue). The repository publishes it (`insulinOnboard`) and refreshes it every 30 s plus after every logbook change, since it only moves by decaying otherwise.
+- **Device-local on/off:** the flag lives in each device's own `settings.dat` and is not synced; only the insulin types travel to a watch (`datbackup.cpp`), which is why the watch offers the switch and not the picker.
+
+---
+
 ## Technical Stack & Architecture
 - **UI Framework:** Jetpack Compose with Material 3 (`androidx.compose.material3`).
 - **Target Modules:** Android Mobile & Wear OS. Code shared across platforms resides primarily in `Common/src/main/java/tk/glucodata/ui/`.

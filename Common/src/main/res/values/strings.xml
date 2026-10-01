@@ -2225,4 +2225,16 @@
     <string name="food_db_show_zero">Show zero values</string>
     <string name="food_db_trace">trace</string>
     <string name="food_db_unknown">unknown</string>
+    <string name="iob_title">Insulin on board</string>
+    <string name="iob_desc">Show how much insulin of earlier doses is still active</string>
+    <string name="iob_show">Show insulin on board</string>
+    <string name="iob_show_on">Shown next to the glucose value</string>
+    <string name="iob_show_off">Nothing is calculated or shown yet</string>
+    <string name="iob_needs_type">Give a label an insulin type below first: without one there is nothing to calculate with.</string>
+    <string name="iob_section_types">Insulin type per label</string>
+    <string name="iob_type_title">%1$s insulin type</string>
+    <string name="iob_types_hint">Every label you log boluses under needs the insulin it holds. Doses under a label set to “Not” are left out.</string>
+    <string name="iob_info">Insulin on board is what earlier doses still have left to do. Each label carries the insulin it holds, and its doses are summed with that insulin\'s own curve. The calculation runs on this device, using the last 16 hours of logbook.</string>
+    <string name="iob_read_only">The labels come from another device, so their insulin types are set there.</string>
+    <string name="iob_value">%1$s %2$s</string>
 </resources>

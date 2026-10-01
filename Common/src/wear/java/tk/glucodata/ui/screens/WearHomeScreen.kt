@@ -56,6 +56,7 @@ fun WearHomeScreen(
     val unit by repository.unit.collectAsState()
     val glucoseRange by repository.range.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
+    val insulinOnboard by repository.insulinOnboard.collectAsState()
 
     val listState = rememberScalingLazyListState(
         initialCenterItemIndex = 0,
@@ -87,6 +88,7 @@ fun WearHomeScreen(
                         readings = readings,
                         unit = unit,
                         deltaCalculation = displayConfig.deltaCalculation,
+                        insulinOnboard = insulinOnboard,
                         onClick = onNavigateToGraph
                     )
                 }

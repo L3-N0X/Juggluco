@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedback
@@ -287,9 +290,13 @@ fun WearSettingsScreen(
     val glucoseRange by repository.range.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
     val hardwareConfig by repository.hardwareConfig.collectAsState()
+    val insulinOnboardOn by repository.insulinOnboardEnabled.collectAsState()
     val colorPreset by WearThemePreferences.colorPreset.collectAsState()
 
     val haptic = LocalHapticFeedback.current
+    // Native refuses to calculate while no label holds an insulin type, and the watch cannot set
+    // one itself, so the refusal is the only feedback there is to give.
+    var insulinOnboardRefused by remember { mutableStateOf(false) }
     fun tap(action: () -> Unit) {
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         action()
@@ -308,6 +315,9 @@ fun WearSettingsScreen(
     val veryHighLabel = stringResource(R.string.status_very_high)
     val onLabel = stringResource(R.string.wear_ui_on)
     val offLabel = stringResource(R.string.wear_ui_off)
+    val iobOnLabel = stringResource(R.string.iob_show_on)
+    val iobOffLabel = stringResource(R.string.iob_show_off)
+    val iobRefusedLabel = stringResource(R.string.iob_needs_type)
 
     val listState = rememberScalingLazyListState()
 
@@ -468,6 +478,27 @@ fun WearSettingsScreen(
             ) { value ->
                 tap { repository.setRangeLevel(RangeLevel.VERY_HIGH, unit.toMgDl(value)) }
             }
+
+            // Insulin on board. The insulin types themselves come from the phone with the labels,
+            // so only the switch is here; native turns the request down while none of them is set,
+            // which the summary then says instead of leaving the switch to snap back.
+            item {
+                ListSubHeader {
+                    Text(stringResource(R.string.iob_title))
+                }
+            }
+            wearAlarmToggle(
+                titleRes = R.string.iob_show,
+                summary = when {
+                    insulinOnboardRefused -> iobRefusedLabel
+                    insulinOnboardOn -> iobOnLabel
+                    else -> iobOffLabel
+                },
+                checked = insulinOnboardOn,
+                onCheckedChange = { turnedOn ->
+                    tap { insulinOnboardRefused = !repository.setInsulinOnboard(turnedOn) }
+                }
+            )
 
             // Complications Section
             item {
