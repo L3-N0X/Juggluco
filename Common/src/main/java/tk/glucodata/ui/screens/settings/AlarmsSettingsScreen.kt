@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowUp
+import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -69,6 +71,8 @@ import tk.glucodata.alerts.AlertRule
 import tk.glucodata.alerts.AlertRuntime
 import tk.glucodata.alerts.AlertStore
 import tk.glucodata.alerts.AlertSync
+import tk.glucodata.alerts.ReminderRepeat
+import tk.glucodata.alerts.Reminders
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.theme.LocalClinicalColors
@@ -208,6 +212,22 @@ fun AlarmsSettingsScreen(
                     AlertRuleRow(rule, runtime[rule.id], unit, now, onClick = { editingId = rule.id })
                 }
             }
+        }
+        val reminderRules = rules.filter { it.kind.isReminder }
+        SettingsSection(title = stringResource(R.string.loc_reminders_section)) {
+            reminderRules.forEach { rule ->
+                ReminderRow(rule, runtime[rule.id], now, onClick = { editingId = rule.id })
+            }
+            SettingsActionRow(
+                title = stringResource(R.string.loc_add_reminder),
+                subtitle = if (reminderRules.isEmpty()) stringResource(R.string.loc_add_reminder_desc) else null,
+                icon = Icons.Default.Add,
+                onClick = {
+                    val rule = AlertRule.template(AlertKind.REMINDER)
+                    AlertStore.upsert(rule)
+                    editingId = rule.id
+                }
+            )
         }
 
         OutlinedButton(
@@ -370,7 +390,8 @@ private fun PermissionRows(context: Context, rules: List<AlertRule>) {
     val needsDnd = rules.any { it.enabled && it.overrideDnd } && !AlertPlayer.hasDndAccess()
     val needsFullScreen = rules.any { it.enabled && it.fullScreen } && !AlertPlayer.canUseFullScreen()
     val notificationsOff = !androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
-    if (!needsDnd && !needsFullScreen && !notificationsOff) return
+    val needsExactAlarms = rules.any { it.enabled && it.kind.isReminder } && !Reminders.canScheduleExact()
+    if (!needsDnd && !needsFullScreen && !notificationsOff && !needsExactAlarms) return
 
     SettingsSection(title = stringResource(R.string.loc_needs_attention)) {
         if (notificationsOff) {
@@ -391,6 +412,22 @@ private fun PermissionRows(context: Context, rules: List<AlertRule>) {
                 iconTint = MaterialTheme.colorScheme.error,
                 iconBackground = MaterialTheme.colorScheme.errorContainer,
                 onClick = { launchSettings(context, Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS) }
+            )
+        }
+        if (needsExactAlarms && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            SettingsActionRow(
+                title = stringResource(R.string.loc_allow_exact_alarms),
+                subtitle = stringResource(R.string.loc_allow_exact_alarms_desc),
+                icon = Icons.Default.Alarm,
+                iconTint = MaterialTheme.colorScheme.error,
+                iconBackground = MaterialTheme.colorScheme.errorContainer,
+                onClick = {
+                    launchSettings(
+                        context,
+                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                        Uri.parse("package:${context.packageName}")
+                    )
+                }
             )
         }
         if (needsFullScreen) {
@@ -473,13 +510,47 @@ private fun AlertRuleRow(
 }
 
 @Composable
+private fun ReminderRow(
+    rule: AlertRule,
+    runtime: AlertRuntime?,
+    now: Long,
+    onClick: () -> Unit
+) {
+    val (tint, background) = alertColors(rule)
+    val context = LocalContext.current
+    val pending = runtime?.pendingDue ?: 0L
+    val subtitle = buildString {
+        append(reminderSummary(context, rule))
+        rule.reminder.dose.trim().takeIf { it.isNotEmpty() }?.let { append(" · ").append(it) }
+        if (rule.enabled) {
+            if (pending > 0L) {
+                append(" · ").append(context.getString(R.string.loc_reminder_waiting, formatClock(pending)))
+            } else {
+                Reminders.nextDue(rule, now)?.let { append(" · ").append(context.getString(R.string.loc_reminder_next, formatReminderTime(context, it, now))) }
+            }
+        }
+    }
+    SettingsNavRow(
+        title = rule.name,
+        subtitle = subtitle,
+        icon = alertIcon(rule.kind),
+        iconTint = tint,
+        iconBackground = background,
+        onClick = onClick,
+        checked = rule.enabled,
+        onCheckedChange = { AlertStore.setEnabled(rule.id, it) }
+    )
+}
+
+@Composable
 private fun AddAlertDialog(onDismiss: () -> Unit, onAdd: (AlertKind) -> Unit) {
     val choices = listOf(
         AlertKind.LOW to (stringResource(R.string.loc_alert_choice_low) to stringResource(R.string.loc_alert_choice_low_desc)),
         AlertKind.HIGH to (stringResource(R.string.loc_alert_choice_high) to stringResource(R.string.loc_alert_choice_high_desc)),
         AlertKind.FALLING to (stringResource(R.string.loc_alert_choice_falling) to stringResource(R.string.loc_alert_choice_falling_desc)),
         AlertKind.RISING to (stringResource(R.string.loc_alert_choice_rising) to stringResource(R.string.loc_alert_choice_rising_desc)),
-        AlertKind.SIGNAL_LOSS to (stringResource(R.string.loc_alert_choice_loss) to stringResource(R.string.loc_alert_choice_loss_desc))
+        AlertKind.SIGNAL_LOSS to (stringResource(R.string.loc_alert_choice_loss) to stringResource(R.string.loc_alert_choice_loss_desc)),
+        AlertKind.REMINDER to (stringResource(R.string.loc_alert_choice_reminder) to stringResource(R.string.loc_alert_choice_reminder_desc))
     )
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -523,6 +594,7 @@ internal fun alertIcon(kind: AlertKind): ImageVector = when (kind) {
     AlertKind.FALLING -> Icons.Default.KeyboardDoubleArrowDown
     AlertKind.RISING -> Icons.Default.KeyboardDoubleArrowUp
     AlertKind.SIGNAL_LOSS -> Icons.Default.WifiOff
+    AlertKind.REMINDER -> Icons.Default.Medication
 }
 
 /** Icon tint and background for an alert, following the glucose range colors. */
@@ -544,6 +616,9 @@ internal fun alertColors(rule: AlertRule): Pair<Color, Color> {
         AlertKind.RISING -> clinical.high to clinical.highContainer
         AlertKind.SIGNAL_LOSS -> MaterialTheme.colorScheme.onSurfaceVariant to
             MaterialTheme.colorScheme.surfaceVariant
+        // Kept apart from the glucose range hues: a reminder is not about a reading.
+        AlertKind.REMINDER -> MaterialTheme.colorScheme.tertiary to
+            MaterialTheme.colorScheme.tertiaryContainer
     }
 }
 
@@ -570,7 +645,37 @@ internal fun triggerSummary(context: Context, rule: AlertRule, unit: GlucoseUnit
             context.getString(unit.labelRes)
         ) + if (rule.thresholdMgdl > 0f) context.getString(R.string.alert_trigger_over, level) else ""
         AlertKind.SIGNAL_LOSS -> context.getString(R.string.alert_trigger_signal_loss, formatDuration(rule.lossMinutes * 60))
+        AlertKind.REMINDER -> reminderSummary(context, rule)
     }
+}
+
+/** Times and recurrence of a reminder, e.g. "08:00, 20:00 · Every day". */
+internal fun reminderSummary(context: Context, rule: AlertRule): String {
+    val spec = rule.reminder
+    val times = spec.times.joinToString(", ") { formatMinuteOfDay(it) }
+    val repeat = when (spec.repeat) {
+        ReminderRepeat.DAYS_OF_WEEK -> scheduleSummary(rule.schedule.copy(allDay = true))
+        ReminderRepeat.EVERY_N_DAYS -> context.getString(R.string.loc_reminder_every_n_days, spec.intervalDays)
+        ReminderRepeat.ONCE -> formatEpochDay(spec.startDay)
+    }
+    return "$times · $repeat"
+}
+
+internal fun formatEpochDay(epochDay: Long): String =
+    java.time.LocalDate.ofEpochDay(epochDay)
+        .format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(java.util.Locale.getDefault()))
+
+/** A due time: the time alone today, with the weekday within a week, with the date beyond. */
+internal fun formatReminderTime(context: Context, millis: Long, now: Long = System.currentTimeMillis()): String {
+    var flags = android.text.format.DateUtils.FORMAT_SHOW_TIME
+    if (!android.text.format.DateUtils.isToday(millis)) {
+        flags = flags or if (millis - now < 6 * 24 * 3_600_000L && millis > now - 6 * 24 * 3_600_000L) {
+            android.text.format.DateUtils.FORMAT_SHOW_WEEKDAY or android.text.format.DateUtils.FORMAT_ABBREV_WEEKDAY
+        } else {
+            android.text.format.DateUtils.FORMAT_SHOW_DATE or android.text.format.DateUtils.FORMAT_ABBREV_MONTH
+        }
+    }
+    return android.text.format.DateUtils.formatDateTime(context, millis, flags)
 }
 
 internal fun deliverySummary(rule: AlertRule): String {

@@ -774,7 +774,7 @@ public static void initwearos(Context app) {
     MessageSender.sendnetinfo();
     }*/
 static boolean dataAtStart=false;
-boolean initproc() {
+public boolean initproc() {
     if(!initproccalled) {
         if(!numio.setlibrary(this))
             return false;
@@ -783,6 +783,7 @@ boolean initproc() {
         libre3init.init();
         SuperGattCallback.initAlarmTalk();
        // initializeNet();
+        tk.glucodata.alerts.Reminders.start();
         NumAlarm.handlealarm(this);
         Maintenance.setMaintenancealarm(this);
        // initbroadcasts();

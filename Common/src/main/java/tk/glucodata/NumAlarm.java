@@ -88,6 +88,9 @@ static void killprogram(int ret) {
 		System.exit(ret);
 		}
 static private void numalarm(Application mApp) {
+	// Old reminders were taken over by the medication reminders (tk.glucodata.alerts.Reminders).
+	if(tk.glucodata.alerts.Reminders.replacesLegacyAlarms())
+		return;
     	int[] nums=Natives.numAlarmEvents();
     	if(nums==null)
     		return;
@@ -118,7 +121,7 @@ static private void numalarm(Application mApp) {
 	}
 static public void	   handlealarm(Application context) {
 	numalarm(context);
-	long firstNum=Natives.firstAlarm();
+	long firstNum=tk.glucodata.alerts.Reminders.replacesLegacyAlarms()?0L:Natives.firstAlarm();
         long  firstProfile=Natives.nextScheduledProfileMSEC();
 	if(firstNum>0L) {
                 if(firstProfile==0L||firstProfile>firstNum) {

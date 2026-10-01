@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +52,7 @@ import tk.glucodata.alerts.AlertKind
 import tk.glucodata.alerts.AlertOutput
 import tk.glucodata.alerts.AlertPlayer
 import tk.glucodata.alerts.AlertStore
+import tk.glucodata.alerts.Reminders
 import tk.glucodata.alerts.formatMinutes
 import tk.glucodata.ui.theme.LocalClinicalColors
 import tk.glucodata.ui.theme.WearJugglucoTheme
@@ -83,7 +85,13 @@ class WearAlertActivity : ComponentActivity() {
                         alert = it,
                         snoozeOptions = settings.snoozeOptions,
                         onSnooze = { minutes -> AlertPlayer.snooze(minutes); finish() },
-                        onDismiss = { AlertPlayer.dismiss(); finish() }
+                        onDismiss = {
+                            // A reminder's main button confirms the dose.
+                            if (it.isReminder) Reminders.taken(it.rule.id, it.reminderDue, isTest = it.isTest, fallback = it.rule)
+                            else AlertPlayer.dismiss()
+                            finish()
+                        },
+                        onSkip = { Reminders.skip(it.rule.id, it.reminderDue, isTest = it.isTest); finish() }
                     )
                 }
             }
@@ -101,7 +109,8 @@ private fun WearAlertScreen(
     alert: AlertPlayer.ActiveAlert,
     snoozeOptions: List<Int>,
     onSnooze: (Int) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onSkip: () -> Unit
 ) {
     val context = LocalContext.current
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
@@ -113,6 +122,7 @@ private fun WearAlertScreen(
         AlertKind.LOW, AlertKind.FALLING -> if (critical) clinical.veryLow else clinical.low
         AlertKind.HIGH, AlertKind.RISING -> if (critical) clinical.veryHigh else clinical.high
         AlertKind.SIGNAL_LOSS -> scheme.onSurface
+        AlertKind.REMINDER -> scheme.tertiary
     }
     val visibleSnoozeOptions = snoozeOptions.take(3)
 
@@ -138,7 +148,7 @@ private fun WearAlertScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = rule.name,
+                        text = if (alert.isReminder) AlertPlayer.reminderTitle(rule) else rule.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = scheme.onSurfaceVariant,
@@ -148,7 +158,17 @@ private fun WearAlertScreen(
                     )
                     Spacer(Modifier.height(2.dp))
                     val reading = alert.reading
-                    if (rule.kind == AlertKind.SIGNAL_LOSS || reading == null) {
+                    if (alert.isReminder) {
+                        if (rule.reminder.dose.isNotBlank()) {
+                            Text(
+                                text = rule.reminder.dose,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = glucoseColor,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else if (rule.kind == AlertKind.SIGNAL_LOSS || reading == null) {
                         Text(
                             text = pluralStringResource(
                                 R.plurals.loc_minutes_value,
@@ -196,12 +216,12 @@ private fun WearAlertScreen(
                     ),
                     icon = {
                         Icon(
-                            Icons.Default.NotificationsOff,
+                            if (alert.isReminder) Icons.Default.Check else Icons.Default.NotificationsOff,
                             contentDescription = null,
                             modifier = Modifier.size(ButtonDefaults.IconSize)
                         )
                     },
-                    label = { Text(stringResource(R.string.dismiss)) }
+                    label = { Text(stringResource(if (alert.isReminder) R.string.loc_reminder_taken else R.string.dismiss)) }
                 )
             }
             if (visibleSnoozeOptions.isNotEmpty()) {
@@ -244,6 +264,15 @@ private fun WearAlertScreen(
                             )
                         }
                     }
+                }
+            }
+            if (alert.isReminder) {
+                item {
+                    FilledTonalButton(
+                        onClick = onSkip,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.loc_reminder_skip)) }
+                    )
                 }
             }
         }

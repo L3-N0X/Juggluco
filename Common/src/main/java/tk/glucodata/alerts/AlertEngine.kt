@@ -53,7 +53,8 @@ object AlertEngine {
 
     private fun evaluate(reading: Reading): Boolean {
         val now = System.currentTimeMillis()
-        val rules = AlertStore.rules.value
+        // Medication reminders run on the clock, see Reminders.
+        val rules = AlertStore.rules.value.filterNot { it.kind.isReminder }
         val matching = rules.filter { it.enabled && matches(it, reading) }.toSet()
 
         // A fresh reading ends any signal loss episode, and closes episodes of rules
@@ -139,7 +140,7 @@ object AlertEngine {
                 (rule.thresholdMgdl <= 0f || reading.mgdl <= rule.thresholdMgdl)
             AlertKind.RISING -> hasRate && rate >= rule.rateMgdlPerMin &&
                 (rule.thresholdMgdl <= 0f || reading.mgdl >= rule.thresholdMgdl)
-            AlertKind.SIGNAL_LOSS -> false
+            AlertKind.SIGNAL_LOSS, AlertKind.REMINDER -> false
         }
     }
 
@@ -171,6 +172,7 @@ object AlertEngine {
                 AlertKind.LOW, AlertKind.FALLING -> other.kind == AlertKind.LOW || other.kind == AlertKind.FALLING
                 AlertKind.HIGH, AlertKind.RISING -> other.kind == AlertKind.HIGH || other.kind == AlertKind.RISING
                 AlertKind.SIGNAL_LOSS -> other.kind == AlertKind.SIGNAL_LOSS
+                AlertKind.REMINDER -> false
             }
         }.toSet()
 
