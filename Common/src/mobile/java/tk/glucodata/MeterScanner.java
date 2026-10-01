@@ -77,7 +77,16 @@ class MeterScanner  {
         knowName=true;
         clear();
       adapter=null;
+      listener=null;
      }
+   /**
+    * Told about every meter the search turns up. The Compose meter screen uses this instead of the
+    * adapter, so the search does not need a RecyclerView to report into.
+    */
+   public interface DeviceFoundListener {
+        void deviceFound(BluetoothDevice device, String name, String address);
+        }
+   DeviceFoundListener listener=null;
    DeviceList.DeviceListViewAdapter adapter=null;
    private final ScanCallback mScanCallback = new ScanCallback() {
        private GlucoseMeterGatt  getCallback(BluetoothDevice device) {
@@ -168,6 +177,12 @@ private void addDevice(BluetoothDevice device) {
                     var adapt=adapter;
                     if(adapt!=null)
                         adapt.notifyDataSetChanged();
+                    var found=listener;
+                    if(found!=null) {
+                        // The address is only given for the meters whose address tells them apart;
+                        // the rest are matched on the name alone, as they are in the meter list.
+                        found.deviceFound(device,name,shouldUseDeviceAddress(name,device)?device.getAddress():null);
+                        }
                    }
         }
 

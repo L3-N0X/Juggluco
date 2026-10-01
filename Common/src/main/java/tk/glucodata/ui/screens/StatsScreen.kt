@@ -80,13 +80,13 @@ import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.graph.AgpGraph
 import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseStats
+import tk.glucodata.ui.model.GlucoseStatus
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.HourlyPercentiles
 import tk.glucodata.ui.model.StatsPeriod
 import tk.glucodata.ui.theme.DarkClinicalColors
 import tk.glucodata.ui.theme.LocalClinicalColors
 import java.util.Locale
-import kotlin.math.roundToInt
 
 @Composable
 fun StatsScreen(
@@ -646,12 +646,25 @@ private fun TimeInRangeBreakdownCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            Text(
+                text = stringResource(
+                    R.string.tir_observed_coverage,
+                    formatTirDuration(stats.observedMillis),
+                    formatTirDuration(stats.expectedWindowMillis)
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             // 5 Clinical Ranges Breakdown Rows (Vertical descending hierarchy: Top/Very High -> Bottom/Very Low)
             TirRow(
                 icon = Icons.Default.KeyboardDoubleArrowUp,
                 label = stringResource(R.string.status_very_high),
                 rangeDesc = stringResource(R.string.tir_range_greater_than, unit.format(range.veryHighMgDl)),
                 percent = stats.timeVeryHighPercent,
+                duration = stats.millisIn(GlucoseStatus.VERY_HIGH),
                 target = stringResource(R.string.tir_target_very_high),
                 color = clinicalColors.veryHigh
             )
@@ -660,6 +673,7 @@ private fun TimeInRangeBreakdownCard(
                 label = stringResource(R.string.status_high),
                 rangeDesc = stringResource(R.string.tir_range_between, unit.format(range.highMgDl + 1f), unit.format(range.veryHighMgDl)),
                 percent = stats.timeAbovePercent,
+                duration = stats.millisIn(GlucoseStatus.HIGH),
                 target = stringResource(R.string.tir_target_high),
                 color = clinicalColors.high
             )
@@ -668,6 +682,7 @@ private fun TimeInRangeBreakdownCard(
                 label = stringResource(R.string.status_in_range),
                 rangeDesc = stringResource(R.string.tir_range_between, unit.format(range.lowMgDl), unit.format(range.highMgDl)),
                 percent = stats.timeInRangePercent,
+                duration = stats.millisIn(GlucoseStatus.IN_RANGE),
                 target = stringResource(R.string.tir_target_in_range),
                 color = clinicalColors.inRange,
                 isPrimary = true
@@ -677,6 +692,7 @@ private fun TimeInRangeBreakdownCard(
                 label = stringResource(R.string.status_low),
                 rangeDesc = stringResource(R.string.tir_range_between, unit.format(range.veryLowMgDl), unit.format(range.lowMgDl - 1f)),
                 percent = stats.timeBelowPercent,
+                duration = stats.millisIn(GlucoseStatus.LOW),
                 target = stringResource(R.string.tir_target_low),
                 color = clinicalColors.low
             )
@@ -685,6 +701,7 @@ private fun TimeInRangeBreakdownCard(
                 label = stringResource(R.string.status_very_low),
                 rangeDesc = stringResource(R.string.tir_range_less_than, unit.format(range.veryLowMgDl)),
                 percent = stats.timeVeryLowPercent,
+                duration = stats.millisIn(GlucoseStatus.VERY_LOW),
                 target = stringResource(R.string.tir_target_very_low),
                 color = clinicalColors.veryLow
             )
@@ -698,14 +715,11 @@ private fun TirRow(
     label: String,
     rangeDesc: String,
     percent: Int,
+    duration: Long,
     target: String,
     color: Color,
     isPrimary: Boolean = false
 ) {
-    val totalMinutes = ((percent / 100f) * 24f * 60f).roundToInt()
-    val hours = totalMinutes / 60
-    val minutes = totalMinutes % 60
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -756,7 +770,7 @@ private fun TirRow(
                 color = if (isPrimary) color else MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = stringResource(R.string.tir_duration_format, hours, minutes),
+                text = formatTirDuration(duration),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -889,3 +903,24 @@ fun CustomStatsPeriodDialog(
 
 /** Consensus target average glucose (~A1C 7%), independent of the configured band edges. */
 private const val GOAL_AVERAGE_MGDL = 154f
+
+/**
+ * Compact duration for a time in range row or the coverage line, e.g. `4d 20h`, `16h 48m` or `48m`.
+ *
+ * The analysed period runs from a single day up to ninety, so the scale follows the value: a
+ * fourteen day period has to be able to say `9d 20h` instead of a one day total.
+ */
+@Composable
+private fun formatTirDuration(millis: Long): String {
+    val context = LocalContext.current
+    val totalMinutes = (millis.coerceAtLeast(0L) / 60_000L).toInt()
+    val days = totalMinutes / (24 * 60)
+    val hours = (totalMinutes / 60) % 24
+    val minutes = totalMinutes % 60
+    return when {
+        days > 0 && hours == 0 -> context.resources.getQuantityString(R.plurals.day_count, days, days)
+        days > 0 -> context.getString(R.string.duration_days_hours, days, hours)
+        hours > 0 -> context.getString(R.string.tir_duration_format, hours, minutes)
+        else -> context.getString(R.string.tir_duration_minutes, minutes)
+    }
+}

@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -113,7 +114,13 @@ fun SensorsScreen(
                 sensor = activeSensor,
                 onHideToggled = { hidden -> repository.setSensorHidden(activeSensor.sensorPtr, hidden) },
                 onUseAgain = {
-                    repository.useSensorAgain(activeSensor.sensorPtr, context as? Activity)
+                    if (activeSensor.isPaused) {
+                        // A paused sensor is only waiting for its link back; useAgain would
+                        // re-run the native reactivation path on a session that never ended.
+                        repository.resumeSensor(activeSensor)
+                    } else {
+                        repository.useSensorAgain(activeSensor.sensorPtr, context as? Activity)
+                    }
                     Toast.makeText(
                         context,
                         context.getString(R.string.sensor_reconnecting, activeSensor.name),
@@ -215,7 +222,28 @@ fun SensorsScreen(
             sensor = activeSensor,
             onDismiss = { showStopSensorDialog = false },
             onTemporaryDisconnect = {
-                Toast.makeText(context, context.getString(R.string.sensor_connection_paused), Toast.LENGTH_SHORT).show()
+                if (activeSensor.isMirrored) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.sensor_pause_not_supported),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    repository.pauseSensor(activeSensor)
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.sensor_connection_paused),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            onResume = {
+                repository.resumeSensor(activeSensor)
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.sensor_resumed, activeSensor.name),
+                    Toast.LENGTH_SHORT
+                ).show()
             },
             onEndSensorPermanently = {
                 repository.endSensorPermanently(activeSensor)
@@ -409,7 +437,8 @@ private fun OverhauledSensorCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = if (sensor.isMirrored) Icons.Default.Sync else Icons.Default.Bluetooth,
+                    imageVector = if (sensor.isPaused) Icons.Default.BluetoothDisabled
+                    else if (sensor.isMirrored) Icons.Default.Sync else Icons.Default.Bluetooth,
                     contentDescription = stringResource(if (sensor.isMirrored) R.string.sensor_mirrored_status else R.string.bluetooth_status),
                     tint = statusColor,
                     modifier = Modifier.size(18.dp)
@@ -417,6 +446,7 @@ private fun OverhauledSensorCard(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = when {
+                        sensor.isPaused -> stringResource(R.string.sensor_status_paused)
                         !sensor.isConnected -> stringResource(sensor.status.labelRes)
                         sensor.isMirrored -> stringResource(R.string.sensor_mirrored_status)
                         sensor.isStreaming -> stringResource(R.string.sensor_connected_streaming)

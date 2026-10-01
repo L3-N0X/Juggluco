@@ -562,7 +562,9 @@ void initbluetooth(boolean usebluetooth,Context context,boolean frommain) {
     SensorBluetooth.start(usebluetooth);
 
     if(!isWearable) {
-        BluetoothGlucoseMeter.startDevices();
+        // Only talk to meters when the user asked for it; the feature is off unless switched on.
+        if(tk.glucodata.ui.meters.MeterSettings.isEnabled(app))
+            BluetoothGlucoseMeter.startDevices();
         }
     }
 static boolean possiblybluetooth(Context context) {

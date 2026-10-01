@@ -21,6 +21,8 @@ public class SensorBridge {
         public int warmupMinutes;
         public boolean isHidden;
         public boolean hasCalibration;
+        /** Temporary disconnect: the sensor session is kept, only the link is down. */
+        public boolean isPaused;
     }
 
     /**
@@ -57,7 +59,8 @@ public class SensorBridge {
                     info.startTime = gatt.sensorstartmsec > 0 ? gatt.sensorstartmsec : gatt.starttime;
                     info.isConnected = gatt.mBluetoothGatt != null;
                     info.isStreaming = gatt.streamingEnabled();
-                    info.statusStr = gatt.constatstatusstr != null ? gatt.constatstatusstr : (info.isConnected ? "Connected" : "Disconnected");
+                    info.isPaused = gatt.isPaused();
+                    info.statusStr = info.isPaused ? "Paused" : (gatt.constatstatusstr != null ? gatt.constatstatusstr : (info.isConnected ? "Connected" : "Disconnected"));
                     info.handshakeStr = gatt.handshake != null ? gatt.handshake : "Keys exchanged";
                     info.infoHtml = gatt.getinfo() != null ? gatt.getinfo() : "";
 
@@ -103,6 +106,40 @@ public class SensorBridge {
         try {
             SensorBluetooth.updateDevices();
         } catch (Throwable ignored) {}
+    }
+
+    /**
+     * Temporarily disconnects one sensor: the native sensor session, its history and its
+     * remembered Bluetooth address are all kept, so {@link #resumeSensor} can pick up the
+     * very same session again. Nothing is finished, forgotten or rescanned.
+     *
+     * @return false when the sensor has no local Bluetooth link to drop, for example a sensor
+     *         whose readings arrive over a mirror.
+     */
+    public static boolean pauseSensor(String serial) {
+        if (serial == null || serial.isEmpty()) return false;
+        try {
+            if (SensorBluetooth.blueone != null) {
+                return SensorBluetooth.blueone.pauseSensor(serial);
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    /**
+     * Reconnects a sensor paused with {@link #pauseSensor} to the same native sensor session.
+     * Uses the stored device address, so this normally does not scan.
+     *
+     * @return false when there is no Bluetooth callback for this sensor to reconnect.
+     */
+    public static boolean resumeSensor(String serial) {
+        if (serial == null || serial.isEmpty()) return false;
+        try {
+            if (SensorBluetooth.blueone != null) {
+                return SensorBluetooth.blueone.resumeSensor(serial);
+            }
+        } catch (Throwable ignored) {}
+        return false;
     }
 
     public static void forgetDevice(String serial) {
@@ -174,6 +211,22 @@ public class SensorBridge {
                     HealthConnection.Companion.stop();
                 }
             }
+        } catch (Throwable ignored) {}
+    }
+
+    /** Whether this sensor is temporarily disconnected, also for sensors without a GATT callback. */
+    public static boolean isPaused(String serial) {
+        try {
+            return SensorPause.isPaused(serial);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /** Forgets a pause, for example after the sensor session was ended. */
+    public static void clearPaused(String serial) {
+        try {
+            SensorPause.setPaused(serial, false);
         } catch (Throwable ignored) {}
     }
 

@@ -56,6 +56,15 @@
 
 ---
 
+## Glucose Meters (secondary feature)
+- **Off by default:** reading a Bluetooth finger-prick meter is a rarity next to a CGM sensor, so the whole feature stays switched off until someone asks for it. The flag is `MeterSettings.isEnabled/setEnabled` (SharedPreferences `meters_prefs`), defaulting to *on* only when a meter is already stored, so nobody loses a setup that used to work. `Applic.initbluetooth` only calls `BluetoothGlucoseMeter.startDevices()` when it is on, and Settings → Connectivity shows one row that both toggles it and opens the screen.
+- **Split like the notifications:** the state lives in the shared source set, the Bluetooth does not. `ui/meters/MeterModels.kt` and `ui/meters/MeterBle.kt` (interface + `UnsupportedMeterBle`) are in `main`; `tk.glucodata.MeterBleSupport` is the phone implementation in `mobile/` and delegates to the no-op in `wear/` (symlinked into `small/`). The screen and `GlucoseRepository` only ever talk to the interface, which is why `MetersSettingsScreen` compiles for the watch too.
+- **Inventory stays native:** there is no `Meter` model class. Name, address, active flag, last reading and the blood-after cutoff all come from the `Natives.GlucoseMeter*` calls into `settings.dat`. **A meter's `index` is its position, not an id** — removing one shifts the ones behind it, and `getActiveGlucoseMeters()` purges AiDEX X entries, so the list is always reread after a change rather than patched.
+- **Discovery** goes through `MeterScanner.DeviceFoundListener` (new, alongside the old RecyclerView adapter path) and decides per device whether the address or just the name identifies it, exactly as `MeterScanner.shouldUseDeviceAddress` does for the legacy list. `MeterBleSupport` holds the scanned `BluetoothDevice`s until the user picks one.
+- **Blood label** is the app-wide `bloodLabelIndex`, so the editor reuses `repository.setBloodLabelIndex` and refuses to save without one: readings are dropped by `GlucoseMeterSave` when no label is set. Saving a cutoff calls `GlucoseMeterSetLastTime`, which also switches the meter on and resets its record position — that is wanted, a meter nobody talks to collects nothing.
+
+---
+
 ## Screen Layout & Headers
 - **Shared layout module:** `Common/src/main/java/tk/glucodata/ui/screens/ScreenLayout.kt` owns the spacing scale (`Gutter` / `CardPadding` 16.dp, `SectionSpacing`, `TopPadding`, `BottomPadding` 96.dp) plus `ScreenContent { }` (standard scrolling tab body) and `SectionTitle(...)`. Use these instead of ad-hoc dp values.
 - **One title per screen:** the persistent app bar supplies it — `JugglucoApp`'s `TopAppBar` for every tab, `SettingsDetailScaffold` for detail screens. Never repeat the page title in the content, and leave descriptions out unless they earn their space.

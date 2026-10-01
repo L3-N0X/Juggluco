@@ -61,6 +61,7 @@ import tk.glucodata.ui.screens.settings.LibreViewSettingsScreen
 import tk.glucodata.ui.screens.settings.LibreViewTreatmentsScreen
 import tk.glucodata.ui.screens.settings.LogbookSettingsScreen
 import tk.glucodata.ui.screens.settings.MirrorConnectionEditScreen
+import tk.glucodata.ui.screens.settings.MetersSettingsScreen
 import tk.glucodata.ui.screens.settings.MirrorSettingsScreen
 import tk.glucodata.ui.screens.settings.SettingsDestination
 import tk.glucodata.ui.screens.settings.TurnServerSettingsScreen
@@ -228,6 +229,10 @@ SettingsDestination.UPLOADER -> UploaderSettingsScreen(
                 )
                 SettingsDestination.INGREDIENTS -> IngredientsSettingsScreen(
                     onNavigateBack = { activeSettingsDestination = SettingsDestination.LOGBOOK }
+                )
+                SettingsDestination.METERS -> MetersSettingsScreen(
+                    repository = repository,
+                    onNavigateBack = { activeSettingsDestination = null }
                 )
                 null -> {}
             }

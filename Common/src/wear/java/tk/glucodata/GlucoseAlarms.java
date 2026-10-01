@@ -35,6 +35,13 @@ public GlucoseAlarms(Application context) {
 
 public    void handlealarm() {
         SensorBluetooth.reconnectall();
+        // Every sensor is paused by the user, so the missing glucose is expected.
+        // Stay quiet and do not reschedule: the resume arms the alarm again.
+        if(SensorBluetooth.allSensorsPaused()) {
+            {if(doLog) {Log.i(LOG_ID, "handlealarm all sensors paused");};};
+            LossOfSensorAlarm.cancelalarm();
+            return;
+            }
         final long nu = System.currentTimeMillis();
         final var view=Floating.floatview;
         if(view!=null) {

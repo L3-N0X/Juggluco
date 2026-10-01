@@ -44,6 +44,12 @@ public	static long waitmmsec() {
 //boolean saidloss = false;
 
 public  void setLossAlarm() {
+    // A user-paused sensor is silent on purpose, so arming a loss-of-signal alarm for it
+    // would turn a deliberate pause into a nightly alert.
+    if(SensorBluetooth.allSensorsPaused()) {
+        LossOfSensorAlarm.cancelalarm();
+        return;
+        }
     if(hasalarmloss()) {
          //saidloss = false;
          final long nu = System.currentTimeMillis();

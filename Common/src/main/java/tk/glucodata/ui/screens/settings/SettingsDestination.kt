@@ -3,6 +3,7 @@ package tk.glucodata.ui.screens.settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.CloudUpload
@@ -167,5 +168,11 @@ UPLOADER(
         descRes = R.string.settings_group_logbook_desc,
         categoryRes = R.string.settings_cat_glucose,
         icon = Icons.Default.Restaurant
+    ),
+    METERS(
+        titleRes = R.string.meterlist,
+        descRes = R.string.settings_group_meters_desc,
+        categoryRes = R.string.settings_cat_hardware,
+        icon = Icons.Default.Bloodtype
     )
 }

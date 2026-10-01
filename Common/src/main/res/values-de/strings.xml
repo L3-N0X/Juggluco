@@ -628,6 +628,8 @@
     <string name="tir_range_less_than">&lt; %s</string>
     <string name="tir_range_with_target">%1$s, Ziel: %2$s</string>
     <string name="tir_duration_format">%1$d Std. %2$d Min.</string>
+    <string name="tir_duration_minutes">%1$d Min.</string>
+    <string name="tir_observed_coverage">%1$s von %2$s gemessen</string>
     <string name="tir_percent">%d%%</string>
     <string name="tir_target_very_high">&lt; 5%</string>
     <string name="tir_target_high">&lt; 25%</string>
@@ -1003,6 +1005,11 @@
     <string name="sensor_serial_status">Seriennummer: %1$s • Status: %2$s</string>
     <string name="sensor_pause_disconnect">Bluetooth pausieren / trennen</string>
     <string name="sensor_pause_disconnect_desc">Pausiert die Bluetooth-Verbindung, ohne den Sensor zu beenden. Du kannst dich jederzeit wieder verbinden.</string>
+    <string name="sensor_resume_connection">Sensor wieder verbinden</string>
+    <string name="sensor_resume_connection_desc">Dieser Sensor ist pausiert. Stellt die Verbindung zur selben Sensorsitzung wieder her.</string>
+    <string name="sensor_status_paused">Pausiert</string>
+    <string name="sensor_pause_not_supported">Für diesen Sensor gibt es keine Bluetooth-Verbindung zum Pausieren.</string>
+    <string name="sensor_resumed">Verbinde mich neu mit %1$s…</string>
     <string name="sensor_end_replace">Sensor beenden &amp; ersetzen</string>
     <string name="sensor_end_replace_desc">Beendet die aktuelle Tragezeit und bereitet Juggluco auf einen neuen Sensor vor.</string>
     <string name="next">Weiter</string>
@@ -1585,6 +1592,20 @@
     <string name="loc_rest_endpoints_title">Nightscout- und xDrip-Endpunkte</string>
     <string name="loc_rest_endpoints">• Entries: http://127.0.0.1:%1$s/api/v1/entries.json\n• Status: http://127.0.0.1:%1$s/api/v1/status.json\n• AGP-Bericht: http://127.0.0.1:%1$s/x/report</string>
     <string name="loc_web_server_info">Der lokale Webserver ermöglicht externen Apps, Nightscout-Widgets, Emulator-Umgebungen und anderen Telefon-Apps den Zugriff auf Glukose-Streams ohne Bluetooth-Kopplung.</string>
+    <string name="loc_https_certificates">HTTPS und Zertifikate</string>
+    <string name="loc_https_server">HTTPS ausliefern</string>
+    <string name="loc_https_active">Zertifikat geladen, HTTPS wird auf Port %1$s ausgeliefert</string>
+    <string name="loc_https_inactive">Aus, es wird nur einfaches HTTP ausgeliefert</string>
+    <string name="loc_https_private_key">Privater Schlüssel</string>
+    <string name="loc_https_full_chain">Zertifikatskette</string>
+    <string name="loc_https_info">Importiere einen privaten Schlüssel und die vollständige Zertifikatskette, um die API über HTTPS auf dem SSL-Port auszuliefern. Beide Dateien liegen im privaten Speicher der App. Ohne sie liefert der Server weiterhin einfaches HTTP aus.</string>
+    <string name="loc_cert_installed">%1$s installiert, %2$s</string>
+    <string name="loc_cert_not_installed">%1$s ist nicht installiert, tippe zum Importieren einer Datei</string>
+    <string name="loc_cert_imported">%1$s importiert</string>
+    <string name="loc_cert_import_failed">Die ausgewählte Datei konnte nicht gelesen werden</string>
+    <string name="loc_cert_too_small">Die ausgewählte Datei ist zu klein für ein Zertifikat</string>
+    <string name="loc_cert_too_large">Die ausgewählte Datei ist zu groß für ein Zertifikat</string>
+    <string name="loc_https_start_failed">HTTPS wurde nicht gestartet: %1$s</string>
 
     <string name="loc_target_range">Zielbereich</string>
     <string name="loc_example_value">z. B. %1$s</string>
