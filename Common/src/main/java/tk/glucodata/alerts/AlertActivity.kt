@@ -1,5 +1,6 @@
 package tk.glucodata.alerts
 
+import android.app.Activity
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -56,7 +57,6 @@ import tk.glucodata.ui.theme.LocalClinicalColors
 class AlertActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AlertPlayer.fullScreenShowing = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -67,13 +67,16 @@ class AlertActivity : ComponentActivity() {
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        keepScreenOnWhileRinging(AlertPlayer.active.value?.ringing == true)
         setContent {
             JugglucoTheme(darkTheme = isSystemInDarkTheme()) {
                 val alert by AlertPlayer.active.collectAsState()
                 val settings by AlertStore.settings.collectAsState()
                 LaunchedEffect(alert) {
                     if (alert == null) finish()
+                }
+                LaunchedEffect(alert?.ringing) {
+                    keepScreenOnWhileRinging(alert?.ringing == true)
                 }
                 alert?.let {
                     if (it.isReminder) {
@@ -97,9 +100,29 @@ class AlertActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
+    override fun onStart() {
+        super.onStart()
+        AlertPlayer.fullScreenShowing = true
+        keepScreenOnWhileRinging(AlertPlayer.active.value?.ringing == true)
+    }
+
+    override fun onStop() {
         AlertPlayer.fullScreenShowing = false
-        super.onDestroy()
+        super.onStop()
+    }
+}
+
+/**
+ * Holds the screen on only while the alert rings. Once sound and vibration end, the alert stays up
+ * until it is dismissed or the value recovers, which can take hours; keeping the display lit for
+ * all of that was what emptied a watch battery. A later ring brings the activity back to the front,
+ * and its turn-screen-on attribute wakes the display again then.
+ */
+internal fun Activity.keepScreenOnWhileRinging(ringing: Boolean) {
+    if (ringing) {
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    } else {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 }
 

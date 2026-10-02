@@ -54,6 +54,7 @@ import tk.glucodata.alerts.AlertPlayer
 import tk.glucodata.alerts.AlertStore
 import tk.glucodata.alerts.Reminders
 import tk.glucodata.alerts.formatMinutes
+import tk.glucodata.alerts.keepScreenOnWhileRinging
 import tk.glucodata.ui.theme.LocalClinicalColors
 import tk.glucodata.ui.theme.WearJugglucoTheme
 
@@ -61,7 +62,6 @@ import tk.glucodata.ui.theme.WearJugglucoTheme
 class WearAlertActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AlertPlayer.fullScreenShowing = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -72,13 +72,16 @@ class WearAlertActivity : ComponentActivity() {
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        keepScreenOnWhileRinging(AlertPlayer.active.value?.ringing == true)
         setContent {
             WearJugglucoTheme {
                 val alert by AlertPlayer.active.collectAsState()
                 val settings by AlertStore.settings.collectAsState()
                 LaunchedEffect(alert) {
                     if (alert == null) finish()
+                }
+                LaunchedEffect(alert?.ringing) {
+                    keepScreenOnWhileRinging(alert?.ringing == true)
                 }
                 alert?.let {
                     WearAlertScreen(
@@ -98,9 +101,17 @@ class WearAlertActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
+    // Visible rather than alive: a watch alert left behind once the screen went off has to be
+    // brought back to the front by the next ring, or that ring would never light the display.
+    override fun onStart() {
+        super.onStart()
+        AlertPlayer.fullScreenShowing = true
+        keepScreenOnWhileRinging(AlertPlayer.active.value?.ringing == true)
+    }
+
+    override fun onStop() {
         AlertPlayer.fullScreenShowing = false
-        super.onDestroy()
+        super.onStop()
     }
 }
 
