@@ -5,6 +5,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -12,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -322,6 +326,34 @@ class GlucoseRepository(
      */
     private val _libreAmountsAllowed = MutableStateFlow(false)
     val libreAmountsAllowed: StateFlow<Boolean> = _libreAmountsAllowed.asStateFlow()
+
+    /**
+     * Whether a screen showing this repository is in the foreground. Only the UI reads these flows
+     * (alerts, complications and widgets go to native themselves), so the heartbeat sleeps while
+     * this is false. A watch keeps the activity alive behind the watch face for days, and polling
+     * every few seconds plus a full native reload every two minutes for a screen nobody sees was
+     * a steady drain on its battery.
+     */
+    private val uiVisible = MutableStateFlow(true)
+
+    /** False once the scope it was built on is gone, e.g. the activity owning it was destroyed. */
+    val isAlive: Boolean get() = scope.isActive
+
+    /** Runs the heartbeat only while [lifecycle] is at least started. */
+    fun followVisibility(lifecycle: Lifecycle) {
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) = setUiVisible(true)
+            override fun onStop(owner: LifecycleOwner) = setUiVisible(false)
+        })
+    }
+
+    private fun setUiVisible(visible: Boolean) {
+        if (uiVisible.value == visible) return
+        uiVisible.value = visible
+        // The heartbeat only appends the latest reading, so whatever arrived while hidden comes
+        // back with one full reload.
+        if (visible) refreshAll()
+    }
 
     init {
         DisplaySync.install(this)
@@ -4080,6 +4112,10 @@ class GlucoseRepository(
             var ticks = 0
             while (isActive) {
                 delay(FAST_POLL_INTERVAL_MILLIS)
+                if (!uiVisible.value) {
+                    uiVisible.first { it }
+                    continue
+                }
                 try {
                     ticks++
                     if (Applic.Nativesloaded) {
@@ -4128,7 +4164,8 @@ class GlucoseRepository(
                         refreshAllLocked()
                     }
                     if (ticks % FAST_TICKS_PER_DEVICE_SWEEP == 0) {
-                        refreshWearDevices()
+                        // The paired-watch list is a phone screen; a watch never shows it.
+                        if (!Applic.isWearable) refreshWearDevices()
                         refreshMirrorConnections()
                     }
                 } catch (_: Throwable) {}

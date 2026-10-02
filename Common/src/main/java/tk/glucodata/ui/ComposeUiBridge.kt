@@ -26,6 +26,7 @@ object ComposeUiBridge {
         } catch (_: Throwable) {}
 
         val repo = GlucoseRepository(activity.lifecycleScope)
+        repo.followVisibility(activity.lifecycle)
         repository = repo
         tk.glucodata.alerts.AlertStore.ensureLoaded(activity)
         tk.glucodata.alerts.AlertSync.pushConfig()
