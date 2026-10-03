@@ -460,6 +460,7 @@ class GlucoseRepository(
     /** Re-reads the labels from native and publishes them. */
     private fun reloadLabels(): LabelConfig {
         if (!Applic.Nativesloaded) return _labelConfig.value
+        if (LabelDefaults.apply(::labelInUse)) sendLabels()
         ensureBloodLabel()
         val config = NativeLabels.read()
         _labelConfig.value = config
@@ -468,6 +469,23 @@ class GlucoseRepository(
             _displayConfig.value = _displayConfig.value.copy(bloodLabelIndex = config.bloodLabel)
         }
         return config
+    }
+
+    /** Whether anything in the logbook was ever saved under native label [label]. */
+    private fun labelInUse(label: Int): Boolean {
+        for (store in NumberStore.values()) {
+            try {
+                val ptr = numberStorePointer(store) ?: continue
+                for (pos in Natives.getfirstNum(ptr) until Natives.getlastNum(ptr)) {
+                    val itm = Natives.getNumitem(ptr, pos) ?: continue
+                    if (itm.time > 0 && itm.label == label) return true
+                }
+            } catch (_: Throwable) {
+                // Unreadable counts as used: renaming a label is only safe on proof it is empty.
+                return true
+            }
+        }
+        return false
     }
 
     /** The labels as currently configured, reading them first if that never happened yet. */
@@ -672,8 +690,9 @@ class GlucoseRepository(
 
     private fun readLibreTreatments(): List<LibreLabelMapping> {
         val labels = try { Natives.getLabels().toList() } catch (_: Throwable) { return emptyList() }
-        // The last label is the reserved blood label, which is never mapped to a treatment.
-        return labels.dropLast(1).mapIndexed { index, label ->
+        // The last entry is native's empty "no label", which is never mapped to a treatment.
+        return labels.dropLast(1).mapIndexed { index, short ->
+            val label = LabelNames.fullName(index, short.orEmpty())
             val kind = LibreTreatmentKind.fromNative(
                 try { Natives.getlibrenumkind(LIBRE_NIGHT, index) } catch (_: Throwable) { 0 }
             )
@@ -2522,7 +2541,7 @@ class GlucoseRepository(
         return (0 until labels.size - 1).map { index ->
             TreatmentMapping(
                 index = index,
-                label = labels[index].orEmpty(),
+                label = LabelNames.fullName(index, labels[index].orEmpty()),
                 kind = try { Natives.getlibrenumkind(1, index) } catch (_: Throwable) { 0 },
                 weight = try { Natives.getlibrefoodweight(1, index) } catch (_: Throwable) { 1f }
             )
@@ -3634,23 +3653,27 @@ class GlucoseRepository(
     // --- LOGBOOK LABELS ---
 
     /**
-     * Saves label [index] (a new one at the end when below zero). [roundTo] is the Garmin rounding
+     * Saves label [index] (a new one at the end when below zero) as [name], shown as [shortName]
+     * where space is tight. A blank short name is derived from the name, and one that does not fit
+     * native's 11 bytes is cut to fit, so any name can be saved. [roundTo] is the Garmin rounding
      * step and [weight] the classic graph's height factor, see [tk.glucodata.ui.model.LogLabel].
      */
-    fun saveLabel(index: Int, name: String, weight: Float, roundTo: Float): LabelSaveError? {
+    fun saveLabel(index: Int, name: String, shortName: String, weight: Float, roundTo: Float): LabelSaveError? {
         val config = currentLabels()
         if (!config.editable) return LabelSaveError.READ_ONLY
-        val trimmed = name.trim()
-        if (trimmed.isEmpty()) return LabelSaveError.EMPTY
-        if (trimmed.toByteArray(Charsets.UTF_8).size > LabelConfig.MAX_NAME_BYTES) return LabelSaveError.TOO_LONG
+        val full = name.trim().take(LabelNames.MAX_NAME_LENGTH)
+        if (full.isEmpty()) return LabelSaveError.EMPTY
+        val short = LabelNames.fitShort(shortName).ifEmpty { LabelNames.deriveShort(full) }
+        if (short.isEmpty()) return LabelSaveError.EMPTY
         val position = if (index in config.labels.indices) index else config.labels.size
         if (position >= LabelConfig.MAX_LABELS) return LabelSaveError.TOO_MANY
         val saved = try {
-            Applic.Nativesloaded && Natives.setlabel(position, trimmed, roundTo, weight.coerceAtLeast(0f))
+            Applic.Nativesloaded && Natives.setlabel(position, short, roundTo, weight.coerceAtLeast(0f))
         } catch (_: Throwable) {
             false
         }
-        if (!saved) return LabelSaveError.TOO_LONG
+        if (!saved) return LabelSaveError.FAILED
+        LabelNames.store(position, short, full)
         onLabelsChanged()
         return null
     }
@@ -3665,6 +3688,7 @@ class GlucoseRepository(
         } catch (_: Throwable) {
             return false
         }
+        LabelNames.forget(last)
         onLabelsChanged()
         return true
     }
@@ -3690,7 +3714,7 @@ class GlucoseRepository(
                     if (type == LogType.RAPID_INSULIN) {
                         NativeInsulinOnboard.ensureInsulinType(index, InsulinType.ASPART)
                     }
-                    DisplaySync.onLocalLabelChange()
+                    // Handed to a mirroring watch by onLabelsChanged below.
                 }
                 LogType.CUSTOM -> return
             }
@@ -3712,16 +3736,22 @@ class GlucoseRepository(
      */
     private fun onLabelsChanged() {
         scope.launch(Dispatchers.IO) {
-            try {
-                if (Natives.shouldsendlabels()) {
-                    Applic.wakemirrors()
-                    Applic.app?.sendlabels()
-                }
-            } catch (_: Throwable) {}
+            sendLabels()
             reloadLabels()
             _libreTreatments.value = readLibreTreatments()
             loadLogsFromNative()
         }
+    }
+
+    /** Hands the labels to mirroring devices: native ones the short names, the watch the full ones too. */
+    private fun sendLabels() {
+        try {
+            if (Natives.shouldsendlabels()) {
+                Applic.wakemirrors()
+                Applic.app?.sendlabels()
+            }
+        } catch (_: Throwable) {}
+        DisplaySync.onLocalLabelChange()
     }
 
     // --- INSULIN ONBOARD ---

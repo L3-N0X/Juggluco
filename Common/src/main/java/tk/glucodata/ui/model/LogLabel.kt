@@ -8,7 +8,13 @@ package tk.glucodata.ui.model
  */
 data class LogLabel(
     val index: Int,
+    /** The name as the user wrote it, of any length. */
     val name: String,
+    /**
+     * The name where space is tight (watch, totals, filters). It is what native stores, so the
+     * classic view, Garmin, Nightscout and mirrors show it too. Equal to [name] when that fits.
+     */
+    val shortName: String,
     val type: LogType,
     /**
      * Classic graph only: a weight above zero draws the amount at amount × weight on the glucose
@@ -40,6 +46,14 @@ data class LabelConfig(
     fun label(index: Int): LogLabel? = labels.getOrNull(index)
 
     fun nameOf(index: Int): String = labels.getOrNull(index)?.name.orEmpty()
+
+    fun shortNameOf(index: Int): String = labels.getOrNull(index)?.shortName.orEmpty()
+
+    /** The full name of the label [type] is saved under, or empty without one. */
+    fun nameFor(type: LogType): String = nameOf(labelFor(type))
+
+    /** The short name of the label [type] is saved under, or empty without one. */
+    fun shortNameFor(type: LogType): String = shortNameOf(labelFor(type))
 
     /** The entry type of entries saved under [index]. */
     fun typeOf(index: Int): LogType = when {
@@ -76,13 +90,10 @@ data class LabelConfig(
         /** `maxvarnr` in settings.hpp. */
         const val MAX_LABELS = 40
 
-        /** A label name is a `char[12]` holding UTF-8. */
-        const val MAX_NAME_BYTES = 11
-
         /** The entry types that are tied to one label each, in the order they are shown. */
         val ROLE_TYPES = listOf(LogType.CARBS, LogType.RAPID_INSULIN, LogType.BASAL_INSULIN, LogType.BLOOD_GLUCOSE)
     }
 }
 
 /** Why a label could not be saved. */
-enum class LabelSaveError { EMPTY, TOO_LONG, TOO_MANY, READ_ONLY }
+enum class LabelSaveError { EMPTY, TOO_MANY, READ_ONLY, FAILED }

@@ -319,7 +319,7 @@ private fun EditorContent(
     fun fieldName(field: Field): String = if (field.type == LogType.CUSTOM) {
         labels.nameOf(field.label).ifBlank { entry?.labelName.orEmpty() }.ifBlank { customFallback }
     } else {
-        typeNames.getValue(field.type)
+        labels.nameFor(field.type).ifBlank { typeNames.getValue(field.type) }
     }
     fun shown(text: String) = text.replace('.', separator)
 

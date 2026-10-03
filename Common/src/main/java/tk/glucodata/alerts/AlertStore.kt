@@ -10,6 +10,7 @@ import tk.glucodata.Applic
 import tk.glucodata.R
 import tk.glucodata.Log
 import tk.glucodata.Natives
+import tk.glucodata.ui.data.LabelNames
 
 /**
  * Persistent home of the alert configuration. Rules and settings live in their own
@@ -253,7 +254,7 @@ object AlertStore {
                 val window = ((alarm - start) % (24 * 60) + 24 * 60) % (24 * 60)
                 val template = AlertRule.template(AlertKind.REMINDER)
                 template.copy(
-                    name = labels.getOrNull(label) ?: template.name,
+                    name = labels.getOrNull(label)?.let { LabelNames.fullName(label, it) } ?: template.name,
                     output = if (sound) AlertOutput.NOTIFICATION else AlertOutput.NONE,
                     soundUri = ringtone,
                     vibrate = vibrate,

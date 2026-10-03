@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.ui.model.LabelConfig
 import tk.glucodata.ui.model.LogRecord
 import tk.glucodata.ui.model.LogType
 
@@ -36,10 +37,26 @@ val LogType.shortLabelRes: Int
         LogType.CUSTOM -> R.string.log_type_custom
     }
 
-/** What a logged entry is called: its type, or the label's own name for a custom label. */
+/**
+ * What a logged entry is called: the full name of the label it is saved under, so "NovoRapid"
+ * reads as NovoRapid. Only an entry whose label has no name falls back to its type.
+ */
 @Composable
 fun LogRecord.title(): String =
-    if (type == LogType.CUSTOM) labelName.ifBlank { stringResource(R.string.log_type_custom) } else stringResource(type.shortLabelRes)
+    labelName.ifBlank { stringResource(if (type == LogType.CUSTOM) R.string.log_type_custom else type.shortLabelRes) }
+
+/** What entries of [type] are called: the full name of their label, or the type's name without one. */
+@Composable
+fun LabelConfig.displayName(type: LogType): String =
+    nameFor(type).ifBlank { stringResource(type.shortLabelRes) }
+
+/**
+ * The same where space is tight (totals, filter chips, the watch): the label's short name, or
+ * [fallback] while there is no label.
+ */
+@Composable
+fun LabelConfig.shortDisplayName(type: LogType, @StringRes fallback: Int = type.shortLabelRes): String =
+    shortNameFor(type).ifBlank { stringResource(fallback) }
 
 /**
  * Input rules for an amount of [type], in the unit the user types it in.

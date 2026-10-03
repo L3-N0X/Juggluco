@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +48,7 @@ import tk.glucodata.ui.components.parseDecimal
 import tk.glucodata.ui.components.plainAmount
 import tk.glucodata.ui.components.shortLabelRes
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.data.LabelNames
 import tk.glucodata.ui.data.MealStore
 import tk.glucodata.ui.model.LabelConfig
 import tk.glucodata.ui.model.LabelSaveError
@@ -173,8 +175,8 @@ fun LogbookSettingsScreen(
             label = edit.label,
             labels = labels,
             onDismiss = { editingLabel = null },
-            onSave = { name, weight, roundStep ->
-                repository.saveLabel(edit.label?.index ?: -1, name, weight, roundStep)
+            onSave = { name, shortName, weight, roundStep ->
+                repository.saveLabel(edit.label?.index ?: -1, name, shortName, weight, roundStep)
                     .also { if (it == null) editingLabel = null }
             },
             onDelete = {
@@ -200,11 +202,14 @@ fun LogbookSettingsScreen(
 /** Which label is being edited; null for a new one. */
 private data class LabelEdit(val label: LogLabel?)
 
-/** What a label is used for, and its classic graph weight when it has one. */
+/** What a label is used for, its short name when that differs, and its classic graph weight. */
 @Composable
 private fun labelSubtitle(label: LogLabel): String? {
     val parts = mutableListOf<String>()
     if (label.type != LogType.CUSTOM) parts += stringResource(label.type.shortLabelRes)
+    if (label.shortName.isNotBlank() && label.shortName != label.name) {
+        parts += stringResource(R.string.labels_short_shown, label.shortName)
+    }
     if (label.weight > 0f) parts += stringResource(R.string.labels_weight_shown, plainAmount(label.weight, 2))
     return parts.joinToString(" · ").ifEmpty { null }
 }
@@ -265,23 +270,33 @@ private fun LabelPickerDialog(
 }
 
 /**
- * Names a label and sets its classic graph weight and Garmin rounding. The name is stored as up
- * to 11 bytes of UTF-8, so the counter counts bytes: an accented letter takes two.
+ * Names a label and sets its classic graph weight and Garmin rounding.
+ *
+ * The name can be as long as the user likes. The short name is what the watch, the totals and
+ * the filters show, and what native stores (see [LabelNames]): it fills itself in from the name
+ * until the user types one, so most people never need to touch it. Only the short name has a
+ * limit, 11 bytes, and its counter counts those: an accented letter takes two.
  */
 @Composable
 private fun LabelEditorDialog(
     label: LogLabel?,
     labels: LabelConfig,
     onDismiss: () -> Unit,
-    onSave: (name: String, weight: Float, roundTo: Float) -> LabelSaveError?,
+    onSave: (name: String, shortName: String, weight: Float, roundTo: Float) -> LabelSaveError?,
     onDelete: () -> Unit
 ) {
     var name by remember { mutableStateOf(label?.name.orEmpty()) }
+    // Empty while the short name follows the name; a short name that is exactly what would be
+    // derived anyway stays automatic, so renaming the label later updates it too.
+    var shortName by remember {
+        mutableStateOf(label?.shortName?.takeIf { it != LabelNames.deriveShort(label.name) }.orEmpty())
+    }
+    val derivedShort = LabelNames.deriveShort(name)
+    val shortBytes = LabelNames.nativeBytes(shortName.trim())
     var weightText by remember { mutableStateOf(label?.weight?.let { plainAmount(it, 3) } ?: "0") }
     var roundText by remember { mutableStateOf(label?.roundTo?.let { plainAmount(it, 3) } ?: "1") }
     var error by remember { mutableStateOf<LabelSaveError?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
-    val bytes = name.trim().toByteArray(Charsets.UTF_8).size
     val weight = parseDecimal(weightText)
     val roundTo = parseDecimal(roundText)
     val usedBy = label?.let { labels.roleOf(it.index) }
@@ -296,11 +311,33 @@ private fun LabelEditorDialog(
             ) {
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it; error = null },
-                    label = { Text(stringResource(R.string.ingredient_name)) },
-                    supportingText = { Text("$bytes/${LabelConfig.MAX_NAME_BYTES}") },
-                    isError = bytes > LabelConfig.MAX_NAME_BYTES || error != null,
+                    onValueChange = { name = it.take(LabelNames.MAX_NAME_LENGTH); error = null },
+                    label = { Text(stringResource(R.string.labels_name)) },
+                    isError = error != null,
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = shortName,
+                    onValueChange = { typed ->
+                        // Typing past the limit stops at it rather than turning the field red.
+                        shortName = if (LabelNames.fitsShort(typed.trim())) typed else LabelNames.fitShort(typed)
+                        error = null
+                    },
+                    label = { Text(stringResource(R.string.labels_short_name)) },
+                    placeholder = { Text(derivedShort) },
+                    supportingText = {
+                        Row {
+                            Text(stringResource(R.string.labels_short_name_hint), modifier = Modifier.weight(1f))
+                            if (shortName.isNotEmpty()) {
+                                Spacer(Modifier.width(8.dp))
+                                Text("$shortBytes/${LabelNames.MAX_SHORT_BYTES}")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -349,9 +386,14 @@ private fun LabelEditorDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = weight != null && (!labels.hasGarmin || roundTo != null),
+                enabled = name.isNotBlank() && weight != null && (!labels.hasGarmin || roundTo != null),
                 onClick = {
-                    error = onSave(name, weight ?: 0f, if (labels.hasGarmin) roundTo ?: 0f else label?.roundTo ?: 0f)
+                    error = onSave(
+                        name,
+                        shortName,
+                        weight ?: 0f,
+                        if (labels.hasGarmin) roundTo ?: 0f else label?.roundTo ?: 0f
+                    )
                 }
             ) { Text(stringResource(R.string.save)) }
         },
@@ -385,9 +427,9 @@ private fun LabelEditorDialog(
 
 private fun labelErrorRes(error: LabelSaveError): Int = when (error) {
     LabelSaveError.EMPTY -> R.string.ingredient_error_empty
-    LabelSaveError.TOO_LONG -> R.string.labels_error_too_long
     LabelSaveError.TOO_MANY -> R.string.labels_error_too_many
     LabelSaveError.READ_ONLY -> R.string.labels_read_only
+    LabelSaveError.FAILED -> R.string.labels_error_failed
 }
 
 /** The step a meal's carbs total is rounded to before it becomes the carbs amount. */
