@@ -44,6 +44,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
@@ -59,6 +60,7 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import tk.glucodata.R
 import tk.glucodata.ui.components.WearQuickLogDial
+import tk.glucodata.ui.components.shortDisplayName
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
 import tk.glucodata.ui.model.LogType
@@ -74,7 +76,8 @@ private const val DialSweepAngle = 230f
 // Extra-small edge button height plus a small gap above it.
 private val EdgeButtonReserve = 50.dp
 
-private val CategoryLabelSizes = listOf(12.sp, 11.sp, 10.sp, 9.sp)
+// Short label names are the user's own (up to 11 bytes), so the smallest step is a last resort.
+private val CategoryLabelSizes = listOf(12.sp, 11.sp, 10.sp, 9.sp, 8.sp)
 
 private data class QuickLogCategory(val label: String, val type: LogType)
 
@@ -107,6 +110,7 @@ fun WearQuickLogScreen(
 ) {
     val unit by repository.unit.collectAsState()
     val logs by repository.logs.collectAsState()
+    val labels by repository.labelConfig.collectAsState()
 
     var selectedType by remember { mutableStateOf(LogType.CARBS) }
     val spec = remember(selectedType, unit) { specFor(selectedType, unit) }
@@ -127,15 +131,17 @@ fun WearQuickLogScreen(
         value = (spec.min + steps * spec.smallStep).coerceIn(spec.min, spec.max)
     }
 
+    // The labels' short names are the ones made to fit a watch; the type names only stand in
+    // until the labels are read.
     val (displayText, labelText) = when (selectedType) {
         LogType.CARBS -> stringResource(R.string.log_value_carbs, "${value.roundToInt()}") to
-            stringResource(R.string.log_short_carbs)
+            labels.shortDisplayName(LogType.CARBS)
         LogType.RAPID_INSULIN ->
             stringResource(R.string.log_value_insulin, String.format(java.util.Locale.getDefault(), "%.1f", value)) to
-                stringResource(R.string.log_short_bolus)
+                labels.shortDisplayName(LogType.RAPID_INSULIN)
         LogType.BASAL_INSULIN ->
             stringResource(R.string.log_value_insulin, String.format(java.util.Locale.getDefault(), "%.1f", value)) to
-                stringResource(R.string.log_short_basal)
+                labels.shortDisplayName(LogType.BASAL_INSULIN)
         LogType.BLOOD_GLUCOSE -> if (unit == GlucoseUnit.MMOL_L) {
             String.format(java.util.Locale.getDefault(), "%.1f", value) to stringResource(unit.labelRes)
         } else {
@@ -146,10 +152,10 @@ fun WearQuickLogScreen(
 
     val haptic = LocalHapticFeedback.current
 
-    val carbsLabel = stringResource(R.string.log_pick_carbs)
-    val bolusLabel = stringResource(R.string.log_pick_bolus)
-    val basalLabel = stringResource(R.string.log_pick_basal)
-    val bgLabel = stringResource(R.string.log_pick_bg)
+    val carbsLabel = labels.shortDisplayName(LogType.CARBS, R.string.log_pick_carbs)
+    val bolusLabel = labels.shortDisplayName(LogType.RAPID_INSULIN, R.string.log_pick_bolus)
+    val basalLabel = labels.shortDisplayName(LogType.BASAL_INSULIN, R.string.log_pick_basal)
+    val bgLabel = labels.shortDisplayName(LogType.BLOOD_GLUCOSE, R.string.log_pick_bg)
     val categories = remember(carbsLabel, bolusLabel, basalLabel, bgLabel) {
         listOf(
             QuickLogCategory(carbsLabel, LogType.CARBS),
@@ -172,7 +178,7 @@ fun WearQuickLogScreen(
                 step = spec.smallStep,
                 onValueChange = { value = it },
                 stateDescription = displayText,
-                contentDescription = stringResource(selectedType.labelRes),
+                contentDescription = labels.nameFor(selectedType).ifBlank { stringResource(selectedType.labelRes) },
                 accentColor = typeColors.primary,
                 sweepAngle = DialSweepAngle,
                 modifier = Modifier.fillMaxSize()
@@ -424,7 +430,8 @@ private fun SemicircleCategoryPicker(
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     color = if (isSelected) selectedColor else colors.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

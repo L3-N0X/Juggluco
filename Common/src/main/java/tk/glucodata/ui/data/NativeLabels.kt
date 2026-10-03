@@ -47,9 +47,12 @@ internal object NativeLabels {
     )
 
     fun read(): LabelConfig {
-        val names = try { Natives.getLabels().orEmpty() } catch (_: Throwable) { emptyList() }
+        val shortNames = try { Natives.getLabels().orEmpty() } catch (_: Throwable) { emptyList() }
             // Native always appends an empty entry for "no label".
             .dropLast(1)
+            .map { it.orEmpty() }
+        // Native holds the short names; the full ones are kept beside them, see [LabelNames].
+        val names = shortNames.mapIndexed { index, short -> LabelNames.fullName(index, short) }
         val count = names.size
         val editable = try { !Natives.staticnum() } catch (_: Throwable) { true }
         val carbs = (try { Natives.getmealvar().toInt() } catch (_: Throwable) { UNSET })
@@ -76,7 +79,7 @@ internal object NativeLabels {
             basalLabel = basal,
             bloodLabel = blood,
             labels = names.mapIndexed { index, name ->
-                LogLabel(index, name, LogType.CUSTOM, weight = 0f, roundTo = 0f)
+                LogLabel(index, name, shortNames[index], LogType.CUSTOM, weight = 0f, roundTo = 0f)
             }
         )
         return provisional.copy(

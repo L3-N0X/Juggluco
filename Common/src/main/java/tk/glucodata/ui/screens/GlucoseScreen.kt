@@ -75,6 +75,7 @@ import tk.glucodata.ui.components.CurrentGlucoseHeroCard
 import tk.glucodata.ui.components.LogEntryEditor
 import tk.glucodata.ui.components.GlucoseStatsCard
 import tk.glucodata.ui.components.SearchGlucoseDialog
+import tk.glucodata.ui.components.shortDisplayName
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.graph.GlucoseGraph
 import tk.glucodata.ui.graph.GraphViewportState
@@ -765,6 +766,7 @@ fun GlucoseScreen(
             SearchGlucoseDialog(
                 unit = unit,
                 range = glucoseRange,
+                labels = repository.labelConfig.collectAsState().value,
                 onDismiss = { showSearchDialog = false },
                 onExecuteSearch = { under, above, label, keyword ->
                     showSearchDialog = false
@@ -1072,6 +1074,7 @@ fun LogbookSection(
     modifier: Modifier = Modifier
 ) {
     val logs by repository.logs.collectAsState()
+    val labels by repository.labelConfig.collectAsState()
     val context = LocalContext.current
     var selectedTypeFilter by remember { mutableStateOf<LogType?>(null) }
     var editingEntry by remember { mutableStateOf<LogRecord?>(null) }
@@ -1168,22 +1171,22 @@ fun LogbookSection(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             DailyTotalPill(
-                label = stringResource(R.string.log_short_bolus),
+                label = labels.shortDisplayName(LogType.RAPID_INSULIN),
                 value = stringResource(R.string.log_value_insulin, String.format(Locale.getDefault(), "%.1f", todayBolus)),
                 color = logbookColors.bolus.primary
             )
             DailyTotalPill(
-                label = stringResource(R.string.log_short_basal),
+                label = labels.shortDisplayName(LogType.BASAL_INSULIN),
                 value = stringResource(R.string.log_value_insulin, String.format(Locale.getDefault(), "%.1f", todayBasal)),
                 color = logbookColors.basal.primary
             )
             DailyTotalPill(
-                label = stringResource(R.string.log_short_carbs),
+                label = labels.shortDisplayName(LogType.CARBS),
                 value = stringResource(R.string.log_value_carbs, todayCarbs.toInt().toString()),
                 color = logbookColors.carbs.primary
             )
             DailyTotalPill(
-                label = stringResource(R.string.log_type_finger_prick),
+                label = labels.shortDisplayName(LogType.BLOOD_GLUCOSE),
                 value = todayChecks.toString(),
                 color = logbookColors.bloodGlucose.primary
             )
@@ -1205,22 +1208,22 @@ fun LogbookSection(
             FilterChip(
                 selected = selectedTypeFilter == LogType.RAPID_INSULIN,
                 onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.RAPID_INSULIN) null else LogType.RAPID_INSULIN },
-                label = { Text(stringResource(R.string.log_short_bolus), fontSize = 11.sp) }
+                label = { Text(labels.shortDisplayName(LogType.RAPID_INSULIN), fontSize = 11.sp) }
             )
             FilterChip(
                 selected = selectedTypeFilter == LogType.BASAL_INSULIN,
                 onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BASAL_INSULIN) null else LogType.BASAL_INSULIN },
-                label = { Text(stringResource(R.string.log_short_basal), fontSize = 11.sp) }
+                label = { Text(labels.shortDisplayName(LogType.BASAL_INSULIN), fontSize = 11.sp) }
             )
             FilterChip(
                 selected = selectedTypeFilter == LogType.CARBS,
                 onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.CARBS) null else LogType.CARBS },
-                label = { Text(stringResource(R.string.log_short_carbs), fontSize = 11.sp) }
+                label = { Text(labels.shortDisplayName(LogType.CARBS), fontSize = 11.sp) }
             )
             FilterChip(
                 selected = selectedTypeFilter == LogType.BLOOD_GLUCOSE,
                 onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BLOOD_GLUCOSE) null else LogType.BLOOD_GLUCOSE },
-                label = { Text(stringResource(R.string.log_short_bg), fontSize = 11.sp) }
+                label = { Text(labels.shortDisplayName(LogType.BLOOD_GLUCOSE, R.string.log_short_bg), fontSize = 11.sp) }
             )
         }
 

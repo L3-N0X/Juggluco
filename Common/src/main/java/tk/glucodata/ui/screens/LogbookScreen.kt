@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import tk.glucodata.R
 import tk.glucodata.ui.components.LogEntryEditor
 import tk.glucodata.ui.components.icon
+import tk.glucodata.ui.components.shortDisplayName
 import tk.glucodata.ui.components.title
 import tk.glucodata.ui.data.GlucoseRepository
 import tk.glucodata.ui.model.GlucoseUnit
@@ -87,6 +88,7 @@ fun LogbookScreen(
     val logs by repository.logs.collectAsState()
     val unit by repository.unit.collectAsState()
     val displayConfig by repository.displayConfig.collectAsState()
+    val labels by repository.labelConfig.collectAsState()
 
     var selectedTypeFilter by remember { mutableStateOf<LogType?>(null) }
     var selectedTimeFilter by remember { mutableStateOf(LogbookTimeFilter.TODAY) }
@@ -260,22 +262,22 @@ fun LogbookScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         DailyTotalPill(
-                            label = stringResource(R.string.log_short_bolus),
+                            label = labels.shortDisplayName(LogType.RAPID_INSULIN),
                             value = stringResource(R.string.log_value_insulin, String.format(Locale.getDefault(), "%.1f", windowBolus)),
                             color = logbookColors.bolus.primary
                         )
                         DailyTotalPill(
-                            label = stringResource(R.string.log_short_basal),
+                            label = labels.shortDisplayName(LogType.BASAL_INSULIN),
                             value = stringResource(R.string.log_value_insulin, String.format(Locale.getDefault(), "%.1f", windowBasal)),
                             color = logbookColors.basal.primary
                         )
                         DailyTotalPill(
-                            label = stringResource(R.string.log_short_carbs),
+                            label = labels.shortDisplayName(LogType.CARBS),
                             value = stringResource(R.string.log_value_carbs, windowCarbs.toInt().toString()),
                             color = logbookColors.carbs.primary
                         )
                         DailyTotalPill(
-                            label = stringResource(R.string.log_type_finger_prick),
+                            label = labels.shortDisplayName(LogType.BLOOD_GLUCOSE),
                             value = windowChecks.toString(),
                             color = logbookColors.bloodGlucose.primary
                         )
@@ -299,22 +301,22 @@ fun LogbookScreen(
                 FilterChip(
                     selected = selectedTypeFilter == LogType.RAPID_INSULIN,
                     onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.RAPID_INSULIN) null else LogType.RAPID_INSULIN },
-                    label = { Text(stringResource(R.string.log_short_bolus), fontSize = 12.sp) }
+                    label = { Text(labels.shortDisplayName(LogType.RAPID_INSULIN), fontSize = 12.sp) }
                 )
                 FilterChip(
                     selected = selectedTypeFilter == LogType.BASAL_INSULIN,
                     onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BASAL_INSULIN) null else LogType.BASAL_INSULIN },
-                    label = { Text(stringResource(R.string.log_short_basal), fontSize = 12.sp) }
+                    label = { Text(labels.shortDisplayName(LogType.BASAL_INSULIN), fontSize = 12.sp) }
                 )
                 FilterChip(
                     selected = selectedTypeFilter == LogType.CARBS,
                     onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.CARBS) null else LogType.CARBS },
-                    label = { Text(stringResource(R.string.log_short_carbs), fontSize = 12.sp) }
+                    label = { Text(labels.shortDisplayName(LogType.CARBS), fontSize = 12.sp) }
                 )
                 FilterChip(
                     selected = selectedTypeFilter == LogType.BLOOD_GLUCOSE,
                     onClick = { selectedTypeFilter = if (selectedTypeFilter == LogType.BLOOD_GLUCOSE) null else LogType.BLOOD_GLUCOSE },
-                    label = { Text(stringResource(R.string.log_short_bg), fontSize = 12.sp) }
+                    label = { Text(labels.shortDisplayName(LogType.BLOOD_GLUCOSE, R.string.log_short_bg), fontSize = 12.sp) }
                 )
                 // Custom labels only get a filter once there is something to filter.
                 if (hasCustomEntries || selectedTypeFilter == LogType.CUSTOM) {
@@ -401,7 +403,13 @@ fun LogbookScreen(
 @Composable
 fun DailyTotalPill(label: String, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
         Spacer(modifier = Modifier.height(2.dp))
         Text(text = value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = color)
     }
@@ -478,7 +486,9 @@ fun LogItemCard(
                 text = record.title(),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(

@@ -2179,10 +2179,30 @@
     <string name="labels_delete_not_last">Only the last label can be deleted.</string>
     <string name="labels_delete_question">Delete %1$s?</string>
     <string name="labels_delete_message">Entries already saved under it keep its number, and take the name of a label added in its place.</string>
-    <string name="labels_error_too_long">The name is too long. A label holds 11 bytes, and accented letters take two.</string>
     <string name="labels_error_too_many">Juggluco holds up to 40 labels.</string>
     <string name="labels_read_only">These labels come from the device this one mirrors, so they can only be changed there.</string>
     <string name="labels_info">Every other label can be logged from the entry screen under More labels, and appears in the logbook under its own name.</string>
+    <string name="labels_name">Name</string>
+    <string name="labels_short_name">Short name</string>
+    <string name="labels_short_name_hint">Shown on the watch and wherever space is tight.</string>
+    <string name="labels_short_shown">Short: %1$s</string>
+    <string name="labels_error_failed">The label could not be saved.</string>
+    <!-- The labels a new logbook starts with. Each one has a full name and a short one of at most 11 bytes (accented letters take two) for the watch and other tight spots. label_defaults_language is the language code of this translation: only when it matches the device language are native's old default names replaced. -->
+    <string name="label_defaults_language">en</string>
+    <string name="label_default_carbs">Carbs</string>
+    <string name="label_default_carbs_short">Carbs</string>
+    <string name="label_default_hypo">Hypo treatment</string>
+    <string name="label_default_hypo_short">Hypo</string>
+    <string name="label_default_bolus">Bolus insulin</string>
+    <string name="label_default_bolus_short">Bolus</string>
+    <string name="label_default_basal">Basal insulin</string>
+    <string name="label_default_basal_short">Basal</string>
+    <string name="label_default_exercise">Exercise</string>
+    <string name="label_default_exercise_short">Exercise</string>
+    <string name="label_default_ketones">Ketones</string>
+    <string name="label_default_ketones_short">Ketones</string>
+    <string name="label_default_finger_prick">Finger prick</string>
+    <string name="label_default_finger_prick_short">BG</string>
     <string name="meals_section">Meals</string>
     <string name="meals_ingredients">Ingredients</string>
     <plurals name="ingredient_count"><item quantity="one">%d ingredient</item><item quantity="other">%d ingredients</item></plurals>

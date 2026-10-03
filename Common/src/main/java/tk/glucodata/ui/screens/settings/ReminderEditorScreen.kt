@@ -72,7 +72,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import tk.glucodata.Applic
-import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.alerts.AlertPlayer
 import tk.glucodata.alerts.AlertRule
@@ -81,15 +80,14 @@ import tk.glucodata.alerts.AlertStore
 import tk.glucodata.alerts.ReminderRepeat
 import tk.glucodata.alerts.ReminderSpec
 import tk.glucodata.alerts.Reminders
+import tk.glucodata.ui.data.NativeLabels
+import tk.glucodata.ui.model.LabelConfig
+import tk.glucodata.ui.model.LogType
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** Native logbook labels the Compose logbook knows by name: rapid insulin, carbs, basal insulin. */
-private const val LABEL_RAPID = 0
-private const val LABEL_CARBS = 1
-private const val LABEL_BASAL = 2
 private const val DAY_MILLIS = 86_400_000L
 
 /**
@@ -529,22 +527,20 @@ private fun DateRow(title: String, epochDay: Long, onPick: (Long) -> Unit) {
 private fun LogbookSection(rule: AlertRule, onChange: ((ReminderSpec) -> ReminderSpec) -> Unit) {
     val context = LocalContext.current
     val spec = rule.reminder
-    val nativeLabels by produceState(emptyList<String>()) {
+    // logLabel is a native label index, the one the dose is saved under and looked for.
+    val labels by produceState(LabelConfig()) {
         value = withContext(Dispatchers.Default) {
-            runCatching { if (Applic.Nativesloaded) Natives.getLabels().toList() else emptyList() }.getOrDefault(emptyList())
+            runCatching { if (Applic.Nativesloaded) NativeLabels.read() else LabelConfig() }.getOrDefault(LabelConfig())
         }
     }
     val noneLabel = stringResource(R.string.loc_reminder_log_none)
     fun typeName(label: Int): String = when (label) {
         -1 -> noneLabel
-        LABEL_RAPID -> context.getString(R.string.log_type_rapid_insulin)
-        LABEL_BASAL -> context.getString(R.string.log_type_basal_insulin)
-        LABEL_CARBS -> context.getString(R.string.log_type_carbs)
-        else -> nativeLabels.getOrNull(label) ?: "#$label"
+        else -> labels.nameOf(label).ifBlank { "#$label" }
     }
-    val unit = when (spec.logLabel) {
-        LABEL_RAPID, LABEL_BASAL -> context.getString(R.string.unit_insulin_short)
-        LABEL_CARBS -> context.getString(R.string.unit_carbs_short)
+    val unit = when (labels.typeOf(spec.logLabel).takeIf { spec.logLabel >= 0 }) {
+        LogType.RAPID_INSULIN, LogType.BASAL_INSULIN -> context.getString(R.string.unit_insulin_short)
+        LogType.CARBS -> context.getString(R.string.unit_carbs_short)
         else -> null
     }
     val amountText = formatAmount(spec.logAmount)
@@ -555,11 +551,15 @@ private fun LogbookSection(rule: AlertRule, onChange: ((ReminderSpec) -> Reminde
     }
 
     SettingsSection(title = stringResource(R.string.loc_reminder_logbook_section)) {
-        // Labels other than the three the logbook names are kept when imported from the old reminders.
+        // The insulin and carbs labels first, then any other label (the old reminders could use any).
         val options = buildList {
-            addAll(listOf(-1, LABEL_BASAL, LABEL_RAPID, LABEL_CARBS))
+            add(-1)
+            listOf(LogType.BASAL_INSULIN, LogType.RAPID_INSULIN, LogType.CARBS)
+                .map(labels::labelFor)
+                .filterTo(this) { it >= 0 }
+            labels.customLabels.mapTo(this) { it.index }
             if (spec.logLabel !in this) add(spec.logLabel)
-        }
+        }.distinct()
         ChoiceRow(
             title = stringResource(R.string.loc_reminder_log_type),
             subtitle = stringResource(R.string.loc_reminder_log_type_desc),

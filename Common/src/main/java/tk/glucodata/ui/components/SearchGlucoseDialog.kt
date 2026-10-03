@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -45,11 +46,14 @@ import androidx.compose.ui.window.DialogProperties
 import tk.glucodata.R
 import tk.glucodata.ui.model.GlucoseRange
 import tk.glucodata.ui.model.GlucoseUnit
+import tk.glucodata.ui.model.LabelConfig
+import tk.glucodata.ui.model.LogType
 
 @Composable
 fun SearchGlucoseDialog(
     unit: GlucoseUnit,
     range: GlucoseRange = GlucoseRange(),
+    labels: LabelConfig = LabelConfig(),
     onDismiss: () -> Unit,
     onExecuteSearch: (under: Float, above: Float, label: Int, keyword: String) -> Unit
 ) {
@@ -175,8 +179,11 @@ fun SearchGlucoseDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
+                    // Label names are the user's own and can be longer than the type names were.
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         FilterChip(
@@ -187,22 +194,22 @@ fun SearchGlucoseDialog(
                         FilterChip(
                             selected = selectedCategory == 0,
                             onClick = { selectedCategory = 0 },
-                            label = { Text(stringResource(R.string.log_short_bolus), fontSize = 11.sp) }
+                            label = { Text(labels.shortDisplayName(LogType.RAPID_INSULIN), fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = selectedCategory == 1,
                             onClick = { selectedCategory = 1 },
-                            label = { Text(stringResource(R.string.log_short_carbs), fontSize = 11.sp) }
+                            label = { Text(labels.shortDisplayName(LogType.CARBS), fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = selectedCategory == 2,
                             onClick = { selectedCategory = 2 },
-                            label = { Text(stringResource(R.string.log_short_basal), fontSize = 11.sp) }
+                            label = { Text(labels.shortDisplayName(LogType.BASAL_INSULIN), fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = selectedCategory == 3,
                             onClick = { selectedCategory = 3 },
-                            label = { Text(stringResource(R.string.log_short_bg), fontSize = 11.sp) }
+                            label = { Text(labels.shortDisplayName(LogType.BLOOD_GLUCOSE, R.string.log_short_bg), fontSize = 11.sp) }
                         )
                     }
                 }

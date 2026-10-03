@@ -7,6 +7,7 @@ import tk.glucodata.Log
 import tk.glucodata.MessageSender
 import tk.glucodata.Natives
 import tk.glucodata.ui.data.GlucoseRepository
+import tk.glucodata.ui.data.LabelNames
 import tk.glucodata.ui.data.NativeLabels
 import tk.glucodata.ui.model.DeltaCalculation
 
@@ -15,9 +16,10 @@ import tk.glucodata.ui.model.DeltaCalculation
  * the Wear message channel ([PATH]):
  *
  * - `delta`: the delta window this device uses, tagged with the moment it was chosen.
- * - `labels`: the labels bolus and basal are saved under. Native sends the labels themselves from
- *   the device that owns them to the one that mirrors them, so this follows the same direction:
- *   only a device that can edit its labels sends, and only one that mirrors them applies.
+ * - `labels`: the labels bolus and basal are saved under, and the full label names native has no
+ *   room for ([LabelNames]). Native sends the labels themselves (their short names) from the
+ *   device that owns them to the one that mirrors them, so this follows the same direction: only
+ *   a device that can edit its labels sends, and only one that mirrors them applies.
  * - `request`: the other device asks for the values this one has.
  *
  * Every value travels with the moment it was chosen, so the most recent change wins. A device
@@ -54,7 +56,7 @@ object DisplaySync {
         push(calculation, now)
     }
 
-    /** The user picked another bolus or basal label here. */
+    /** The labels changed here: another bolus or basal label, or a label renamed. */
     fun onLocalLabelChange() {
         pushLabels()
     }
@@ -84,8 +86,13 @@ object DisplaySync {
     private fun pushLabels() {
         if (labelsMirrored()) return
         val (bolus, basal) = NativeLabels.storedInsulinLabels()
-        if (bolus < 0 && basal < 0) return
-        send(JSONObject().put("t", "labels").put("bolus", bolus).put("basal", basal))
+        send(
+            JSONObject()
+                .put("t", "labels")
+                .put("bolus", bolus)
+                .put("basal", basal)
+                .put("names", LabelNames.snapshot())
+        )
     }
 
     private fun labelsMirrored(): Boolean = try { Natives.staticnum() } catch (_: Throwable) { false }
@@ -147,10 +154,20 @@ object DisplaySync {
         if (!labelsMirrored()) return
         val bolus = json.optInt("bolus", -1)
         val basal = json.optInt("basal", -1)
-        if (NativeLabels.applyMirroredInsulinLabels(bolus, basal)) {
+        var changed = false
+        // A phone that never chose either sends -1 for both; that is no choice to take over.
+        if ((bolus >= 0 || basal >= 0) && NativeLabels.applyMirroredInsulinLabels(bolus, basal)) {
             Log.i(LOG_ID, "Applying the bolus and basal labels of the other device: $bolus, $basal")
-            repository?.refreshLabels()
+            changed = true
         }
+        // Sent by phones that know full names; an older one leaves the names here as they are.
+        json.optJSONArray("names")?.let { names ->
+            if (LabelNames.applyMirrored(names)) {
+                Log.i(LOG_ID, "Applying the label names of the other device")
+                changed = true
+            }
+        }
+        if (changed) repository?.refreshLabels()
     }
 
     // --- Persistence ------------------------------------------------------------------

@@ -18,6 +18,13 @@
 - **No fixed presets:** quick values and note suggestions come from the user's own history (computed on `Dispatchers.Default`). Never add hardcoded amounts.
 - **Wear keeps the dial** (`WearQuickLogScreen`), tinted with the same type colors and starting from the last logged amount.
 
+## Logbook Labels
+- **Full name + short name:** native keeps a label's name in a `char[12]` of the mmapped `settings.dat`, read by the classic view, Garmin, Nightscout and every mirroring Juggluco. That field stays and holds the **short name** (≤ 11 bytes of *modified* UTF-8, an emoji takes 6). The full name, of any length (`LabelNames.MAX_NAME_LENGTH`, 64, never noticeable), lives in `ui/data/LabelNames.kt` next to the short name it was saved with and only applies while native still holds that short name, so a rename made elsewhere shows up instead of being covered.
+- **Nobody has to think about the short one:** the editor derives it from the name (`LabelNames.deriveShort`: the name if it fits, else its first word, else cut with a dot) until the user types their own. `saveLabel` cuts anything too long to fit, so a label can always be saved — never bring back a byte-limit error on the name.
+- **Which name where:** the full name everywhere there is room (logbook rows via `LogRecord.title()`, the editor tiles, settings, reminders, LibreView/Nightscout mappings), the short one where space is tight (totals, filter chips, the watch dial) via `LabelConfig.displayName(type)` / `shortDisplayName(type)`. Never hardcode "Bolus"/"Basal"/"Carbs" next to an entry; the type strings are only the fallback while no label is set.
+- **Sync:** the full names travel to a mirroring watch inside `DisplaySync`'s `labels` message; other native mirrors see the short names.
+- **Defaults:** `LabelDefaults` renames, once, every label that still carries one of native's old default names in any language ("Ins schnell", "radeln", "Fast Insuli") to Carbs / Hypo treatment / Bolus insulin / Basal insulin / Exercise / Ketones / Finger prick, each with a short name. Positions keep their meaning, so existing entries stay what they were; the walk position becomes Ketones only while nothing was logged under it. It only runs where `label_defaults_language` matches the device language, so untranslated languages keep native's own localized names.
+
 ---
 
 ## Insulin Onboard (IOB)
